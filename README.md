@@ -22,9 +22,6 @@ the API**.
 - **Alessandro Volta** invented the battery — a stack of cells where, when one
   layer alone isn't enough, the stack delivers the power. That is exactly the
   fallback chain.
-- In Italian, *volta* also means **"turn"** — and turn-by-turn conversations,
-  with the history travelling on every call, are one of the SDK's defining
-  design choices.
 
 ## Version support
 
@@ -256,7 +253,7 @@ off.
 ## Tests
 
 ```bash
-swift test   # 34 tests: fallback, privacy, conversations, tokens, parsing
+swift test   # 41 tests: fallback, privacy, conversations, tokens, parsing
 ```
 
 ## For framework contributors

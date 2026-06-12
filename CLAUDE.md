@@ -13,8 +13,8 @@
 ## 1. TL;DR — what this is
 
 VoltaSDK (**VOLTA** = *Versatile Orchestration Layer for Tiered AI*; named
-after Alessandro Volta — battery = stacked cells = fallback chain — and the
-Italian *volta*, "turn", as in multi-turn) is a Swift Package that **resolves
+after Alessandro Volta — battery = stacked cells = fallback chain) is a
+Swift Package that **resolves
 which AI model to use** at runtime (on-device Foundation Models vs a
 vendor-agnostic developer key — OpenAI, Claude, or Gemini — today; PCC and
 user-account providers on iOS 27) with
