@@ -1,46 +1,31 @@
 # AIProviderKit
 
-Base iOS 26, pronta per la produzione, di un framework che **risolve a runtime
-quale modello AI usare** (on-device o cloud) con fallback automatico e
-disclosure di privacy. Espone un'API pubblica stabile pensata per essere estesa
-su iOS 27 (multi-provider, PCC, Dynamic Profiles) **senza riscrivere il codice
-dell'app**.
+Framework Swift che **risolve a runtime quale modello AI usare** — on-device
+(Apple Intelligence) o cloud — con fallback automatico, disclosure di privacy
+e conversazioni multi-turno. L'app chiede una risposta; il framework sceglie il
+modello giusto in base a disponibilità, preferenza, finestra di contesto e
+policy di privacy.
 
-## Cosa fa in questa versione (iOS 26)
+Non è un framework di agenti: non possiede sessioni né conversazioni. Il suo
+unico mestiere è la **risoluzione del modello**, pensata per estendersi a
+iOS 27 (multi-provider, Private Cloud Compute, Dynamic Profiles) **senza
+cambiare l'API**.
 
-- **Due provider**: on-device (Foundation Models) e developer key (OpenAI).
-- **Fallback runtime**: salta i provider indisponibili e scala su errori
-  recuperabili (429, rete, context window superato, lingua non supportata).
-- **Disclosure di privacy**: quando il fallback scende di livello (es.
-  on-device → OpenAI) la policy configurata decide: `.silent`, `.notify`,
-  `.askOnPrivacyChange`, `.denyDowngrade`.
-- **Errori tipizzati**: 429 → rate limit, 401 → auth, guardrail → terminale, ecc.
-- **Gestione disponibilità**: rileva se Apple Intelligence è presente/attivo/pronto.
-- **UI opzionale**: il core è headless; `AIProviderKitUI` offre componenti
-  SwiftUI pronti e personalizzabili.
+## Supporto versioni
 
-## Struttura
+| OS | Cosa funziona |
+|---|---|
+| **iOS / macOS 26.0+** | Tutto il core: catena di fallback, errori tipizzati, disclosure di privacy, conversazioni multi-turno, componenti UI opzionali. Gestione del contesto *reattiva* (errore → fallback). |
+| **iOS / macOS 26.4+** | In più, si attiva da solo il tier *token-aware*: conteggio esatto dei token on-device, pre-flight automatico sulla finestra di contesto, `contextUsage` per sapere quanto è piena. |
+| **iOS 27** | In sviluppo (multi-provider, PCC, bridge per i Dynamic Profiles). Arriverà come aggiornamento additivo della serie 1.x: stessa API, nessuna riscrittura. |
 
-| Prodotto | Cosa contiene | Obbligatorio? |
-|---|---|---|
-| `AIProviderKit` | orchestratore, provider, errori, privacy | sì (il core) |
-| `AIProviderKitUI` | `PrivacyLevelBadge`, `ProviderStatusList`, `AIPlaygroundView` | no |
-| `AIProviderKitDemoUI` | UI demo condivisa macOS+iOS (`DemoRootView`) | no |
-| `AIProviderKitDemo` | app di prova macOS (`swift run AIProviderKitDemo`) | no |
+Requisiti: Swift 6.2 / Xcode 26. Il modello on-device richiede un device con
+Apple Intelligence (rilevato a runtime: se assente, il framework lo esclude e
+spiega il perché).
 
-La demo iPhone/iPad è in `Examples/iOSDemo/iOSDemo.xcodeproj`.
+## Installazione (Swift Package Manager)
 
-## Installazione
-
-Swift Package Manager. Dalla tua app in Xcode:
-
-**Package locale (stessa macchina):** File → Add Package Dependencies… →
-Add Local… → seleziona la cartella `AIProvider`. Poi aggiungi il prodotto
-`AIProviderKit` al target dell'app (e `AIProviderKitUI` solo se vuoi i
-componenti pronti). Nota: una dipendenza locale usa sempre la working copy,
-i tag di versione non si applicano.
-
-**Da repository git (consigliato appena pubblicato su un remote):**
+**Da repository git:**
 
 ```swift
 dependencies: [
@@ -48,9 +33,18 @@ dependencies: [
 ]
 ```
 
+In Xcode: File → Add Package Dependencies… → incolla l'URL → aggiungi il
+prodotto **`AIProviderKit`** al target dell'app. Aggiungi **`AIProviderKitUI`**
+solo se vuoi i componenti SwiftUI pronti: il core è completamente utilizzabile
+senza UI.
+
+**Package locale (stessa macchina):** File → Add Package Dependencies… →
+Add Local… → seleziona la cartella del package. Nota: una dipendenza locale usa
+sempre la working copy, i tag di versione non si applicano.
+
 La versione corrente è **1.0.0** (vedi [CHANGELOG.md](CHANGELOG.md)).
 
-## Uso (senza UI)
+## Uso
 
 ### 1. Configurazione (all'avvio dell'app)
 
@@ -84,7 +78,7 @@ let response = try await AIOrchestrator.active.respondDetailed(to: "…")
 print(response.text, response.provider, response.privacyLevel)
 ```
 
-### Conversazioni multi-turno
+### 3. Conversazioni multi-turno
 
 Il framework è **stateless**: non ricorda nulla tra una chiamata e l'altra.
 La conversazione appartiene all'app, che la passa a ogni chiamata:
@@ -105,15 +99,12 @@ a metà conversazione, il successivo riceve la stessa storia e la conversazione
 continua senza interruzioni (con la disclosure di privacy configurata).
 Quando e come accorciare la storia resta una scelta dell'app.
 
-### Consapevolezza dei token (iOS/macOS 26.4+)
+### 4. Consapevolezza dei token (26.4+)
 
 Il framework fa un **pre-flight** automatico: se sa che la chiamata non può
 stare nella finestra di contesto di un provider, lo salta senza pagare una
-generazione destinata a fallire (stessa semantica di `.contextWindowExceeded`).
-Su 26.0–26.3 il conteggio on-device non è disponibile e resta il solo
-comportamento reattivo.
-
-Per decidere quando accorciare o riassumere la storia:
+generazione destinata a fallire. Su 26.0–26.3 il conteggio on-device non è
+disponibile e resta il solo comportamento reattivo.
 
 ```swift
 if let usage = await kit.contextUsage(history: history), usage.fraction > 0.8 {
@@ -121,10 +112,10 @@ if let usage = await kit.contextUsage(history: history), usage.fraction > 0.8 {
 }
 ```
 
-`usage` riporta token usati, finestra e provider risolto. È `nil` se il
-provider non sa contare (mai una stima spacciata per conteggio).
+`usage` è `nil` se il provider risolto non sa contare (mai una stima spacciata
+per conteggio).
 
-### 3. Risoluzione senza esecuzione (il primitivo)
+### 5. Risoluzione senza esecuzione (il primitivo)
 
 ```swift
 let provider = try await AIOrchestrator.active.resolveProvider()
@@ -132,7 +123,7 @@ let provider = try await AIOrchestrator.active.resolveProvider()
 // LanguageModel da passare a un Dynamic Profile nativo.
 ```
 
-### 4. Istanza esplicita (senza stato globale)
+### 6. Istanza esplicita (senza stato globale)
 
 ```swift
 var config = AIConfiguration()
@@ -141,7 +132,7 @@ let kit = AIOrchestrator(configuration: config)
 let answer = try await kit.respond(to: "...")
 ```
 
-## Uso (con i componenti opzionali)
+## UI opzionale (`AIProviderKitUI`)
 
 ```swift
 import AIProviderKitUI
@@ -149,14 +140,14 @@ import AIProviderKitUI
 // Stato della catena di fallback (per debug o impostazioni):
 ProviderStatusList(orchestrator: kit)
 
-// Playground conversazionale pronto all'uso, con badge di privacy.
-// Possiede la propria storia e la passa a ogni chiamata (pattern D12):
+// Playground conversazionale pronto all'uso, con badge di privacy
+// e indicatore di pressione sul contesto:
 AIPlaygroundView(orchestrator: kit, instructions: "Sii conciso.")
 ```
 
 Le righe (`ProviderStatusRow`) e i badge (`PrivacyLevelBadge`) sono pubblici:
-si possono ricomporre in layout completamente custom usando
-`providerStatuses()` e `respondDetailed()` del core.
+si possono ricomporre in layout custom usando `providerStatuses()` e
+`respondDetailed()` del core.
 
 ## App di prova
 
@@ -170,34 +161,19 @@ swift run AIProviderKitDemo
 device o su un simulatore con runtime iOS 26. Su un device con Apple
 Intelligence il provider on-device è reale; altrimenti la lista mostra il
 motivo di indisponibilità e il fallback passa alla developer key.
-(Per il device fisico: impostare il team in Signing & Capabilities.)
-
-Entrambe le demo usano la stessa `DemoRootView` (layout adattivo: split su
-macOS, tab su iOS) con: configurazione live (key, modello, preferenza), stato
-della catena di fallback con i motivi reali, playground con indicazione del
-provider che ha risposto e log dei downgrade di privacy.
 
 ## Test
 
 ```bash
-swift test   # 23 test: fallback, privacy, risoluzione, parsing
+swift test   # 34 test: fallback, privacy, conversazioni, token, parsing
 ```
 
-## Mappatura verso iOS 27
+## Per chi lavora sul framework
 
-| iOS 26 (oggi)                     | iOS 27 (estensione)                              |
-|-----------------------------------|--------------------------------------------------|
-| `OnDeviceProvider`                | invariato                                        |
-| `OpenAIProvider` (URLSession)     | provider conforme al protocollo `LanguageModel`  |
-| `ModelPreference` (4 casi)        | catena di fallback per-bisogno + quote PCC       |
-| `resolveProvider()`               | `preferred(_ need:)` per i Dynamic Profiles      |
-| `PrivacyDisclosure` (già attiva)  | invariata, estesa al livello `appleCloud` (PCC)  |
-| —                                 | `PrivateCloudComputeProvider`                    |
-| —                                 | provider utente (Gemini/Claude) + ModelPicker    |
-
-L'API pubblica (`configure`, `respond`, `resolveProvider`) non cambia.
-
-## Requisiti
-
-- iOS 26 / macOS 26, Swift 6.2
-- Per on-device: device con Apple Intelligence
+La documentazione interna è in `docs/`:
+- [docs/iOS26-Implementation.md](docs/iOS26-Implementation.md) — come è
+  implementata la base iOS 26 / 26.4 (decisioni, API stabile, verifica).
+- [docs/iOS27-Design.md](docs/iOS27-Design.md) — il design dell'estensione
+  iOS 27 (non ancora implementata).
+- [docs/iOS27-OpenQuestions.md](docs/iOS27-OpenQuestions.md) — le domande
+  aperte che bloccano l'implementazione iOS 27.
