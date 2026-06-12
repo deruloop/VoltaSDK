@@ -33,6 +33,7 @@ public struct AIPlaygroundView: View {
     @State private var exchanges: [PlaygroundExchange] = []
     @State private var errorText: String?
     @State private var isLoading = false
+    @State private var contextUsage: ContextUsage?
 
     public init(
         orchestrator: AIOrchestrator,
@@ -57,10 +58,18 @@ public struct AIPlaygroundView: View {
                 Text("Conversazione (\(exchanges.count) turni)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if let contextUsage {
+                    // Pressione sulla finestra del provider che risponderebbe
+                    // ora (D13): è il segnale per accorciare/riassumere (D12).
+                    Text("· contesto \(Int(contextUsage.fraction * 100))% di \(contextUsage.contextSize)")
+                        .font(.caption)
+                        .foregroundStyle(contextUsage.fraction > 0.8 ? .orange : .secondary)
+                }
                 Spacer()
                 Button("Nuova conversazione", systemImage: "plus.bubble") {
                     exchanges.removeAll()
                     errorText = nil
+                    contextUsage = nil
                 }
                 .font(.caption)
                 .buttonStyle(.borderless)
@@ -144,6 +153,10 @@ public struct AIPlaygroundView: View {
                     history: history
                 )
                 exchanges.append(PlaygroundExchange(prompt: text, response: response))
+                contextUsage = await orchestrator.contextUsage(
+                    instructions: instructions,
+                    history: conversationHistory
+                )
             } catch let error as ProviderError {
                 errorText = Self.describe(error)
             } catch {

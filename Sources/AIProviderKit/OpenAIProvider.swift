@@ -36,7 +36,8 @@ public struct OpenAIProvider: ModelProvider {
         maxTokens: Int = 1000,
         temperature: Double = 0.3,
         endpoint: URL = URL(string: "https://api.openai.com/v1/chat/completions")!,
-        urlSession: URLSession = .shared
+        urlSession: URLSession = .shared,
+        contextSize: Int? = nil
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -44,6 +45,42 @@ public struct OpenAIProvider: ModelProvider {
         self.temperature = temperature
         self.endpoint = endpoint
         self.urlSession = urlSession
+        self.explicitContextSize = contextSize
+    }
+
+    // MARK: Consapevolezza dei token (D13) — stime oneste
+
+    /// Finestra di contesto: quella passata all'init se presente, altrimenti
+    /// best-effort dai modelli noti. `nil` per modelli sconosciuti: meglio
+    /// nessun pre-flight che un pre-flight sbagliato.
+    private let explicitContextSize: Int?
+
+    public var contextSize: Int? {
+        if let explicitContextSize { return explicitContextSize }
+        return Self.knownContextSize(forModel: model)
+    }
+
+    /// STIMA (~4 caratteri/token): OpenAI non offre un tokenizer ufficiale
+    /// client-side. Sottostimare di poco è voluto: il pre-flight non deve
+    /// scartare un provider utilizzabile; l'overflow vero resta comunque
+    /// coperto dal percorso reattivo (.contextWindowExceeded).
+    public func tokenCount(
+        prompt: String,
+        instructions: String?,
+        history: [ChatTurn]
+    ) async -> Int? {
+        var characters = prompt.count + (instructions?.count ?? 0)
+        for turn in history { characters += turn.text.count }
+        return (characters + 3) / 4
+    }
+
+    static func knownContextSize(forModel model: String) -> Int? {
+        if model.hasPrefix("gpt-4.1") { return 1_047_576 }
+        if model.hasPrefix("gpt-4o") { return 128_000 }
+        if model.hasPrefix("o1") || model.hasPrefix("o3") || model.hasPrefix("o4") {
+            return 200_000
+        }
+        return nil
     }
 
     public func availability() async -> ProviderAvailability {

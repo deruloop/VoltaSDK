@@ -59,6 +59,22 @@ public struct AIConfiguration: Sendable {
     public init() {}
 }
 
+// MARK: - Pressione sul contesto (D13)
+
+/// Quanto della finestra di contesto del provider risolto occuperebbe la
+/// conversazione corrente. È l'informazione che serve all'app per decidere
+/// QUANDO accorciare o riassumere la storia (la policy resta sua, D12).
+public struct ContextUsage: Sendable, Equatable {
+    public let tokens: Int
+    public let contextSize: Int
+    public let provider: ProviderIdentifier
+
+    /// Frazione occupata, 0...1+ (può superare 1 se già oltre la finestra).
+    public var fraction: Double {
+        contextSize > 0 ? Double(tokens) / Double(contextSize) : 0
+    }
+}
+
 // MARK: - Risposta dettagliata
 
 /// Risposta arricchita con la provenienza: indispensabile per UI che vogliono
@@ -78,22 +94,28 @@ public actor AIOrchestrator {
 
     private let orderedProviders: [any ModelProvider]
     private let privacyDisclosure: PrivacyDisclosure
+    /// Token riservati alla risposta nel pre-flight (D13): una chiamata che
+    /// riempie esattamente la finestra fallirebbe comunque in generazione.
+    private let responseTokenReserve: Int
 
     // MARK: Init esplicito (consigliato: nessuno stato globale)
 
     public init(configuration: AIConfiguration) {
         self.orderedProviders = Self.buildProviders(from: configuration)
         self.privacyDisclosure = configuration.privacyDisclosure
+        self.responseTokenReserve = configuration.maxTokens
     }
 
     /// Init diretto con provider già costruiti — utile per i test o per
     /// inserire provider custom.
     public init(
         providers: [any ModelProvider],
-        privacyDisclosure: PrivacyDisclosure = .silent
+        privacyDisclosure: PrivacyDisclosure = .silent,
+        responseTokenReserve: Int = 0
     ) {
         self.orderedProviders = providers
         self.privacyDisclosure = privacyDisclosure
+        self.responseTokenReserve = responseTokenReserve
     }
 
     // MARK: Singleton opzionale per comodità
@@ -164,6 +186,20 @@ public actor AIOrchestrator {
         for provider in orderedProviders {
             // Salta i provider non disponibili senza nemmeno tentare.
             if case .unavailable = await provider.availability() {
+                continue
+            }
+
+            // Pre-flight sul contesto (D13): se il provider sa contare e la
+            // chiamata non può stare nella sua finestra, saltalo come se
+            // avesse già lanciato .contextWindowExceeded — senza pagare una
+            // generazione destinata a fallire. Viene PRIMA del gate di
+            // privacy: inutile chiedere all'utente per un provider inutile.
+            if let window = provider.contextSize,
+               let needed = await provider.tokenCount(
+                   prompt: prompt, instructions: instructions, history: history
+               ),
+               needed + responseTokenReserve >= window {
+                lastError = .contextWindowExceeded
                 continue
             }
 
@@ -242,6 +278,27 @@ public actor AIOrchestrator {
         throw ProviderError.noProviderAvailable
     }
 
+    /// Pressione della conversazione corrente sulla finestra del provider
+    /// che risponderebbe ora (D13). `nil` se nessun provider è disponibile o
+    /// se quello risolto non sa contare (es. on-device prima di 26.4).
+    /// L'app la usa per decidere quando accorciare/riassumere la storia (D12).
+    public func contextUsage(
+        instructions: String? = nil,
+        history: [ChatTurn]
+    ) async -> ContextUsage? {
+        guard let provider = try? await resolveProvider(),
+              let window = provider.contextSize,
+              let tokens = await provider.tokenCount(
+                  prompt: "", instructions: instructions, history: history
+              )
+        else { return nil }
+        return ContextUsage(
+            tokens: tokens,
+            contextSize: window,
+            provider: provider.identifier
+        )
+    }
+
     // MARK: Introspezione (per UI e diagnostica)
 
     /// I provider attualmente utilizzabili, in ordine di preferenza.
@@ -263,7 +320,8 @@ public actor AIOrchestrator {
             result.append(ProviderStatus(
                 identifier: provider.identifier,
                 privacyLevel: provider.privacyLevel,
-                availability: await provider.availability()
+                availability: await provider.availability(),
+                contextSize: provider.contextSize
             ))
         }
         return result

@@ -20,18 +20,34 @@ public struct MockProvider: ModelProvider {
     private let outcome: Result<String, ProviderError>
     private let onRespond: (@Sendable (_ prompt: String, _ instructions: String?, _ history: [ChatTurn]) -> Void)?
 
+    /// Capability di token awareness simulata (D13). Default: non supportata.
+    public let contextSize: Int?
+    private let tokenCountValue: Int?
+
     public init(
         identifier: ProviderIdentifier,
         privacyLevel: PrivacyLevel = .onDevice,
         availability: ProviderAvailability = .available,
         outcome: Result<String, ProviderError> = .success(""),
+        contextSize: Int? = nil,
+        tokenCount: Int? = nil,
         onRespond: (@Sendable (_ prompt: String, _ instructions: String?, _ history: [ChatTurn]) -> Void)? = nil
     ) {
         self.identifier = identifier
         self.privacyLevel = privacyLevel
         self.availabilityResult = availability
         self.outcome = outcome
+        self.contextSize = contextSize
+        self.tokenCountValue = tokenCount
         self.onRespond = onRespond
+    }
+
+    public func tokenCount(
+        prompt: String,
+        instructions: String?,
+        history: [ChatTurn]
+    ) async -> Int? {
+        tokenCountValue
     }
 
     public func availability() async -> ProviderAvailability {

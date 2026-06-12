@@ -53,17 +53,21 @@ public struct ProviderStatus: Sendable, Identifiable {
     public let identifier: ProviderIdentifier
     public let privacyLevel: PrivacyLevel
     public let availability: ProviderAvailability
+    /// Finestra di contesto in token, se il provider la conosce (D13).
+    public let contextSize: Int?
 
     public var id: ProviderIdentifier { identifier }
 
     public init(
         identifier: ProviderIdentifier,
         privacyLevel: PrivacyLevel,
-        availability: ProviderAvailability
+        availability: ProviderAvailability,
+        contextSize: Int? = nil
     ) {
         self.identifier = identifier
         self.privacyLevel = privacyLevel
         self.availability = availability
+        self.contextSize = contextSize
     }
 }
 
@@ -143,6 +147,22 @@ public protocol ModelProvider: Sendable {
         instructions: String?,
         history: [ChatTurn]
     ) async throws -> String
+
+    // MARK: Capability opzionale: consapevolezza dei token (D13)
+
+    /// Dimensione della finestra di contesto in token, se nota.
+    /// `nil` = sconosciuta: l'orchestratore non farà pre-flight.
+    var contextSize: Int? { get }
+
+    /// Numero di token che la chiamata occuperebbe (prompt + instructions +
+    /// history), se il provider sa contarli o stimarli. `nil` = non sa.
+    /// On-device: conteggio esatto da iOS 26.4, `nil` prima.
+    /// Cloud: stima onesta (nessun tokenizer ufficiale client-side).
+    func tokenCount(
+        prompt: String,
+        instructions: String?,
+        history: [ChatTurn]
+    ) async -> Int?
 }
 
 public extension ModelProvider {
@@ -150,4 +170,14 @@ public extension ModelProvider {
     func respond(to prompt: String, instructions: String?) async throws -> String {
         try await respond(to: prompt, instructions: instructions, history: [])
     }
+
+    /// Default: capability non supportata. I provider custom esistenti
+    /// continuano a compilare e semplicemente non partecipano al pre-flight.
+    var contextSize: Int? { nil }
+
+    func tokenCount(
+        prompt: String,
+        instructions: String?,
+        history: [ChatTurn]
+    ) async -> Int? { nil }
 }

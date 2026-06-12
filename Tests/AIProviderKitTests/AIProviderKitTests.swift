@@ -330,6 +330,107 @@ struct ConversationHistoryTests {
     }
 }
 
+// MARK: - Token awareness (D13)
+
+@Suite("Consapevolezza dei token (D13)")
+struct TokenAwarenessTests {
+
+    @Test("Pre-flight: salta il provider la cui finestra non basta, senza chiamarlo")
+    func preflightSkipsOverflowingProvider() async throws {
+        let firstWasCalled = Mutex(false)
+        let kit = AIOrchestrator(providers: [
+            MockProvider(identifier: .onDevice,
+                         contextSize: 100,
+                         tokenCount: 200,
+                         onRespond: { _, _, _ in firstWasCalled.withLock { $0 = true } }),
+            MockProvider(identifier: .openAI,
+                         privacyLevel: .external,
+                         outcome: .success("openai"),
+                         contextSize: 128_000,
+                         tokenCount: 200)
+        ])
+
+        let result = try await kit.respond(to: "prompt lungo")
+        #expect(result == "openai")
+        #expect(firstWasCalled.withLock { $0 } == false)
+    }
+
+    @Test("Pre-flight: la riserva per la risposta conta nel budget")
+    func preflightAccountsForResponseReserve() async throws {
+        // 60 token di chiamata + 50 di riserva > finestra di 100 → skip.
+        let kit = AIOrchestrator(
+            providers: [
+                MockProvider(identifier: .onDevice,
+                             contextSize: 100,
+                             tokenCount: 60),
+                MockProvider(identifier: .openAI,
+                             privacyLevel: .external,
+                             outcome: .success("openai"))
+            ],
+            responseTokenReserve: 50
+        )
+        #expect(try await kit.respond(to: "x") == "openai")
+    }
+
+    @Test("Pre-flight: tutti i provider troppo piccoli → contextWindowExceeded")
+    func preflightThrowsWhenNothingFits() async {
+        let kit = AIOrchestrator(providers: [
+            MockProvider(identifier: .onDevice, contextSize: 100, tokenCount: 500),
+            MockProvider(identifier: .openAI, contextSize: 200, tokenCount: 500)
+        ])
+        await #expect(throws: ProviderError.contextWindowExceeded) {
+            _ = try await kit.respond(to: "enorme")
+        }
+    }
+
+    @Test("Un provider che non sa contare non viene mai scartato dal pre-flight")
+    func providerWithoutCountingIsNotSkipped() async throws {
+        let kit = AIOrchestrator(providers: [
+            MockProvider(identifier: .onDevice, outcome: .success("on-device"))
+            // contextSize/tokenCount nil → nessun pre-flight possibile.
+        ])
+        #expect(try await kit.respond(to: "ciao") == "on-device")
+    }
+
+    @Test("contextUsage riporta token, finestra e provider risolto")
+    func contextUsageReportsPressure() async {
+        let kit = AIOrchestrator(providers: [
+            MockProvider(identifier: .onDevice, contextSize: 4096, tokenCount: 1024)
+        ])
+        let usage = await kit.contextUsage(history: [.user("a"), .assistant("b")])
+        #expect(usage == ContextUsage(tokens: 1024, contextSize: 4096, provider: .onDevice))
+        #expect(usage?.fraction == 0.25)
+    }
+
+    @Test("contextUsage è nil se il provider risolto non sa contare")
+    func contextUsageNilWithoutCapability() async {
+        let kit = AIOrchestrator(providers: [
+            MockProvider(identifier: .onDevice)
+        ])
+        let usage = await kit.contextUsage(history: [])
+        #expect(usage == nil)
+    }
+
+    @Test("OpenAI: finestre note per modello, nil per modelli sconosciuti")
+    func openAIKnownWindows() {
+        #expect(OpenAIProvider.knownContextSize(forModel: "gpt-4o-mini") == 128_000)
+        #expect(OpenAIProvider.knownContextSize(forModel: "gpt-4.1") == 1_047_576)
+        #expect(OpenAIProvider.knownContextSize(forModel: "modello-misterioso") == nil)
+    }
+
+    @Test("OpenAI: la stima dei token usa ~4 caratteri/token su tutto il payload")
+    func openAITokenEstimate() async {
+        let provider = OpenAIProvider(apiKey: "test")
+        let estimate = await provider.tokenCount(
+            prompt: String(repeating: "a", count: 100),
+            instructions: String(repeating: "b", count: 100),
+            history: [.user(String(repeating: "c", count: 100)),
+                      .assistant(String(repeating: "d", count: 100))]
+        )
+        #expect(estimate == 100)   // 400 caratteri / 4
+    }
+}
+
 // MARK: - Configurazione globale
 
 @Suite("Configurazione", .serialized)

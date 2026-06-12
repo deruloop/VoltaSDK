@@ -85,6 +85,25 @@ a metà conversazione, il successivo riceve la stessa storia e la conversazione
 continua senza interruzioni (con la disclosure di privacy configurata).
 Quando e come accorciare la storia resta una scelta dell'app.
 
+### Consapevolezza dei token (iOS/macOS 26.4+)
+
+Il framework fa un **pre-flight** automatico: se sa che la chiamata non può
+stare nella finestra di contesto di un provider, lo salta senza pagare una
+generazione destinata a fallire (stessa semantica di `.contextWindowExceeded`).
+Su 26.0–26.3 il conteggio on-device non è disponibile e resta il solo
+comportamento reattivo.
+
+Per decidere quando accorciare o riassumere la storia:
+
+```swift
+if let usage = await kit.contextUsage(history: history), usage.fraction > 0.8 {
+    // Tocca all'app: tronca i turni più vecchi, o riassumili.
+}
+```
+
+`usage` riporta token usati, finestra e provider risolto. È `nil` se il
+provider non sa contare (mai una stima spacciata per conteggio).
+
 ### 3. Risoluzione senza esecuzione (il primitivo)
 
 ```swift

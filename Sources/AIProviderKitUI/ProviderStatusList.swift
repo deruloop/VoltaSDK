@@ -32,6 +32,11 @@ public struct ProviderStatusRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                if let contextSize = status.contextSize {
+                    Text("Finestra: \(contextSize.formatted()) token")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
             }
             Spacer()
             PrivacyLevelBadge(level: status.privacyLevel)

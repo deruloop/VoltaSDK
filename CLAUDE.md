@@ -36,7 +36,7 @@ shapes decisions but never blocks compilation.
 
 ## 2. Current status — what's built (verified June 2026)
 
-Working Swift Package: `swift build` succeeds and **26 tests in 6 suites pass**
+Working Swift Package: `swift build` succeeds and **34 tests in 7 suites pass**
 on macOS 26.5 SDK / Xcode 26.6, Swift 6.2 tools. The iOS demo app builds and
 runs on the iOS 26.5 simulator (verified on iPhone 17 Pro: the fallback chain
 correctly reports on-device as unavailable with the Apple Intelligence reason).
@@ -100,8 +100,9 @@ What each core piece does:
   `max_completion_tokens` (the non-deprecated parameter).
 - **`AIOrchestrator`** (actor) — builds the ordered provider list from
   preference; `respond`/`respondDetailed` walk the chain skipping unavailable
-  providers, applying the privacy gate, falling through on recoverable errors.
-  `resolveProvider()` is the *resolution primitive* (see D9).
+  providers, running the token pre-flight (D13), applying the privacy gate,
+  falling through on recoverable errors. `resolveProvider()` is the
+  *resolution primitive* (see D9). `contextUsage()` reports window pressure;
   `providerStatuses()` powers UI. Global access via `configure {}` + `.active`
   (Mutex-protected; Swift 6 forbids bare mutable statics).
 
@@ -222,6 +223,52 @@ or summarize stays with the developer (ties into roadmap "token awareness").
 `AIPlaygroundView` demonstrates the pattern: the *view* plays the developer
 role, holds the exchanges, and passes them via `history:` on each send.
 
+### D13 — Proactive token awareness as an optional capability *(June 2026)*
+Verified against the real SDK: `SystemLanguageModel.contextSize` is available
+on **all of 26.x** (back-deployed), while the five `tokenCount(for:)` overloads
+(prompt, instructions, tools, schema, transcript entries) require **26.4**.
+Design:
+- `ModelProvider` gains an *optional capability* (defaulted in a protocol
+  extension, so custom providers keep compiling): `contextSize: Int?` and
+  `tokenCount(prompt:instructions:history:) -> Int?`. `nil` always means
+  "don't know" — the framework never guesses.
+- On-device: exact counts via the native Transcript entries on 26.4+, `nil` on
+  26.0–26.3 (base tier stays reactive-only). OpenAI: known windows per model
+  family (`nil` for unknown models, overridable in init) + an ~4 chars/token
+  estimate, deliberately on the low side: pre-flight must never wrongly skip a
+  usable provider; real overflow is still caught reactively.
+- Orchestrator **pre-flight**: if a provider can count and
+  `needed + responseTokenReserve >= window`, it's skipped as if it had thrown
+  `.contextWindowExceeded` — same recoverable semantics and privacy gating,
+  without paying for a doomed generation. Runs *before* the privacy gate (never
+  ask the user about a provider that can't serve the call). The reserve is
+  `config.maxTokens` (or explicit in `init(providers:)`).
+- `contextUsage(instructions:history:)` reports the conversation's pressure on
+  the *resolved* provider's window. The app decides when to trim/summarize —
+  same division of labor as D10/D12: we detect, the developer decides.
+- This capability surface is where iOS 27's per-model token reading (open
+  question Q10) will land.
+
+### D14 — One package, three capability tiers — not three SDKs *(June 2026)*
+The product ships as **one package** with three runtime tiers:
+- **Tier 26.0 (base):** fallback + privacy + transcript transparency; context
+  handling is reactive only.
+- **Tier 26.4 (token-aware):** D13 lights up — exact on-device counting,
+  proactive pre-flight, `contextUsage`. Gated by `if #available(iOS 26.4, *)`
+  *inside* the on-device provider; everything else is identical code.
+- **Tier 27 (multi-provider):** new capabilities arrive as **whole new types**
+  (PCC provider, user-account providers, `preferred(_:)` bridge), each marked
+  `@available(iOS 27, *)` at the type level and wired into `buildProviders`
+  in one place — not as `if` statements scattered through shared logic.
+Rationale: small in-API deltas (26.0→26.4) suit *expression-level* availability
+checks; paradigm-sized deltas (26→27) suit *type-level* gating, because the
+orchestration logic doesn't branch — the provider list just gets longer on
+newer OSes. Three separate branches/packages were rejected: combinatorial
+maintenance, and D3 already promises adopters one stable API where features
+light up. Practical constraint to remember: iOS 27 code physically requires
+the iOS 27 SDK (Xcode beta) to compile, so until we adopt it, iOS 27 remains
+design-only (per the standing rule: build for iOS 26, decide for iOS 27).
+
 ---
 
 ## 4. iOS 26 vs iOS 27 capability split
@@ -266,8 +313,10 @@ role, holds the exchanges, and passes them via `history:` on each send.
    (OpenAI via SSE `"stream": true`). Resolves the streaming asymmetry between
    on-device and dev key. Design question: how does a stream interact with
    fallback (fail before first token = fall through; fail mid-stream = surface)?
-4. **Token/context awareness** (iOS 26.4 APIs): surface context-window pressure
-   and a summarize-or-truncate hook before saturation.
+4. ~~Token/context awareness~~ ✅ done (June 2026, D13): optional capability on
+   `ModelProvider`, proactive pre-flight in the orchestrator, `contextUsage`
+   for the app. Trimming/summarizing remains deliberately the developer's job,
+   informed by `contextUsage` (D12).
 5. ~~Multi-turn~~ ✅ resolved by D12 (June 2026): the core stays stateless,
    the app passes `history: [ChatTurn]` per call, fallback works
    mid-conversation. Still open (lower priority): KV-cache/`Transcript` reuse
@@ -339,12 +388,15 @@ AIOrchestrator.active                               // configured shared instanc
 try await kit.respond(to: prompt, instructions: nil, history: []) -> String
 try await kit.respondDetailed(to:instructions:history:) -> AIResponse  // + provenance
 try await kit.resolveProvider() -> any ModelProvider            // the primitive (D9)
+await kit.contextUsage(instructions:history:) -> ContextUsage?  // window pressure (D13)
 await kit.availableProviders() -> [ProviderIdentifier]
 await kit.providerStatuses() -> [ProviderStatus]                // for UI
 
 // extension points
-protocol ModelProvider { identifier; privacyLevel; availability(); respond(to:instructions:history:) }
+protocol ModelProvider { identifier; privacyLevel; availability(); respond(to:instructions:history:);
+                         contextSize; tokenCount(prompt:instructions:history:) }  // last two defaulted (D13)
 struct ChatTurn { role (.user/.assistant), text }               // app-supplied turn (D12)
+struct ContextUsage { tokens, contextSize, provider, fraction } // (D13)
 enum ProviderError { ...; var isRecoverableByFallback: Bool }
 enum PrivacyLevel { external < appleCloud < onDevice }
 enum PrivacyDisclosure { silent, notify(…), askOnPrivacyChange(…), denyDowngrade }
@@ -363,9 +415,11 @@ ProviderStatusList, AIPlaygroundView) are additive and optional by definition.
 ## 9. Demo & verification
 
 - `swift build` — builds core + UI + demo (macOS side).
-- `swift test` — 26 tests: fallback chain, terminal vs recoverable errors,
+- `swift test` — 34 tests: fallback chain, terminal vs recoverable errors,
   privacy disclosure policies (all four), resolution primitive, provider
   statuses, conversation-history pass-through incl. across fallback (D12),
+  token pre-flight incl. response reserve and the no-capability case (D13),
+  context-usage reporting, OpenAI window table + estimate,
   global configure, Retry-After parsing.
 - `swift run AIProviderKitDemo` — macOS test UI.
 - **iOS demo:** open `Examples/iOSDemo/iOSDemo.xcodeproj` and run on an
@@ -382,7 +436,11 @@ privacy badge, and watch privacy-downgrade notifications. Layout is adaptive —
 split view on macOS, tabs (Configura / Playground) on iOS. The playground is a
 real conversation since D12: follow-ups ("modifica il giorno 2") work because
 the view holds the history and passes it per call; "Nuova conversazione"
-resets it.
+resets it. Since D13 it also shows the context pressure ("contesto N% di
+\<window\>", orange above 80%) for the provider that would answer next, and the
+status list shows each provider's window size. On 26.0–26.3 the on-device
+pressure indicator simply doesn't appear (no counting API): that's the base
+tier behaving as designed.
 
 Model-limitation behavior to expect:
 - Simulator / non-Apple-Intelligence device: on-device row shows the reason

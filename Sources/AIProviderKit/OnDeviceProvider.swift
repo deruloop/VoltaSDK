@@ -49,6 +49,33 @@ public struct OnDeviceProvider: ModelProvider {
         }
     }
 
+    // MARK: Consapevolezza dei token (D13)
+
+    /// Finestra di contesto del modello on-device. La proprietà è
+    /// back-deployed: disponibile su tutta la 26.x.
+    public var contextSize: Int? {
+        SystemLanguageModel.default.contextSize
+    }
+
+    /// Conteggio ESATTO via SDK da iOS/macOS 26.4; `nil` su 26.0–26.3
+    /// (il tier base resta solo reattivo: errore a chiamata avvenuta).
+    public func tokenCount(
+        prompt: String,
+        instructions: String?,
+        history: [ChatTurn]
+    ) async -> Int? {
+        guard #available(iOS 26.4, macOS 26.4, *) else { return nil }
+        var entries = Self.transcriptEntries(instructions: instructions, history: history)
+        if !prompt.isEmpty {
+            entries.append(.prompt(Transcript.Prompt(
+                segments: [.text(Transcript.TextSegment(content: prompt))]
+            )))
+        }
+        return try? await SystemLanguageModel.default.tokenCount(for: entries)
+    }
+
+    // MARK: Costruzione sessione/transcript
+
     /// Costruisce la sessione per la singola chiamata. Senza storia usa gli
     /// init semplici; con storia ricostruisce un `Transcript` nativo, così il
     /// modello vede la conversazione esattamente come se fosse sua.
@@ -62,7 +89,16 @@ public struct OnDeviceProvider: ModelProvider {
             }
             return LanguageModelSession()
         }
+        let entries = transcriptEntries(instructions: instructions, history: history)
+        return LanguageModelSession(transcript: Transcript(entries: entries))
+    }
 
+    /// Mappa instructions + storia (D12) in entry di `Transcript` native.
+    /// Condivisa tra la creazione della sessione e il conteggio dei token.
+    private static func transcriptEntries(
+        instructions: String?,
+        history: [ChatTurn]
+    ) -> [Transcript.Entry] {
         var entries: [Transcript.Entry] = []
         if let instructions, !instructions.isEmpty {
             entries.append(.instructions(Transcript.Instructions(
@@ -83,7 +119,7 @@ public struct OnDeviceProvider: ModelProvider {
                 )))
             }
         }
-        return LanguageModelSession(transcript: Transcript(entries: entries))
+        return entries
     }
 
     /// Mappa gli errori di generazione su ProviderError, distinguendo i casi
