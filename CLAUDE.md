@@ -36,6 +36,12 @@ shapes decisions but never blocks compilation.
 
 ## 2. Current status — what's built (verified June 2026)
 
+**Released: v1.0.0 (git tag `1.0.0`, 2026-06-12)** — first adoption in the
+author's app is in progress. Versioning policy: SemVer; per D3 the iOS 27
+extension must be additive, so it stays in the 1.x series — a 2.0 would mean
+we broke the §8 contract and needs explicit discussion first. Releases are
+documented in CHANGELOG.md.
+
 Working Swift Package: `swift build` succeeds and **34 tests in 7 suites pass**
 on macOS 26.5 SDK / Xcode 26.6, Swift 6.2 tools. The iOS demo app builds and
 runs on the iOS 26.5 simulator (verified on iPhone 17 Pro: the fallback chain

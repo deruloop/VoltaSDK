@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 51;
+	objectVersion = 52;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -13,7 +13,7 @@
 
 /* Begin PBXFileReference section */
 		7B57388DF75171F241E09BAF /* AIProvider */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AIProvider; path = ../..; sourceTree = SOURCE_ROOT; };
-		B161B8B436DF0E418C592968 /* iOSDemo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = iOSDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B161B8B436DF0E418C592968 /* iOSDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iOSDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B9993C5358C1ECE89FE7CB90 /* iOSDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSDemoApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -93,7 +93,6 @@
 				LastUpgradeCheck = 1200;
 				TargetAttributes = {
 					E7BC14F5D970E77DF29D5DC2 = {
-						DevelopmentTeam = J6HPZ958W6;
 						ProvisioningStyle = Automatic;
 					};
 				};

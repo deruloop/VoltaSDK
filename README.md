@@ -30,6 +30,26 @@ dell'app**.
 
 La demo iPhone/iPad è in `Examples/iOSDemo/iOSDemo.xcodeproj`.
 
+## Installazione
+
+Swift Package Manager. Dalla tua app in Xcode:
+
+**Package locale (stessa macchina):** File → Add Package Dependencies… →
+Add Local… → seleziona la cartella `AIProvider`. Poi aggiungi il prodotto
+`AIProviderKit` al target dell'app (e `AIProviderKitUI` solo se vuoi i
+componenti pronti). Nota: una dipendenza locale usa sempre la working copy,
+i tag di versione non si applicano.
+
+**Da repository git (consigliato appena pubblicato su un remote):**
+
+```swift
+dependencies: [
+    .package(url: "<url-del-repo>", from: "1.0.0")
+]
+```
+
+La versione corrente è **1.0.0** (vedi [CHANGELOG.md](CHANGELOG.md)).
+
 ## Uso (senza UI)
 
 ### 1. Configurazione (all'avvio dell'app)
