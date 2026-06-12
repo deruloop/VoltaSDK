@@ -3,9 +3,13 @@
 //  AIProviderKitUI
 //
 //  Vista prompt→risposta pronta all'uso, con indicazione di quale provider
-//  ha risposto e a quale livello di privacy. Ogni invio è una chiamata
-//  indipendente (il multi-turno con memoria è in roadmap nel core: questa
-//  vista mostra lo storico solo visivamente).
+//  ha risposto e a quale livello di privacy.
+//
+//  Dimostra il pattern D12 ("stateless core, transcript-transparent"):
+//  questa vista interpreta il ruolo dello SVILUPPATORE — possiede la storia
+//  della conversazione e la passa a ogni chiamata via `history:`. Il
+//  framework non memorizza nulla; ogni chiamata è autocontenuta, quindi i
+//  follow-up funzionano anche se il provider cambia tra un turno e l'altro.
 //
 
 import SwiftUI
@@ -40,8 +44,28 @@ public struct AIPlaygroundView: View {
         self.placeholder = placeholder
     }
 
+    /// La storia che verrà inviata col prossimo turno (ruolo "sviluppatore").
+    private var conversationHistory: [ChatTurn] {
+        exchanges.flatMap { exchange in
+            [.user(exchange.prompt), .assistant(exchange.response.text)]
+        }
+    }
+
     public var body: some View {
         VStack(spacing: 8) {
+            HStack {
+                Text("Conversazione (\(exchanges.count) turni)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Nuova conversazione", systemImage: "plus.bubble") {
+                    exchanges.removeAll()
+                    errorText = nil
+                }
+                .font(.caption)
+                .buttonStyle(.borderless)
+                .disabled(exchanges.isEmpty)
+            }
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 12) {
@@ -108,11 +132,16 @@ public struct AIPlaygroundView: View {
         errorText = nil
         isLoading = true
 
+        // Fotografa la storia PRIMA della chiamata: è l'app (qui la vista)
+        // a possederla e fornirla — il framework non ricorda nulla (D12).
+        let history = conversationHistory
+
         Task {
             do {
                 let response = try await orchestrator.respondDetailed(
                     to: text,
-                    instructions: instructions
+                    instructions: instructions,
+                    history: history
                 )
                 exchanges.append(PlaygroundExchange(prompt: text, response: response))
             } catch let error as ProviderError {

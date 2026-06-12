@@ -133,5 +133,21 @@ public protocol ModelProvider: Sendable {
     func availability() async -> ProviderAvailability
 
     /// Risposta non-streaming. Firma stabile: resterà identica su iOS 27.
-    func respond(to prompt: String, instructions: String?) async throws -> String
+    ///
+    /// `history` sono i turni precedenti della conversazione, forniti
+    /// dall'app (D12): il provider non ricorda nulla tra una chiamata e
+    /// l'altra, ma ogni chiamata è autocontenuta e può quindi essere
+    /// servita da qualsiasi provider della catena di fallback.
+    func respond(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn]
+    ) async throws -> String
+}
+
+public extension ModelProvider {
+    /// Convenience per la chiamata one-shot (senza conversazione).
+    func respond(to prompt: String, instructions: String?) async throws -> String {
+        try await respond(to: prompt, instructions: instructions, history: [])
+    }
 }

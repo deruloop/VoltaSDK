@@ -132,15 +132,25 @@ public actor AIOrchestrator {
     /// preferenza, con fallback automatico sui provider successivi quando il
     /// primo è indisponibile o fallisce in modo recuperabile (429, rete,
     /// context window, lingua). Firma stabile: identica su iOS 27.
-    public func respond(to prompt: String, instructions: String? = nil) async throws -> String {
-        try await respondDetailed(to: prompt, instructions: instructions).text
+    ///
+    /// `history` (D12): i turni precedenti della conversazione, posseduti e
+    /// forniti dall'app. Il framework non li memorizza mai; li inoltra al
+    /// provider scelto. Ogni chiamata è autocontenuta, quindi il fallback
+    /// funziona anche a metà conversazione.
+    public func respond(
+        to prompt: String,
+        instructions: String? = nil,
+        history: [ChatTurn] = []
+    ) async throws -> String {
+        try await respondDetailed(to: prompt, instructions: instructions, history: history).text
     }
 
     /// Come `respond`, ma restituisce anche quale provider ha risposto e il
     /// suo livello di privacy (per banner/badge in UI).
     public func respondDetailed(
         to prompt: String,
-        instructions: String? = nil
+        instructions: String? = nil,
+        history: [ChatTurn] = []
     ) async throws -> AIResponse {
         guard let first = orderedProviders.first else {
             throw ProviderError.noProviderAvailable
@@ -181,7 +191,11 @@ public actor AIOrchestrator {
             }
 
             do {
-                let text = try await provider.respond(to: prompt, instructions: instructions)
+                let text = try await provider.respond(
+                    to: prompt,
+                    instructions: instructions,
+                    history: history
+                )
                 return AIResponse(
                     text: text,
                     provider: provider.identifier,

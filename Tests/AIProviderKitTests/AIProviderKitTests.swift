@@ -266,6 +266,70 @@ struct PrivacyDisclosureTests {
     }
 }
 
+// MARK: - Transcript transparency (D12)
+
+@Suite("Storia della conversazione (D12)")
+struct ConversationHistoryTests {
+
+    @Test("La storia fornita dall'app arriva intatta al provider")
+    func historyReachesProvider() async throws {
+        let received = Mutex<[ChatTurn]?>(nil)
+        let kit = AIOrchestrator(providers: [
+            MockProvider(identifier: .onDevice, outcome: .success("ok")) { _, _, history in
+                received.withLock { $0 = history }
+            }
+        ])
+
+        let history: [ChatTurn] = [
+            .user("Pianifica un weekend"),
+            .assistant("Ecco l'itinerario…")
+        ]
+        _ = try await kit.respond(to: "modifica il giorno 2", history: history)
+
+        #expect(received.withLock { $0 } == history)
+    }
+
+    @Test("Senza storia il provider riceve una lista vuota")
+    func defaultHistoryIsEmpty() async throws {
+        let received = Mutex<[ChatTurn]?>(nil)
+        let kit = AIOrchestrator(providers: [
+            MockProvider(identifier: .onDevice, outcome: .success("ok")) { _, _, history in
+                received.withLock { $0 = history }
+            }
+        ])
+        _ = try await kit.respond(to: "ciao")
+        #expect(received.withLock { $0 } == [])
+    }
+
+    @Test("Il fallback inoltra la STESSA storia al provider successivo")
+    func fallbackForwardsSameHistory() async throws {
+        let firstSaw = Mutex<[ChatTurn]?>(nil)
+        let secondSaw = Mutex<[ChatTurn]?>(nil)
+
+        let kit = AIOrchestrator(providers: [
+            MockProvider(identifier: .onDevice,
+                         outcome: .failure(.rateLimited(retryAfter: nil))) { _, _, history in
+                firstSaw.withLock { $0 = history }
+            },
+            MockProvider(identifier: .openAI,
+                         privacyLevel: .external,
+                         outcome: .success("openai")) { _, _, history in
+                secondSaw.withLock { $0 = history }
+            }
+        ])
+
+        let history: [ChatTurn] = [.user("turno 1"), .assistant("risposta 1")]
+        let result = try await kit.respond(to: "turno 2", history: history)
+
+        // Il primo provider fallisce in modo recuperabile, il secondo riceve
+        // la chiamata autocontenuta con la stessa storia: la conversazione
+        // sopravvive al cambio di provider.
+        #expect(result == "openai")
+        #expect(firstSaw.withLock { $0 } == history)
+        #expect(secondSaw.withLock { $0 } == history)
+    }
+}
+
 // MARK: - Configurazione globale
 
 @Suite("Configurazione", .serialized)

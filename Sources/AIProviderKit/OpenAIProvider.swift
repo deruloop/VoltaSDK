@@ -52,15 +52,26 @@ public struct OpenAIProvider: ModelProvider {
             : .available
     }
 
-    public func respond(to prompt: String, instructions: String?) async throws -> String {
+    public func respond(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn]
+    ) async throws -> String {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
+        // system → storia fornita dall'app (D12) → prompt corrente.
         var messages: [ChatRequest.Message] = []
         if let instructions, !instructions.isEmpty {
             messages.append(.init(role: "system", content: instructions))
+        }
+        for turn in history {
+            messages.append(.init(
+                role: turn.role == .user ? "user" : "assistant",
+                content: turn.text
+            ))
         }
         messages.append(.init(role: "user", content: prompt))
 

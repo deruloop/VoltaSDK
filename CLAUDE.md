@@ -36,7 +36,7 @@ shapes decisions but never blocks compilation.
 
 ## 2. Current status — what's built (verified June 2026)
 
-Working Swift Package: `swift build` succeeds and **23 tests in 5 suites pass**
+Working Swift Package: `swift build` succeeds and **26 tests in 6 suites pass**
 on macOS 26.5 SDK / Xcode 26.6, Swift 6.2 tools. The iOS demo app builds and
 runs on the iOS 26.5 simulator (verified on iPhone 17 Pro: the fallback chain
 correctly reports on-device as unavailable with the Apple Intelligence reason).
@@ -50,6 +50,7 @@ AIProvider/                                (repo root)
 ├── Sources/
 │   ├── AIProviderKit/                     // CORE — no UI dependency, ever
 │   │   ├── ModelProvider.swift            // protocol + identifiers + statuses + typed errors
+│   │   ├── ChatTurn.swift                 // app-supplied conversation turn (D12)
 │   │   ├── PrivacyDisclosure.swift        // downgrade event + disclosure policy
 │   │   ├── OnDeviceProvider.swift         // wraps SystemLanguageModel, maps GenerationError
 │   │   ├── OpenAIProvider.swift           // rewritten ChatGptManager (Codable, typed errors)
@@ -194,6 +195,33 @@ SwiftUI components (`PrivacyLevelBadge`, `ProviderStatusRow`/`ProviderStatusList
 `AIPlaygroundView`). Rows/badges are public so developers can recompose them.
 Nothing in the core ever imports SwiftUI.
 
+### D12 — Stateless core, transcript-transparent *(June 2026)*
+The framework **never remembers** conversations, but every call **accepts**
+the prior turns as input (`history: [ChatTurn]`, owned and supplied by the
+app). Three reasons:
+1. **Ownership.** Persistence, editing, trimming, branching of a chat are app
+   domain logic. A framework-held session would be the agent-runtime D1/D2 reject,
+   and would duplicate Apple's `LanguageModelSession` (which on iOS 27, with
+   Dynamic Profiles, *is* the conversation abstraction).
+2. **Fallback composability — the key insight.** If conversation state lived
+   inside a provider's session, a mid-conversation provider death (PCC quota
+   exhausted, on-device rate limit) would trap the transcript in the dead
+   provider (open question Q6). With app-supplied history, **every call is
+   self-contained**, so any provider in the chain can answer any turn: mid-
+   conversation provider switching falls out of the existing per-call fallback
+   for free, privacy disclosure included.
+3. **Provider mapping is natural.** OpenAI: history → messages array.
+   On-device: history → native FoundationModels `Transcript` rebuilt per call
+   (`LanguageModelSession(transcript:)`), so the model sees the conversation
+   as if it were its own.
+Known costs, accepted: history is re-sent (and re-prefilled) each turn — no
+KV-cache reuse; and long chats hit the small on-device window sooner, which the
+architecture already absorbs (`.contextWindowExceeded` is recoverable → falls
+over to a larger-context provider, privacy policy permitting). When/how to trim
+or summarize stays with the developer (ties into roadmap "token awareness").
+`AIPlaygroundView` demonstrates the pattern: the *view* plays the developer
+role, holds the exchanges, and passes them via `history:` on each send.
+
 ---
 
 ## 4. iOS 26 vs iOS 27 capability split
@@ -240,10 +268,11 @@ Nothing in the core ever imports SwiftUI.
    fallback (fail before first token = fall through; fail mid-stream = surface)?
 4. **Token/context awareness** (iOS 26.4 APIs): surface context-window pressure
    and a summarize-or-truncate hook before saturation.
-5. **Multi-turn sessions.** Currently a session is created per call; design
-   persistent session handling and how it interacts with fallback (open Q6).
-   `AIPlaygroundView`'s visual history is NOT real multi-turn — each send is
-   independent.
+5. ~~Multi-turn~~ ✅ resolved by D12 (June 2026): the core stays stateless,
+   the app passes `history: [ChatTurn]` per call, fallback works
+   mid-conversation. Still open (lower priority): KV-cache/`Transcript` reuse
+   for efficiency when the provider did NOT change between turns, and a
+   trimming/summarization hook (belongs with item 4, token awareness).
 6. **iOS 27 providers:** `PrivateCloudComputeProvider`, then user-account
    Gemini/Claude via the `LanguageModel` protocol; wire into the ordered list.
 7. **Runtime fallback chain keyed on need** (`.lightweight/.reasoning/.largeContext`):
@@ -306,15 +335,16 @@ AIOrchestrator(providers: [any ModelProvider],      // tests / custom providers
                privacyDisclosure: PrivacyDisclosure)
 AIOrchestrator.active                               // configured shared instance
 
-// usage
-try await kit.respond(to: prompt, instructions: nil) -> String
-try await kit.respondDetailed(to:instructions:) -> AIResponse   // + provenance
+// usage — history is app-owned conversation context (D12), defaults to []
+try await kit.respond(to: prompt, instructions: nil, history: []) -> String
+try await kit.respondDetailed(to:instructions:history:) -> AIResponse  // + provenance
 try await kit.resolveProvider() -> any ModelProvider            // the primitive (D9)
 await kit.availableProviders() -> [ProviderIdentifier]
 await kit.providerStatuses() -> [ProviderStatus]                // for UI
 
 // extension points
-protocol ModelProvider { identifier; privacyLevel; availability(); respond(to:instructions:) }
+protocol ModelProvider { identifier; privacyLevel; availability(); respond(to:instructions:history:) }
+struct ChatTurn { role (.user/.assistant), text }               // app-supplied turn (D12)
 enum ProviderError { ...; var isRecoverableByFallback: Bool }
 enum PrivacyLevel { external < appleCloud < onDevice }
 enum PrivacyDisclosure { silent, notify(…), askOnPrivacyChange(…), denyDowngrade }
@@ -333,9 +363,10 @@ ProviderStatusList, AIPlaygroundView) are additive and optional by definition.
 ## 9. Demo & verification
 
 - `swift build` — builds core + UI + demo (macOS side).
-- `swift test` — 23 tests: fallback chain, terminal vs recoverable errors,
+- `swift test` — 26 tests: fallback chain, terminal vs recoverable errors,
   privacy disclosure policies (all four), resolution primitive, provider
-  statuses, global configure, Retry-After parsing.
+  statuses, conversation-history pass-through incl. across fallback (D12),
+  global configure, Retry-After parsing.
 - `swift run AIProviderKitDemo` — macOS test UI.
 - **iOS demo:** open `Examples/iOSDemo/iOSDemo.xcodeproj` and run on an
   iPhone/iPad (or simulator with an iOS 26 runtime — Xcode 26.6 ships iPhone 17
@@ -348,7 +379,10 @@ Both demos render the same `DemoRootView` (target `AIProviderKitDemoUI`):
 configure providers/key/preference live, see the fallback chain status with
 real availability reasons, send prompts, see which provider answered with its
 privacy badge, and watch privacy-downgrade notifications. Layout is adaptive —
-split view on macOS, tabs (Configura / Playground) on iOS.
+split view on macOS, tabs (Configura / Playground) on iOS. The playground is a
+real conversation since D12: follow-ups ("modifica il giorno 2") work because
+the view holds the history and passes it per call; "Nuova conversazione"
+resets it.
 
 Model-limitation behavior to expect:
 - Simulator / non-Apple-Intelligence device: on-device row shows the reason

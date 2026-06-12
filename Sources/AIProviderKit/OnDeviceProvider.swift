@@ -27,15 +27,15 @@ public struct OnDeviceProvider: ModelProvider {
         }
     }
 
-    public func respond(to prompt: String, instructions: String?) async throws -> String {
-        // Sessione creata per chiamata. La gestione di sessioni multi-turno
-        // persistenti è un'estensione successiva (vedi roadmap).
-        let session: LanguageModelSession
-        if let instructions, !instructions.isEmpty {
-            session = LanguageModelSession(instructions: instructions)
-        } else {
-            session = LanguageModelSession()
-        }
+    public func respond(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn]
+    ) async throws -> String {
+        // Sessione creata per chiamata (stateless, D12): la storia della
+        // conversazione arriva dall'app e viene ricostruita come Transcript
+        // nativo di Foundation Models.
+        let session = Self.makeSession(instructions: instructions, history: history)
 
         do {
             let response = try await session.respond(to: prompt)
@@ -47,6 +47,43 @@ public struct OnDeviceProvider: ModelProvider {
         } catch {
             throw ProviderError.generation(String(describing: error))
         }
+    }
+
+    /// Costruisce la sessione per la singola chiamata. Senza storia usa gli
+    /// init semplici; con storia ricostruisce un `Transcript` nativo, così il
+    /// modello vede la conversazione esattamente come se fosse sua.
+    private static func makeSession(
+        instructions: String?,
+        history: [ChatTurn]
+    ) -> LanguageModelSession {
+        guard !history.isEmpty else {
+            if let instructions, !instructions.isEmpty {
+                return LanguageModelSession(instructions: instructions)
+            }
+            return LanguageModelSession()
+        }
+
+        var entries: [Transcript.Entry] = []
+        if let instructions, !instructions.isEmpty {
+            entries.append(.instructions(Transcript.Instructions(
+                segments: [.text(Transcript.TextSegment(content: instructions))],
+                toolDefinitions: []
+            )))
+        }
+        for turn in history {
+            switch turn.role {
+            case .user:
+                entries.append(.prompt(Transcript.Prompt(
+                    segments: [.text(Transcript.TextSegment(content: turn.text))]
+                )))
+            case .assistant:
+                entries.append(.response(Transcript.Response(
+                    assetIDs: [],
+                    segments: [.text(Transcript.TextSegment(content: turn.text))]
+                )))
+            }
+        }
+        return LanguageModelSession(transcript: Transcript(entries: entries))
     }
 
     /// Mappa gli errori di generazione su ProviderError, distinguendo i casi

@@ -64,6 +64,27 @@ let response = try await AIOrchestrator.active.respondDetailed(to: "…")
 print(response.text, response.provider, response.privacyLevel)
 ```
 
+### Conversazioni multi-turno
+
+Il framework è **stateless**: non ricorda nulla tra una chiamata e l'altra.
+La conversazione appartiene all'app, che la passa a ogni chiamata:
+
+```swift
+var history: [ChatTurn] = []
+
+let first = try await kit.respond(to: "Pianifica un weekend")
+history += [.user("Pianifica un weekend"), .assistant(first)]
+
+// Il follow-up funziona perché la storia viaggia con la chiamata —
+// anche se nel frattempo il fallback ha cambiato provider.
+let second = try await kit.respond(to: "Modifica il giorno 2", history: history)
+```
+
+Ogni chiamata è autocontenuta: se il provider preferito diventa indisponibile
+a metà conversazione, il successivo riceve la stessa storia e la conversazione
+continua senza interruzioni (con la disclosure di privacy configurata).
+Quando e come accorciare la storia resta una scelta dell'app.
+
 ### 3. Risoluzione senza esecuzione (il primitivo)
 
 ```swift
@@ -89,7 +110,8 @@ import AIProviderKitUI
 // Stato della catena di fallback (per debug o impostazioni):
 ProviderStatusList(orchestrator: kit)
 
-// Playground prompt→risposta pronto all'uso, con badge di privacy:
+// Playground conversazionale pronto all'uso, con badge di privacy.
+// Possiede la propria storia e la passa a ogni chiamata (pattern D12):
 AIPlaygroundView(orchestrator: kit, instructions: "Sii conciso.")
 ```
 

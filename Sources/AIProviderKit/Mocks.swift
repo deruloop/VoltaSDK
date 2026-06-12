@@ -18,24 +18,32 @@ public struct MockProvider: ModelProvider {
 
     private let availabilityResult: ProviderAvailability
     private let outcome: Result<String, ProviderError>
+    private let onRespond: (@Sendable (_ prompt: String, _ instructions: String?, _ history: [ChatTurn]) -> Void)?
 
     public init(
         identifier: ProviderIdentifier,
         privacyLevel: PrivacyLevel = .onDevice,
         availability: ProviderAvailability = .available,
-        outcome: Result<String, ProviderError> = .success("")
+        outcome: Result<String, ProviderError> = .success(""),
+        onRespond: (@Sendable (_ prompt: String, _ instructions: String?, _ history: [ChatTurn]) -> Void)? = nil
     ) {
         self.identifier = identifier
         self.privacyLevel = privacyLevel
         self.availabilityResult = availability
         self.outcome = outcome
+        self.onRespond = onRespond
     }
 
     public func availability() async -> ProviderAvailability {
         availabilityResult
     }
 
-    public func respond(to prompt: String, instructions: String?) async throws -> String {
+    public func respond(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn]
+    ) async throws -> String {
+        onRespond?(prompt, instructions, history)
         switch outcome {
         case .success(let text):
             return text
