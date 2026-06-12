@@ -2,22 +2,22 @@
 //  ChatTurn.swift
 //  AIProviderKit
 //
-//  Un turno di conversazione fornito DALL'APP al framework (D12).
+//  A conversation turn supplied BY THE APP to the framework (D12).
 //
-//  Il framework è "stateless, transcript-transparent": non ricorda mai nulla
-//  tra una chiamata e l'altra, ma ogni chiamata può trasportare la storia
-//  della conversazione fornita dallo sviluppatore. Così:
-//   - la proprietà della conversazione (persistenza, editing, trimming)
-//     resta all'app, non al framework;
-//   - ogni chiamata è autocontenuta, quindi QUALSIASI provider della catena
-//     può rispondere a qualsiasi turno → il cambio di provider a metà
-//     conversazione (quota PCC esaurita, rate limit on-device) è gratuito,
-//     gestito dal normale fallback per-chiamata.
+//  The framework is "stateless, transcript-transparent": it never remembers
+//  anything between calls, but every call can carry the conversation
+//  history supplied by the developer. As a result:
+//   - ownership of the conversation (persistence, editing, trimming)
+//     stays with the app, not the framework;
+//   - every call is self-contained, so ANY provider in the chain can
+//     answer any turn → switching provider mid-conversation (PCC quota
+//     exhausted, on-device rate limit) is free, handled by the normal
+//     per-call fallback.
 //
 
 import Foundation
 
-/// Un messaggio di una conversazione precedente, passato come contesto.
+/// A message from a previous conversation, passed as context.
 public struct ChatTurn: Sendable, Equatable {
     public enum Role: Sendable, Equatable {
         case user

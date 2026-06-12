@@ -2,12 +2,12 @@
 //  iOSDemoApp.swift
 //  iOSDemo
 //
-//  Demo iPhone/iPad di AIProviderKit. Tutta la UI è condivisa con la demo
-//  macOS: vive nel target AIProviderKitDemoUI del package.
+//  iPhone/iPad demo for AIProviderKit. All the UI is shared with the macOS
+//  demo: it lives in the package's AIProviderKitDemoUI target.
 //
-//  Su un device con Apple Intelligence il provider on-device è reale;
-//  sul simulatore (o su device non idonei) la lista provider mostra il
-//  motivo di indisponibilità e si può testare il fallback sulla developer key.
+//  On a device with Apple Intelligence the on-device provider is real;
+//  on the simulator (or ineligible devices) the provider list shows the
+//  unavailability reason and the developer-key fallback can be tested.
 //
 
 import SwiftUI

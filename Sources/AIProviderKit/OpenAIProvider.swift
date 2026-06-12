@@ -2,18 +2,19 @@
 //  OpenAIProvider.swift
 //  AIProviderKit
 //
-//  Evoluzione del ChatGptManager originale.
-//  Differenze chiave rispetto alla versione primitiva:
-//   - firma `throws -> String` invece di `-> String?` (gli errori non si perdono)
-//   - errori mappati su ProviderError (429 → .rateLimited, 401 → .unauthorized, ...)
-//   - modello e parametri configurabili invece che hardcoded
-//   - request/response via Codable invece di JSONSerialization
+//  Evolution of the original ChatGptManager.
+//  Key differences from the primitive version:
+//   - `throws -> String` signature instead of `-> String?` (errors aren't lost)
+//   - errors mapped onto ProviderError (429 → .rateLimited, 401 → .unauthorized, ...)
+//   - model and parameters configurable instead of hardcoded
+//   - request/response via Codable instead of JSONSerialization
 //
-//  NOTA SICUREZZA (iOS 26): qui la developer key viaggia in una chiamata diretta
-//  dal dispositivo all'endpoint OpenAI. La chiave è dello sviluppatore (non dell'utente),
-//  ma resta nel traffico del device. Per produzione ad alto volume valutare un proxy
-//  lato server. Su iOS 27 questo provider sarà rimpiazzabile dall'integrazione nativa
-//  conforme al protocollo `LanguageModel`.
+//  SECURITY NOTE (iOS 26): here the developer key travels in a direct call
+//  from the device to the OpenAI endpoint. The key belongs to the developer
+//  (not the user), but it is present in device traffic. For high-volume
+//  production consider a server-side proxy. On iOS 27 this provider becomes
+//  replaceable by the native integration conforming to the `LanguageModel`
+//  protocol.
 //
 
 import Foundation
@@ -48,11 +49,11 @@ public struct OpenAIProvider: ModelProvider {
         self.explicitContextSize = contextSize
     }
 
-    // MARK: Consapevolezza dei token (D13) — stime oneste
+    // MARK: Token awareness (D13) — honest estimates
 
-    /// Finestra di contesto: quella passata all'init se presente, altrimenti
-    /// best-effort dai modelli noti. `nil` per modelli sconosciuti: meglio
-    /// nessun pre-flight che un pre-flight sbagliato.
+    /// Context window: the one passed to the initializer if present,
+    /// otherwise best-effort from known models. `nil` for unknown models:
+    /// no pre-flight beats a wrong pre-flight.
     private let explicitContextSize: Int?
 
     public var contextSize: Int? {
@@ -60,10 +61,10 @@ public struct OpenAIProvider: ModelProvider {
         return Self.knownContextSize(forModel: model)
     }
 
-    /// STIMA (~4 caratteri/token): OpenAI non offre un tokenizer ufficiale
-    /// client-side. Sottostimare di poco è voluto: il pre-flight non deve
-    /// scartare un provider utilizzabile; l'overflow vero resta comunque
-    /// coperto dal percorso reattivo (.contextWindowExceeded).
+    /// ESTIMATE (~4 characters/token): OpenAI offers no official client-side
+    /// tokenizer. Slightly undercounting is intentional: pre-flight must
+    /// never discard a usable provider; true overflow is still covered by
+    /// the reactive path (.contextWindowExceeded).
     public func tokenCount(
         prompt: String,
         instructions: String?,
@@ -85,7 +86,7 @@ public struct OpenAIProvider: ModelProvider {
 
     public func availability() async -> ProviderAvailability {
         apiKey.isEmpty
-            ? .unavailable(reason: "API key non configurata")
+            ? .unavailable(reason: "API key not configured")
             : .available
     }
 
@@ -99,7 +100,7 @@ public struct OpenAIProvider: ModelProvider {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
-        // system → storia fornita dall'app (D12) → prompt corrente.
+        // system → app-supplied history (D12) → current prompt.
         var messages: [ChatRequest.Message] = []
         if let instructions, !instructions.isEmpty {
             messages.append(.init(role: "system", content: instructions))
@@ -122,7 +123,7 @@ public struct OpenAIProvider: ModelProvider {
                 )
             )
         } catch {
-            throw ProviderError.encoding("Encoding della richiesta fallito: \(error.localizedDescription)")
+            throw ProviderError.encoding("Request encoding failed: \(error.localizedDescription)")
         }
 
         let data: Data
@@ -140,7 +141,7 @@ public struct OpenAIProvider: ModelProvider {
             throw ProviderError.network(code: -1)
         }
 
-        // Errori HTTP mappati su casi semantici.
+        // HTTP errors mapped onto semantic cases.
         switch http.statusCode {
         case 200...299:
             break
@@ -151,14 +152,14 @@ public struct OpenAIProvider: ModelProvider {
             throw ProviderError.rateLimited(retryAfter: retryAfter)
         default:
             if let envelope = try? JSONDecoder().decode(OpenAIErrorEnvelope.self, from: data) {
-                // Il context window superato arriva come errore applicativo:
-                // lo distinguiamo perché per l'orchestratore è recuperabile.
+                // Context-window overflow arrives as an application error:
+                // we single it out because the orchestrator can recover from it.
                 if envelope.error.code == "context_length_exceeded" {
                     throw ProviderError.contextWindowExceeded
                 }
                 throw ProviderError.api(message: envelope.error.message, code: envelope.error.code)
             }
-            let raw = String(data: data, encoding: .utf8) ?? "<corpo non leggibile>"
+            let raw = String(data: data, encoding: .utf8) ?? "<unreadable body>"
             throw ProviderError.api(message: "HTTP \(http.statusCode): \(raw)", code: nil)
         }
 
@@ -177,7 +178,7 @@ public struct OpenAIProvider: ModelProvider {
         }
     }
 
-    /// `Retry-After` può essere in secondi ("120") o una HTTP-date.
+    /// `Retry-After` can be seconds ("120") or an HTTP-date.
     static func parseRetryAfter(_ value: String?) -> TimeInterval? {
         guard let value else { return nil }
         if let seconds = TimeInterval(value) { return seconds }
@@ -192,7 +193,7 @@ public struct OpenAIProvider: ModelProvider {
     }
 }
 
-// MARK: - DTO
+// MARK: - DTOs
 
 private struct ChatRequest: Encodable {
     let model: String
@@ -202,7 +203,7 @@ private struct ChatRequest: Encodable {
 
     enum CodingKeys: String, CodingKey {
         case model, messages, temperature
-        // `max_tokens` è deprecato: i modelli più recenti accettano solo questo.
+        // `max_tokens` is deprecated: newer models only accept this one.
         case maxCompletionTokens = "max_completion_tokens"
     }
 

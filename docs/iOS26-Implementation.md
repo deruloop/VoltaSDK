@@ -9,7 +9,9 @@
 
 ## 1. Verified status
 
-Released **v1.0.0** (git tag `1.0.0`, 2026-06-12). `swift build` succeeds and
+Released **v1.0.1** (git tags `1.0.0`, `1.0.1`, 2026-06-12; 1.0.1 translated
+all comments, docs, and user-facing strings to English — no behavior change).
+`swift build` succeeds and
 **34 tests in 7 suites pass** on macOS 26.5 SDK / Xcode 26.6, Swift 6.2 tools.
 The iOS demo app builds and runs on the iOS 26.5 simulator (verified on
 iPhone 17 Pro) and signs correctly for a physical iPhone 15 Pro Max.
@@ -274,21 +276,21 @@ Both demos render the same `DemoRootView` (target `AIProviderKitDemoUI`):
 configure providers/key/preference live, see the fallback chain status with
 real availability reasons, send prompts, see which provider answered with its
 privacy badge, and watch privacy-downgrade notifications. Layout is adaptive —
-split view on macOS, tabs (Configura / Playground) on iOS. The playground is a
+split view on macOS, tabs (Configure / Playground) on iOS. The playground is a
 real conversation (D12): follow-ups work because the view holds the history and
-passes it per call; "Nuova conversazione" resets it. It also shows the context
-pressure ("contesto N% di \<window\>", orange above 80%) for the provider that
+passes it per call; "New conversation" resets it. It also shows the context
+pressure ("context N% of \<window\>", orange above 80%) for the provider that
 would answer next, and the status list shows each provider's window size. On
 26.0–26.3 the on-device pressure indicator simply doesn't appear (no counting
 API): that's the base tier behaving as designed.
 
 Model-limitation behavior to expect:
 - Simulator / non-Apple-Intelligence device: on-device row shows the reason
-  (e.g. "Apple Intelligence non è attivo nelle Impostazioni") and the chain
+  (e.g. "Apple Intelligence is not enabled in Settings") and the chain
   falls back to the developer key if configured — with the privacy-downgrade
   notification visible in the Privacy section.
 - iPhone 15 Pro / 16+ with Apple Intelligence on: on-device row is green and
-  answers carry the "Sul dispositivo" badge.
+  answers carry the "On device" badge.
 - Context-window overflow / unsupported language on-device fall through to the
   cloud provider per D10; guardrail violations surface as errors (terminal).
 

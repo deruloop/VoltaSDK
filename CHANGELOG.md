@@ -1,39 +1,45 @@
 # Changelog
 
-Tutte le modifiche rilevanti del package. Versioning: [SemVer](https://semver.org).
-La promessa di stabilità (CLAUDE.md §8, D3): le estensioni iOS 27 saranno
-additive sulla stessa API — restano nella serie 1.x.
+All notable changes to this package. Versioning: [SemVer](https://semver.org).
+Stability promise (see docs, D3): the iOS 27 extensions will be additive on
+the same API — they stay in the 1.x series.
+
+## [1.0.1] — 2026-06-12
+
+- All code comments, documentation, and user-facing strings (availability
+  reasons, error descriptions, UI labels, demo) translated from Italian to
+  English. No behavioral changes; API unchanged.
 
 ## [1.0.0] — 2026-06-12
 
-Prima release. Base iOS 26 / macOS 26, Swift 6.2.
+First release. iOS 26 / macOS 26 base, Swift 6.2.
 
 ### Core (`AIProviderKit`)
-- `AIOrchestrator`: catena di fallback runtime tra provider, con errori
-  tipizzati (`ProviderError`) e distinzione recuperabile/terminale.
-- Provider inclusi: `OnDeviceProvider` (Foundation Models, Apple Intelligence)
-  e `OpenAIProvider` (developer key, Chat Completions).
-- Disclosure di privacy sul downgrade (`PrivacyDisclosure`):
+- `AIOrchestrator`: runtime fallback chain across providers, with typed
+  errors (`ProviderError`) and the recoverable/terminal distinction.
+- Bundled providers: `OnDeviceProvider` (Foundation Models, Apple
+  Intelligence) and `OpenAIProvider` (developer key, Chat Completions).
+- Privacy-downgrade disclosure (`PrivacyDisclosure`):
   `.silent` / `.notify` / `.askOnPrivacyChange` / `.denyDowngrade` (D10).
-- Conversazioni multi-turno "transcript-transparent" (D12): il core è
-  stateless, l'app passa la storia (`history: [ChatTurn]`) a ogni chiamata;
-  il fallback funziona anche a metà conversazione.
-- Consapevolezza dei token (D13): pre-flight automatico sulla finestra di
-  contesto (conteggio esatto on-device da iOS/macOS 26.4, stime oneste per
-  i provider cloud) e `contextUsage(instructions:history:)` per decidere
-  quando accorciare la storia.
-- Primitivo di risoluzione `resolveProvider()` (D9) e provenienza della
-  risposta (`respondDetailed` → provider + livello di privacy).
-- `MockProvider` pubblico per testare l'integrazione senza rete né device.
+- Transcript-transparent multi-turn conversations (D12): the core is
+  stateless, the app passes the history (`history: [ChatTurn]`) on every
+  call; fallback works mid-conversation.
+- Token awareness (D13): automatic context-window pre-flight (exact
+  on-device counting from iOS/macOS 26.4, honest estimates for cloud
+  providers) and `contextUsage(instructions:history:)` to decide when to
+  trim the history.
+- Resolution primitive `resolveProvider()` (D9) and response provenance
+  (`respondDetailed` → provider + privacy level).
+- Public `MockProvider` for testing integrations without network or device.
 
-### UI opzionale (`AIProviderKitUI`)
+### Optional UI (`AIProviderKitUI`)
 - `PrivacyLevelBadge`, `ProviderStatusRow`/`ProviderStatusList`,
-  `AIPlaygroundView` (conversazionale, con indicatore di pressione contesto).
+  `AIPlaygroundView` (conversational, with a context-pressure indicator).
 
-### Demo
+### Demos
 - macOS: `swift run AIProviderKitDemo`.
 - iPhone/iPad: `Examples/iOSDemo/iOSDemo.xcodeproj`.
 
-### Verifica
-- 34 test in 7 suite; build verificate su macOS 26.5, simulatore iOS 26.5 e
-  iPhone fisico (firma).
+### Verification
+- 34 tests in 7 suites; builds verified on macOS 26.5, the iOS 26.5
+  simulator, and a physical iPhone (signing).

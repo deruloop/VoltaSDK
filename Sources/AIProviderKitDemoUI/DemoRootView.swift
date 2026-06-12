@@ -2,30 +2,30 @@
 //  DemoRootView.swift
 //  AIProviderKitDemoUI
 //
-//  La UI di prova condivisa tra la demo macOS (`swift run AIProviderKitDemo`)
-//  e la app demo iOS (Examples/iOSDemo). Stessa logica su entrambe le
-//  piattaforme: configurazione live, stato della catena di fallback (con i
-//  motivi di indisponibilità, es. device senza Apple Intelligence),
-//  playground con provenienza della risposta e log dei downgrade di privacy.
+//  Test UI shared between the macOS demo (`swift run AIProviderKitDemo`)
+//  and the iOS demo app (Examples/iOSDemo). Same logic on both platforms:
+//  live configuration, fallback-chain status (with unavailability reasons,
+//  e.g. a device without Apple Intelligence), a playground with response
+//  provenance, and a privacy-downgrade log.
 //
-//  Layout adattivo:
-//   - macOS: HSplitView (configurazione | playground)
-//   - iOS:   TabView (Configura / Playground)
+//  Adaptive layout:
+//   - macOS: HSplitView (configuration | playground)
+//   - iOS:   TabView (Configure / Playground)
 //
 
 import SwiftUI
 import AIProviderKit
 import AIProviderKitUI
 
-/// Eventi di downgrade di privacy raccolti dalla policy `.notify`,
-/// per renderli visibili nella UI di test.
+/// Privacy-downgrade events collected by the `.notify` policy, surfaced
+/// in the test UI.
 @MainActor @Observable
 final class DowngradeLog {
     var events: [String] = []
 }
 
 public struct DemoRootView: View {
-    // Configurazione editabile (ricrea l'orchestratore su "Applica").
+    // Editable configuration (recreates the orchestrator on "Apply").
     @State private var enableOnDevice = true
     @State private var apiKey = ""
     @State private var model = "gpt-4o-mini"
@@ -42,7 +42,7 @@ public struct DemoRootView: View {
             .onAppear { applyConfiguration() }
     }
 
-    // MARK: Layout per piattaforma
+    // MARK: Per-platform layout
 
     @ViewBuilder
     private var platformLayout: some View {
@@ -55,7 +55,7 @@ public struct DemoRootView: View {
         }
         #else
         TabView {
-            Tab("Configura", systemImage: "gearshape") {
+            Tab("Configure", systemImage: "gearshape") {
                 NavigationStack {
                     configurationForm
                         .navigationTitle("AIProviderKit")
@@ -72,25 +72,25 @@ public struct DemoRootView: View {
         #endif
     }
 
-    // MARK: Pannelli
+    // MARK: Panes
 
     private var configurationForm: some View {
         Form {
-            Section("Provider") {
-                Toggle("Modello on-device", isOn: $enableOnDevice)
+            Section("Providers") {
+                Toggle("On-device model", isOn: $enableOnDevice)
                 SecureField("OpenAI API key", text: $apiKey)
                     .textContentType(.password)
-                TextField("Modello developer key", text: $model)
+                TextField("Developer key model", text: $model)
                     .autocorrectionDisabled()
-                Picker("Preferenza", selection: $preference) {
-                    Text("Prima on-device").tag(ModelPreference.preferOnDevice)
-                    Text("Prima developer key").tag(ModelPreference.preferDeveloperKey)
-                    Text("Solo on-device").tag(ModelPreference.onDeviceOnly)
-                    Text("Solo developer key").tag(ModelPreference.developerKeyOnly)
+                Picker("Preference", selection: $preference) {
+                    Text("On-device first").tag(ModelPreference.preferOnDevice)
+                    Text("Developer key first").tag(ModelPreference.preferDeveloperKey)
+                    Text("On-device only").tag(ModelPreference.onDeviceOnly)
+                    Text("Developer key only").tag(ModelPreference.developerKeyOnly)
                 }
             }
             Section("Privacy") {
-                Toggle("Notifica downgrade di privacy", isOn: $notifyDowngrades)
+                Toggle("Notify privacy downgrades", isOn: $notifyDowngrades)
                 if !downgradeLog.events.isEmpty {
                     ForEach(downgradeLog.events.indices, id: \.self) { index in
                         Text(downgradeLog.events[index])
@@ -100,7 +100,7 @@ public struct DemoRootView: View {
                 }
             }
             Section {
-                Button("Applica configurazione") { applyConfiguration() }
+                Button("Apply configuration") { applyConfiguration() }
                 #if os(macOS)
                     .keyboardShortcut("r")
                 #endif
@@ -116,12 +116,12 @@ public struct DemoRootView: View {
         AIPlaygroundView(
             orchestrator: orchestrator,
             instructions: nil,
-            placeholder: "Prova un prompt (es. \"Pianifica un weekend a Roma\")"
+            placeholder: "Try a prompt (e.g. \"Plan a weekend in Rome\")"
         )
         .padding()
     }
 
-    // MARK: Configurazione
+    // MARK: Configuration
 
     private func applyConfiguration() {
         let log = downgradeLog

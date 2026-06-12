@@ -2,8 +2,8 @@
 //  OnDeviceProvider.swift
 //  AIProviderKit
 //
-//  Wrappa il modello on-device di Apple Intelligence (Foundation Models, iOS 26).
-//  Nessuna rete, nessuna chiave, privacy massima.
+//  Wraps Apple Intelligence's on-device model (Foundation Models, iOS 26).
+//  No network, no key, maximum privacy.
 //
 
 import Foundation
@@ -23,7 +23,7 @@ public struct OnDeviceProvider: ModelProvider {
         case .unavailable(let reason):
             return .unavailable(reason: Self.describe(reason))
         @unknown default:
-            return .unavailable(reason: "Motivo di indisponibilità sconosciuto")
+            return .unavailable(reason: "Unknown unavailability reason")
         }
     }
 
@@ -32,9 +32,9 @@ public struct OnDeviceProvider: ModelProvider {
         instructions: String?,
         history: [ChatTurn]
     ) async throws -> String {
-        // Sessione creata per chiamata (stateless, D12): la storia della
-        // conversazione arriva dall'app e viene ricostruita come Transcript
-        // nativo di Foundation Models.
+        // A session is created per call (stateless, D12): the conversation
+        // history comes from the app and is rebuilt as a native Foundation
+        // Models Transcript.
         let session = Self.makeSession(instructions: instructions, history: history)
 
         do {
@@ -49,16 +49,16 @@ public struct OnDeviceProvider: ModelProvider {
         }
     }
 
-    // MARK: Consapevolezza dei token (D13)
+    // MARK: Token awareness (D13)
 
-    /// Finestra di contesto del modello on-device. La proprietà è
-    /// back-deployed: disponibile su tutta la 26.x.
+    /// Context window of the on-device model. The property is back-deployed:
+    /// available across all of 26.x.
     public var contextSize: Int? {
         SystemLanguageModel.default.contextSize
     }
 
-    /// Conteggio ESATTO via SDK da iOS/macOS 26.4; `nil` su 26.0–26.3
-    /// (il tier base resta solo reattivo: errore a chiamata avvenuta).
+    /// EXACT count via the SDK from iOS/macOS 26.4; `nil` on 26.0–26.3
+    /// (the base tier stays reactive-only: error after the call).
     public func tokenCount(
         prompt: String,
         instructions: String?,
@@ -74,11 +74,11 @@ public struct OnDeviceProvider: ModelProvider {
         return try? await SystemLanguageModel.default.tokenCount(for: entries)
     }
 
-    // MARK: Costruzione sessione/transcript
+    // MARK: Session/transcript construction
 
-    /// Costruisce la sessione per la singola chiamata. Senza storia usa gli
-    /// init semplici; con storia ricostruisce un `Transcript` nativo, così il
-    /// modello vede la conversazione esattamente come se fosse sua.
+    /// Builds the session for a single call. Without history it uses the
+    /// simple initializers; with history it rebuilds a native `Transcript`,
+    /// so the model sees the conversation exactly as if it were its own.
     private static func makeSession(
         instructions: String?,
         history: [ChatTurn]
@@ -93,8 +93,8 @@ public struct OnDeviceProvider: ModelProvider {
         return LanguageModelSession(transcript: Transcript(entries: entries))
     }
 
-    /// Mappa instructions + storia (D12) in entry di `Transcript` native.
-    /// Condivisa tra la creazione della sessione e il conteggio dei token.
+    /// Maps instructions + history (D12) into native `Transcript` entries.
+    /// Shared between session creation and token counting.
     private static func transcriptEntries(
         instructions: String?,
         history: [ChatTurn]
@@ -122,10 +122,10 @@ public struct OnDeviceProvider: ModelProvider {
         return entries
     }
 
-    /// Mappa gli errori di generazione su ProviderError, distinguendo i casi
-    /// recuperabili dal fallback (context window, lingua, rate limit) da
-    /// quelli terminali (guardrail: non inoltriamo automaticamente a un
-    /// provider esterno contenuto che il sistema ha bloccato).
+    /// Maps generation errors onto ProviderError, separating the cases the
+    /// fallback can recover from (context window, language, rate limit) from
+    /// the terminal ones (guardrail: we do not auto-forward content the
+    /// system blocked to an external provider).
     private static func map(_ error: LanguageModelSession.GenerationError) -> ProviderError {
         switch error {
         case .exceededContextWindowSize:
@@ -135,8 +135,8 @@ public struct OnDeviceProvider: ModelProvider {
         case .unsupportedLanguageOrLocale:
             return .unsupportedLanguage
         case .rateLimited:
-            // Rate limit on-device (es. app in background): il fallback
-            // su un provider cloud è legittimo.
+            // On-device rate limit (e.g. app in background): falling back
+            // to a cloud provider is legitimate.
             return .rateLimited(retryAfter: nil)
         default:
             return .generation(String(describing: error))
@@ -148,13 +148,13 @@ public struct OnDeviceProvider: ModelProvider {
     ) -> String {
         switch reason {
         case .deviceNotEligible:
-            return "Il dispositivo non supporta Apple Intelligence"
+            return "This device does not support Apple Intelligence"
         case .appleIntelligenceNotEnabled:
-            return "Apple Intelligence non è attivo nelle Impostazioni"
+            return "Apple Intelligence is not enabled in Settings"
         case .modelNotReady:
-            return "Il modello è ancora in download o non pronto"
+            return "The model is still downloading or not ready"
         @unknown default:
-            return "Modello on-device non disponibile"
+            return "On-device model unavailable"
         }
     }
 }

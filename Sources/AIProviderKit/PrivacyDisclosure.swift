@@ -2,29 +2,29 @@
 //  PrivacyDisclosure.swift
 //  AIProviderKit
 //
-//  Disclosure dei downgrade di privacy durante il fallback.
+//  Disclosure of privacy downgrades during fallback.
 //
-//  Perché esiste già su iOS 26: con `.preferOnDevice`, un fallimento
-//  transitorio del modello on-device rimanda il prompt dell'utente a un
-//  provider esterno (OpenAI) in silenzio. È un downgrade di privacy che
-//  avviene OGGI, non solo su iOS 27. Il meccanismo è volutamente identico
-//  a quello previsto dal design iOS 27 (.silent / .notify /
-//  .askOnPrivacyChange), così l'estensione non cambierà l'API.
+//  Why this exists already on iOS 26: with `.preferOnDevice`, a transient
+//  failure of the on-device model silently re-sends the user's prompt to an
+//  external provider (OpenAI). That privacy downgrade happens TODAY, not
+//  only on iOS 27. The mechanism deliberately matches the iOS 27 design
+//  (.silent / .notify / .askOnPrivacyChange), so the extension won't
+//  change the API.
 //
-//  Solo lo sviluppatore conosce la sensibilità della propria app:
-//  per questo la policy è una scelta di configurazione, non un default rigido.
+//  Only the developer knows their app's sensitivity: that's why the policy
+//  is a configuration choice, not a hardcoded default.
 //
 
 import Foundation
 
-/// Descrive un attraversamento di soglia di privacy: il provider che sta per
-/// rispondere opera a un livello più basso del primo provider della catena.
+/// Describes a privacy-threshold crossing: the provider about to answer
+/// operates at a lower level than the first provider in the chain.
 public struct PrivacyDowngrade: Sendable, Equatable {
-    /// Il livello del provider preferito (la "promessa" implicita della catena).
+    /// The preferred provider's level (the chain's implicit "promise").
     public let from: PrivacyLevel
-    /// Il livello del provider che sta per essere usato.
+    /// The level of the provider about to be used.
     public let to: PrivacyLevel
-    /// Chi sta per ricevere il prompt.
+    /// Who is about to receive the prompt.
     public let provider: ProviderIdentifier
 
     public init(from: PrivacyLevel, to: PrivacyLevel, provider: ProviderIdentifier) {
@@ -34,19 +34,19 @@ public struct PrivacyDowngrade: Sendable, Equatable {
     }
 }
 
-/// Policy applicata dall'orchestratore quando il fallback attraversa
-/// una soglia di privacy verso il basso.
+/// Policy the orchestrator applies when fallback crosses a privacy
+/// threshold downwards.
 public enum PrivacyDisclosure: Sendable {
-    /// Nessuna segnalazione: il fallback è trasparente. Default.
+    /// No signal: the fallback is transparent. Default.
     case silent
-    /// Il fallback procede, ma l'handler viene notificato (es. per mostrare
-    /// un banner "risposta generata nel cloud"). L'handler è sincrono e
-    /// non può bloccare il fallback.
+    /// The fallback proceeds, but the handler is notified (e.g. to show a
+    /// "response generated in the cloud" banner). The handler is synchronous
+    /// and cannot block the fallback.
     case notify(@Sendable (PrivacyDowngrade) -> Void)
-    /// Il fallback si ferma e chiede: `true` per procedere, `false` per
-    /// saltare il provider. Tipicamente collegato a un alert in UI.
+    /// The fallback pauses and asks: `true` to proceed, `false` to skip the
+    /// provider. Typically wired to an alert in the UI.
     case askOnPrivacyChange(@Sendable (PrivacyDowngrade) async -> Bool)
-    /// I provider sotto il livello del primo della catena non vengono mai
-    /// usati. Se restano solo loro, `respond` lancia `.privacyRestricted`.
+    /// Providers below the first provider's level are never used. If only
+    /// they remain, `respond` throws `.privacyRestricted`.
     case denyDowngrade
 }

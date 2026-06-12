@@ -1,7 +1,7 @@
-# Progetto demo iOS, generato con XcodeGen:
+# iOS demo project, generated with XcodeGen:
 #     cd Examples/iOSDemo && xcodegen generate
-# Il progetto generato (iOSDemo.xcodeproj) è committato, quindi xcodegen
-# serve solo se si modifica questo file.
+# The generated project (iOSDemo.xcodeproj) is committed, so xcodegen is
+# only needed when this file changes.
 name: iOSDemo
 options:
   bundleIdPrefix: com.aiproviderkit.demo

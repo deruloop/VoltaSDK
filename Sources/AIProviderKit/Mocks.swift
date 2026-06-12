@@ -2,15 +2,16 @@
 //  Mocks.swift
 //  AIProviderKit
 //
-//  Eredita il pattern del ChatGptManagerMock originale, generalizzato.
-//  Permette di testare l'orchestratore e il fallback senza rete né device reale.
+//  Inherits the pattern of the original ChatGptManagerMock, generalized.
+//  Lets you test the orchestrator and the fallback without network or a
+//  real device. Public on purpose: adopters can use it in their own tests.
 //
 
 import Foundation
 
-/// Provider finto con esito configurabile. Copre sia successo che fallimento,
-/// così da poter testare la catena di fallback (es. un provider che restituisce
-/// .rateLimited e uno che risponde correttamente subito dopo).
+/// Fake provider with a configurable outcome. Covers both success and
+/// failure, so the fallback chain can be tested (e.g. one provider that
+/// returns .rateLimited and one that answers correctly right after).
 public struct MockProvider: ModelProvider {
 
     public let identifier: ProviderIdentifier
@@ -20,7 +21,7 @@ public struct MockProvider: ModelProvider {
     private let outcome: Result<String, ProviderError>
     private let onRespond: (@Sendable (_ prompt: String, _ instructions: String?, _ history: [ChatTurn]) -> Void)?
 
-    /// Capability di token awareness simulata (D13). Default: non supportata.
+    /// Simulated token-awareness capability (D13). Default: unsupported.
     public let contextSize: Int?
     private let tokenCountValue: Int?
 
@@ -42,16 +43,16 @@ public struct MockProvider: ModelProvider {
         self.onRespond = onRespond
     }
 
+    public func availability() async -> ProviderAvailability {
+        availabilityResult
+    }
+
     public func tokenCount(
         prompt: String,
         instructions: String?,
         history: [ChatTurn]
     ) async -> Int? {
         tokenCountValue
-    }
-
-    public func availability() async -> ProviderAvailability {
-        availabilityResult
     }
 
     public func respond(

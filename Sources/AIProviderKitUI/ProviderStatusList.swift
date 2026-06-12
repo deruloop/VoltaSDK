@@ -2,16 +2,16 @@
 //  ProviderStatusList.swift
 //  AIProviderKitUI
 //
-//  Lista dello stato dei provider nella catena di fallback.
-//  Componente opzionale e componibile: `ProviderStatusRow` è pubblica,
-//  così chi vuole un layout diverso può costruirselo sopra
+//  Status list for the providers in the fallback chain.
+//  Optional and composable: `ProviderStatusRow` is public, so anyone who
+//  wants a different layout can build their own on top of
 //  `AIOrchestrator.providerStatuses()`.
 //
 
 import SwiftUI
 import AIProviderKit
 
-/// Riga singola: nome provider, disponibilità (con motivo) e badge privacy.
+/// Single row: provider name, availability (with reason) and privacy badge.
 public struct ProviderStatusRow: View {
     private let status: ProviderStatus
 
@@ -33,7 +33,7 @@ public struct ProviderStatusRow: View {
                         .foregroundStyle(.secondary)
                 }
                 if let contextSize = status.contextSize {
-                    Text("Finestra: \(contextSize.formatted()) token")
+                    Text("Window: \(contextSize.formatted()) tokens")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -49,8 +49,8 @@ public struct ProviderStatusRow: View {
     }
 }
 
-/// Lista pronta all'uso: interroga l'orchestratore e mostra una riga per
-/// provider, nell'ordine reale della catena di fallback.
+/// Ready-to-use list: queries the orchestrator and shows one row per
+/// provider, in the real order of the fallback chain.
 public struct ProviderStatusList: View {
     private let orchestrator: AIOrchestrator
     @State private var statuses: [ProviderStatus] = []
@@ -63,7 +63,7 @@ public struct ProviderStatusList: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("Catena di fallback")
+                Text("Fallback chain")
                     .font(.headline)
                 Spacer()
                 Button {
@@ -72,13 +72,13 @@ public struct ProviderStatusList: View {
                     Image(systemName: "arrow.clockwise")
                 }
                 .buttonStyle(.borderless)
-                .accessibilityLabel("Aggiorna stato provider")
+                .accessibilityLabel("Refresh provider status")
             }
             if isLoading {
                 ProgressView()
                     .controlSize(.small)
             } else if statuses.isEmpty {
-                Text("Nessun provider configurato")
+                Text("No providers configured")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {

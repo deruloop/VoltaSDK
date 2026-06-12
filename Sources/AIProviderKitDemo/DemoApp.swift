@@ -2,11 +2,11 @@
 //  DemoApp.swift
 //  AIProviderKitDemo
 //
-//  App di prova macOS:
+//  macOS test app:
 //      swift run AIProviderKitDemo
 //
-//  Tutta la UI vive in AIProviderKitDemoUI (condivisa con la demo iOS in
-//  Examples/iOSDemo). Qui c'è solo il bootstrap macOS.
+//  All the UI lives in AIProviderKitDemoUI (shared with the iOS demo in
+//  Examples/iOSDemo). This is only the macOS bootstrap.
 //
 
 import SwiftUI
@@ -19,8 +19,8 @@ import AppKit
 struct AIProviderKitDemoApp: App {
     init() {
         #if os(macOS)
-        // Eseguita da `swift run` (nessun bundle .app): serve per far
-        // comparire la finestra in primo piano.
+        // Run by `swift run` (no .app bundle): needed to bring the
+        // window to the foreground.
         DispatchQueue.main.async {
             NSApp.setActivationPolicy(.regular)
             NSApp.activate(ignoringOtherApps: true)

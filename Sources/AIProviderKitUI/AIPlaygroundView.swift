@@ -2,28 +2,28 @@
 //  AIPlaygroundView.swift
 //  AIProviderKitUI
 //
-//  Vista prompt→risposta pronta all'uso, con indicazione di quale provider
-//  ha risposto e a quale livello di privacy.
+//  Ready-to-use prompt→response view, showing which provider answered and
+//  at which privacy level.
 //
-//  Dimostra il pattern D12 ("stateless core, transcript-transparent"):
-//  questa vista interpreta il ruolo dello SVILUPPATORE — possiede la storia
-//  della conversazione e la passa a ogni chiamata via `history:`. Il
-//  framework non memorizza nulla; ogni chiamata è autocontenuta, quindi i
-//  follow-up funzionano anche se il provider cambia tra un turno e l'altro.
+//  Demonstrates the D12 pattern ("stateless core, transcript-transparent"):
+//  this view plays the DEVELOPER's role — it owns the conversation history
+//  and passes it on every call via `history:`. The framework stores
+//  nothing; every call is self-contained, so follow-ups keep working even
+//  if the provider changes between turns.
 //
 
 import SwiftUI
 import AIProviderKit
 
-/// Un singolo scambio prompt → risposta, con provenienza.
+/// A single prompt → response exchange, with provenance.
 public struct PlaygroundExchange: Identifiable, Sendable {
     public let id = UUID()
     public let prompt: String
     public let response: AIResponse
 }
 
-/// Playground minimale che lo sviluppatore può usare così com'è o come
-/// riferimento per la propria UI (tutta la logica passa da `respondDetailed`).
+/// Minimal playground the developer can use as-is or as a reference for
+/// their own UI (all the logic goes through `respondDetailed`).
 public struct AIPlaygroundView: View {
     private let orchestrator: AIOrchestrator
     private let instructions: String?
@@ -38,14 +38,14 @@ public struct AIPlaygroundView: View {
     public init(
         orchestrator: AIOrchestrator,
         instructions: String? = nil,
-        placeholder: String = "Scrivi un prompt…"
+        placeholder: String = "Write a prompt…"
     ) {
         self.orchestrator = orchestrator
         self.instructions = instructions
         self.placeholder = placeholder
     }
 
-    /// La storia che verrà inviata col prossimo turno (ruolo "sviluppatore").
+    /// The history that will travel with the next turn ("developer" role).
     private var conversationHistory: [ChatTurn] {
         exchanges.flatMap { exchange in
             [.user(exchange.prompt), .assistant(exchange.response.text)]
@@ -55,18 +55,18 @@ public struct AIPlaygroundView: View {
     public var body: some View {
         VStack(spacing: 8) {
             HStack {
-                Text("Conversazione (\(exchanges.count) turni)")
+                Text("Conversation (\(exchanges.count) turns)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if let contextUsage {
-                    // Pressione sulla finestra del provider che risponderebbe
-                    // ora (D13): è il segnale per accorciare/riassumere (D12).
-                    Text("· contesto \(Int(contextUsage.fraction * 100))% di \(contextUsage.contextSize)")
+                    // Pressure on the window of the provider that would
+                    // answer next (D13): the signal to trim/summarize (D12).
+                    Text("· context \(Int(contextUsage.fraction * 100))% of \(contextUsage.contextSize)")
                         .font(.caption)
                         .foregroundStyle(contextUsage.fraction > 0.8 ? .orange : .secondary)
                 }
                 Spacer()
-                Button("Nuova conversazione", systemImage: "plus.bubble") {
+                Button("New conversation", systemImage: "plus.bubble") {
                     exchanges.removeAll()
                     errorText = nil
                     contextUsage = nil
@@ -141,8 +141,8 @@ public struct AIPlaygroundView: View {
         errorText = nil
         isLoading = true
 
-        // Fotografa la storia PRIMA della chiamata: è l'app (qui la vista)
-        // a possederla e fornirla — il framework non ricorda nulla (D12).
+        // Snapshot the history BEFORE the call: the app (here, the view)
+        // owns and supplies it — the framework remembers nothing (D12).
         let history = conversationHistory
 
         Task {
@@ -170,33 +170,33 @@ public struct AIPlaygroundView: View {
         switch error {
         case .rateLimited(let retryAfter):
             if let retryAfter {
-                return "Limite di richieste raggiunto, riprova tra \(Int(retryAfter))s"
+                return "Rate limit reached, retry in \(Int(retryAfter))s"
             }
-            return "Limite di richieste raggiunto"
+            return "Rate limit reached"
         case .unauthorized:
-            return "API key non valida o mancante"
+            return "Invalid or missing API key"
         case .network(let code):
-            return "Errore di rete (\(code))"
+            return "Network error (\(code))"
         case .emptyResponse:
-            return "Risposta vuota dal provider"
+            return "Empty response from the provider"
         case .encoding(let detail), .decoding(let detail):
-            return "Errore dati: \(detail)"
+            return "Data error: \(detail)"
         case .api(let message, _):
-            return "Errore del provider: \(message)"
+            return "Provider error: \(message)"
         case .contextWindowExceeded:
-            return "Prompt troppo lungo per la finestra di contesto"
+            return "Prompt too long for the context window"
         case .guardrailViolation:
-            return "Contenuto bloccato dai guardrail di sicurezza"
+            return "Content blocked by safety guardrails"
         case .unsupportedLanguage:
-            return "Lingua non supportata dal modello"
+            return "Language not supported by the model"
         case .generation(let detail):
-            return "Errore di generazione: \(detail)"
+            return "Generation error: \(detail)"
         case .noProviderAvailable:
-            return "Nessun provider disponibile"
+            return "No provider available"
         case .privacyRestricted:
-            return "Bloccato dalla policy di privacy"
+            return "Blocked by the privacy policy"
         case .cancelled:
-            return "Operazione annullata"
+            return "Operation cancelled"
         }
     }
 }

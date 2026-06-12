@@ -2,16 +2,16 @@
 //  PrivacyLevelBadge.swift
 //  AIProviderKitUI
 //
-//  Badge compatto che comunica dove vengono elaborati i dati.
-//  Componente opzionale: il core non dipende mai da SwiftUI.
+//  Compact badge communicating where the data is processed.
+//  Optional component: the core never depends on SwiftUI.
 //
 
 import SwiftUI
 import AIProviderKit
 
-/// Badge per un `PrivacyLevel` (icona + etichetta). Personalizzabile via
-/// `tint(_:)`/`font(_:)` standard; per un look completamente custom lo
-/// sviluppatore può ignorarlo e usare direttamente `PrivacyLevel`.
+/// Badge for a `PrivacyLevel` (icon + label). Customizable via the standard
+/// `tint(_:)`/`font(_:)` modifiers; for a fully custom look the developer
+/// can ignore it and use `PrivacyLevel` directly.
 public struct PrivacyLevelBadge: View {
     private let level: PrivacyLevel
     private let showsLabel: Bool
@@ -37,9 +37,9 @@ public struct PrivacyLevelBadge: View {
 
     private var label: String {
         switch level {
-        case .onDevice:   return "Sul dispositivo"
+        case .onDevice:   return "On device"
         case .appleCloud: return "Private Cloud Compute"
-        case .external:   return "Provider esterno"
+        case .external:   return "External provider"
         }
     }
 

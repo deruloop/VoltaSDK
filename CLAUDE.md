@@ -5,8 +5,8 @@
 > the current state, and the roadmap.
 > **Working agreement: every code change must update the relevant doc(s) in the
 > same session** — this index, the implementation/design docs, and CHANGELOG on
-> release. (Language note: internal docs in English; README, code comments and
-> demo UI in Italian.)
+> release. (Language note: **everything is in English** — docs, code comments,
+> and user-facing strings — as of v1.0.1.)
 
 ---
 
@@ -36,11 +36,12 @@ questions doc into the design doc; release → CHANGELOG + state here.
 
 ## 3. Current state (June 2026)
 
-- **iOS 26 / 26.4: fully working and released — v1.0.0** (git tag `1.0.0`,
-  2026-06-12). 34 tests in 7 suites green; builds verified on macOS 26.5,
-  iOS 26.5 simulator, and signed for a physical iPhone. First adoption in the
-  author's app is in progress. The 26.4 token-aware tier lights up by itself
-  at runtime; on 26.0–26.3 context handling stays reactive-only, by design.
+- **iOS 26 / 26.4: fully working and released — v1.0.1** (tags `1.0.0`,
+  `1.0.1`, 2026-06-12; 1.0.1 = full English translation, no behavior change).
+  34 tests in 7 suites green; builds verified on macOS 26.5, iOS 26.5
+  simulator, and signed for a physical iPhone. First adoption in the author's
+  app is in progress. The 26.4 token-aware tier lights up by itself at
+  runtime; on 26.0–26.3 context handling stays reactive-only, by design.
 - **iOS 27: designed, NOT implemented — zero iOS 27 code exists.** The design
   is substantial (see `docs/iOS27-Design.md`: founding decisions, provider
   table, tiering strategy D14, implementation order) but implementation is

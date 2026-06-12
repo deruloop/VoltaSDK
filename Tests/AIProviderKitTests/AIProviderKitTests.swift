@@ -8,22 +8,22 @@ import Testing
 import Synchronization
 @testable import AIProviderKit
 
-// MARK: - Selezione e fallback
+// MARK: - Selection and fallback
 
-@Suite("Orchestratore e fallback")
+@Suite("Orchestrator and fallback")
 struct OrchestratorFallbackTests {
 
-    @Test("Usa il primo provider disponibile")
+    @Test("Uses the first available provider")
     func usesFirstAvailable() async throws {
         let kit = AIOrchestrator(providers: [
             MockProvider(identifier: .onDevice, outcome: .success("on-device")),
             MockProvider(identifier: .openAI, outcome: .success("openai"))
         ])
-        let result = try await kit.respond(to: "ciao")
+        let result = try await kit.respond(to: "hello")
         #expect(result == "on-device")
     }
 
-    @Test("Salta un provider non disponibile")
+    @Test("Skips an unavailable provider")
     func skipsUnavailable() async throws {
         let kit = AIOrchestrator(providers: [
             MockProvider(identifier: .onDevice,
@@ -31,61 +31,61 @@ struct OrchestratorFallbackTests {
                          outcome: .success("on-device")),
             MockProvider(identifier: .openAI, outcome: .success("openai"))
         ])
-        let result = try await kit.respond(to: "ciao")
+        let result = try await kit.respond(to: "hello")
         #expect(result == "openai")
     }
 
-    @Test("Fa fallback su rate limit")
+    @Test("Falls back on rate limit")
     func fallsBackOnRateLimit() async throws {
         let kit = AIOrchestrator(providers: [
             MockProvider(identifier: .openAI, outcome: .failure(.rateLimited(retryAfter: nil))),
             MockProvider(identifier: .onDevice, outcome: .success("on-device"))
         ])
-        let result = try await kit.respond(to: "ciao")
+        let result = try await kit.respond(to: "hello")
         #expect(result == "on-device")
     }
 
-    @Test("Fa fallback su context window superato")
+    @Test("Falls back on context-window overflow")
     func fallsBackOnContextWindow() async throws {
         let kit = AIOrchestrator(providers: [
             MockProvider(identifier: .onDevice, outcome: .failure(.contextWindowExceeded)),
             MockProvider(identifier: .openAI, privacyLevel: .external, outcome: .success("openai"))
         ])
-        let result = try await kit.respond(to: "ciao")
+        let result = try await kit.respond(to: "hello")
         #expect(result == "openai")
     }
 
-    @Test("Non fa fallback su errore terminale (auth)")
+    @Test("Does not fall back on a terminal error (auth)")
     func doesNotFallBackOnTerminalError() async {
         let kit = AIOrchestrator(providers: [
             MockProvider(identifier: .openAI, outcome: .failure(.unauthorized)),
             MockProvider(identifier: .onDevice, outcome: .success("on-device"))
         ])
         await #expect(throws: ProviderError.unauthorized) {
-            _ = try await kit.respond(to: "ciao")
+            _ = try await kit.respond(to: "hello")
         }
     }
 
-    @Test("Non fa fallback su guardrail violation")
+    @Test("Does not fall back on a guardrail violation")
     func doesNotFallBackOnGuardrail() async {
         let kit = AIOrchestrator(providers: [
-            MockProvider(identifier: .onDevice, outcome: .failure(.guardrailViolation("bloccato"))),
+            MockProvider(identifier: .onDevice, outcome: .failure(.guardrailViolation("blocked"))),
             MockProvider(identifier: .openAI, privacyLevel: .external, outcome: .success("openai"))
         ])
-        await #expect(throws: ProviderError.guardrailViolation("bloccato")) {
-            _ = try await kit.respond(to: "ciao")
+        await #expect(throws: ProviderError.guardrailViolation("blocked")) {
+            _ = try await kit.respond(to: "hello")
         }
     }
 
-    @Test("Errore se la lista provider è vuota")
+    @Test("Errors when the provider list is empty")
     func errorWhenEmpty() async {
         let kit = AIOrchestrator(providers: [])
         await #expect(throws: ProviderError.noProviderAvailable) {
-            _ = try await kit.respond(to: "ciao")
+            _ = try await kit.respond(to: "hello")
         }
     }
 
-    @Test("Errore se tutti i provider sono indisponibili")
+    @Test("Errors when every provider is unavailable")
     func errorWhenAllUnavailable() async {
         let kit = AIOrchestrator(providers: [
             MockProvider(identifier: .onDevice,
@@ -96,28 +96,28 @@ struct OrchestratorFallbackTests {
                          outcome: .success("b"))
         ])
         await #expect(throws: ProviderError.noProviderAvailable) {
-            _ = try await kit.respond(to: "ciao")
+            _ = try await kit.respond(to: "hello")
         }
     }
 
-    @Test("Riporta l'ultimo errore se tutti i provider falliscono in modo recuperabile")
+    @Test("Reports the last error when every provider fails recoverably")
     func reportsLastRecoverableError() async {
         let kit = AIOrchestrator(providers: [
             MockProvider(identifier: .openAI, outcome: .failure(.rateLimited(retryAfter: nil))),
             MockProvider(identifier: .onDevice, outcome: .failure(.network(code: -1009)))
         ])
         await #expect(throws: ProviderError.network(code: -1009)) {
-            _ = try await kit.respond(to: "ciao")
+            _ = try await kit.respond(to: "hello")
         }
     }
 }
 
-// MARK: - Risposta dettagliata e risoluzione
+// MARK: - Detailed response and resolution
 
-@Suite("Risoluzione e provenienza")
+@Suite("Resolution and provenance")
 struct ResolutionTests {
 
-    @Test("respondDetailed riporta provider e livello di privacy")
+    @Test("respondDetailed reports provider and privacy level")
     func detailedResponseCarriesProvenance() async throws {
         let kit = AIOrchestrator(providers: [
             MockProvider(identifier: .onDevice,
@@ -125,13 +125,13 @@ struct ResolutionTests {
                          outcome: .success("a")),
             MockProvider(identifier: .openAI, privacyLevel: .external, outcome: .success("openai"))
         ])
-        let response = try await kit.respondDetailed(to: "ciao")
+        let response = try await kit.respondDetailed(to: "hello")
         #expect(response.text == "openai")
         #expect(response.provider == .openAI)
         #expect(response.privacyLevel == .external)
     }
 
-    @Test("resolveProvider restituisce il primo disponibile senza eseguire")
+    @Test("resolveProvider returns the first available without executing")
     func resolveReturnsFirstAvailable() async throws {
         let kit = AIOrchestrator(providers: [
             MockProvider(identifier: .onDevice,
@@ -143,7 +143,7 @@ struct ResolutionTests {
         #expect(provider.identifier == .openAI)
     }
 
-    @Test("resolveProvider con denyDowngrade esclude i provider sotto soglia")
+    @Test("resolveProvider with denyDowngrade excludes providers below the threshold")
     func resolveRespectsDenyDowngrade() async {
         let kit = AIOrchestrator(
             providers: [
@@ -160,32 +160,32 @@ struct ResolutionTests {
         }
     }
 
-    @Test("providerStatuses riporta tutta la catena nell'ordine, con i motivi")
+    @Test("providerStatuses reports the whole chain in order, with reasons")
     func statusesReportWholeChain() async {
         let kit = AIOrchestrator(providers: [
             MockProvider(identifier: .onDevice,
                          privacyLevel: .onDevice,
-                         availability: .unavailable(reason: "niente Apple Intelligence"),
+                         availability: .unavailable(reason: "no Apple Intelligence"),
                          outcome: .success("a")),
             MockProvider(identifier: .openAI, privacyLevel: .external, outcome: .success("b"))
         ])
         let statuses = await kit.providerStatuses()
         #expect(statuses.count == 2)
         #expect(statuses[0].identifier == .onDevice)
-        #expect(statuses[0].availability == .unavailable(reason: "niente Apple Intelligence"))
+        #expect(statuses[0].availability == .unavailable(reason: "no Apple Intelligence"))
         #expect(statuses[1].identifier == .openAI)
         #expect(statuses[1].availability == .available)
         #expect(statuses[1].privacyLevel == .external)
     }
 }
 
-// MARK: - Disclosure di privacy
+// MARK: - Privacy disclosure
 
-@Suite("Disclosure di privacy")
+@Suite("Privacy disclosure")
 struct PrivacyDisclosureTests {
 
-    /// Catena: on-device (indisponibile) → openai (external).
-    /// Il baseline è onDevice, quindi usare openai è un downgrade.
+    /// Chain: on-device (unavailable) → openai (external).
+    /// The baseline is onDevice, so using openai is a downgrade.
     private func downgradeChain() -> [any ModelProvider] {
         [
             MockProvider(identifier: .onDevice,
@@ -196,13 +196,13 @@ struct PrivacyDisclosureTests {
         ]
     }
 
-    @Test("silent: il downgrade procede senza segnalazioni")
+    @Test("silent: the downgrade proceeds without any signal")
     func silentAllowsDowngrade() async throws {
         let kit = AIOrchestrator(providers: downgradeChain(), privacyDisclosure: .silent)
-        #expect(try await kit.respond(to: "ciao") == "openai")
+        #expect(try await kit.respond(to: "hello") == "openai")
     }
 
-    @Test("notify: il downgrade procede e l'handler riceve l'evento")
+    @Test("notify: the downgrade proceeds and the handler receives the event")
     func notifyFiresHandler() async throws {
         let events = Mutex<[PrivacyDowngrade]>([])
         let kit = AIOrchestrator(
@@ -211,7 +211,7 @@ struct PrivacyDisclosureTests {
                 events.withLock { $0.append(downgrade) }
             }
         )
-        let result = try await kit.respond(to: "ciao")
+        let result = try await kit.respond(to: "hello")
         #expect(result == "openai")
 
         let recorded = events.withLock { $0 }
@@ -220,13 +220,13 @@ struct PrivacyDisclosureTests {
         ])
     }
 
-    @Test("askOnPrivacyChange: true → procede")
+    @Test("askOnPrivacyChange: true → proceeds")
     func askApprovedProceeds() async throws {
         let kit = AIOrchestrator(
             providers: downgradeChain(),
             privacyDisclosure: .askOnPrivacyChange { _ in true }
         )
-        #expect(try await kit.respond(to: "ciao") == "openai")
+        #expect(try await kit.respond(to: "hello") == "openai")
     }
 
     @Test("askOnPrivacyChange: false → privacyRestricted")
@@ -236,19 +236,19 @@ struct PrivacyDisclosureTests {
             privacyDisclosure: .askOnPrivacyChange { _ in false }
         )
         await #expect(throws: ProviderError.privacyRestricted) {
-            _ = try await kit.respond(to: "ciao")
+            _ = try await kit.respond(to: "hello")
         }
     }
 
-    @Test("denyDowngrade: i provider sotto soglia non vengono mai usati")
+    @Test("denyDowngrade: providers below the threshold are never used")
     func denyBlocksDowngrade() async {
         let kit = AIOrchestrator(providers: downgradeChain(), privacyDisclosure: .denyDowngrade)
         await #expect(throws: ProviderError.privacyRestricted) {
-            _ = try await kit.respond(to: "ciao")
+            _ = try await kit.respond(to: "hello")
         }
     }
 
-    @Test("Nessun downgrade se il provider che risponde è al livello del baseline")
+    @Test("No downgrade when the answering provider matches the baseline level")
     func noDowngradeAtSameLevel() async throws {
         let events = Mutex<[PrivacyDowngrade]>([])
         let kit = AIOrchestrator(
@@ -260,7 +260,7 @@ struct PrivacyDisclosureTests {
                 events.withLock { $0.append(downgrade) }
             }
         )
-        let result = try await kit.respond(to: "ciao")
+        let result = try await kit.respond(to: "hello")
         #expect(result == "on-device")
         #expect(events.withLock { $0 }.isEmpty)
     }
@@ -268,10 +268,10 @@ struct PrivacyDisclosureTests {
 
 // MARK: - Transcript transparency (D12)
 
-@Suite("Storia della conversazione (D12)")
+@Suite("Conversation history (D12)")
 struct ConversationHistoryTests {
 
-    @Test("La storia fornita dall'app arriva intatta al provider")
+    @Test("App-supplied history reaches the provider intact")
     func historyReachesProvider() async throws {
         let received = Mutex<[ChatTurn]?>(nil)
         let kit = AIOrchestrator(providers: [
@@ -281,15 +281,15 @@ struct ConversationHistoryTests {
         ])
 
         let history: [ChatTurn] = [
-            .user("Pianifica un weekend"),
-            .assistant("Ecco l'itinerario…")
+            .user("Plan a weekend"),
+            .assistant("Here's the itinerary…")
         ]
-        _ = try await kit.respond(to: "modifica il giorno 2", history: history)
+        _ = try await kit.respond(to: "change day 2", history: history)
 
         #expect(received.withLock { $0 } == history)
     }
 
-    @Test("Senza storia il provider riceve una lista vuota")
+    @Test("Without history the provider receives an empty list")
     func defaultHistoryIsEmpty() async throws {
         let received = Mutex<[ChatTurn]?>(nil)
         let kit = AIOrchestrator(providers: [
@@ -297,11 +297,11 @@ struct ConversationHistoryTests {
                 received.withLock { $0 = history }
             }
         ])
-        _ = try await kit.respond(to: "ciao")
+        _ = try await kit.respond(to: "hello")
         #expect(received.withLock { $0 } == [])
     }
 
-    @Test("Il fallback inoltra la STESSA storia al provider successivo")
+    @Test("Fallback forwards the SAME history to the next provider")
     func fallbackForwardsSameHistory() async throws {
         let firstSaw = Mutex<[ChatTurn]?>(nil)
         let secondSaw = Mutex<[ChatTurn]?>(nil)
@@ -318,12 +318,12 @@ struct ConversationHistoryTests {
             }
         ])
 
-        let history: [ChatTurn] = [.user("turno 1"), .assistant("risposta 1")]
-        let result = try await kit.respond(to: "turno 2", history: history)
+        let history: [ChatTurn] = [.user("turn 1"), .assistant("answer 1")]
+        let result = try await kit.respond(to: "turn 2", history: history)
 
-        // Il primo provider fallisce in modo recuperabile, il secondo riceve
-        // la chiamata autocontenuta con la stessa storia: la conversazione
-        // sopravvive al cambio di provider.
+        // The first provider fails recoverably; the second receives the
+        // self-contained call with the same history: the conversation
+        // survives the provider switch.
         #expect(result == "openai")
         #expect(firstSaw.withLock { $0 } == history)
         #expect(secondSaw.withLock { $0 } == history)
@@ -332,10 +332,10 @@ struct ConversationHistoryTests {
 
 // MARK: - Token awareness (D13)
 
-@Suite("Consapevolezza dei token (D13)")
+@Suite("Token awareness (D13)")
 struct TokenAwarenessTests {
 
-    @Test("Pre-flight: salta il provider la cui finestra non basta, senza chiamarlo")
+    @Test("Pre-flight: skips a provider whose window is too small, without calling it")
     func preflightSkipsOverflowingProvider() async throws {
         let firstWasCalled = Mutex(false)
         let kit = AIOrchestrator(providers: [
@@ -350,14 +350,14 @@ struct TokenAwarenessTests {
                          tokenCount: 200)
         ])
 
-        let result = try await kit.respond(to: "prompt lungo")
+        let result = try await kit.respond(to: "a long prompt")
         #expect(result == "openai")
         #expect(firstWasCalled.withLock { $0 } == false)
     }
 
-    @Test("Pre-flight: la riserva per la risposta conta nel budget")
+    @Test("Pre-flight: the response reserve counts toward the budget")
     func preflightAccountsForResponseReserve() async throws {
-        // 60 token di chiamata + 50 di riserva > finestra di 100 → skip.
+        // 60 call tokens + 50 reserve > 100-token window → skip.
         let kit = AIOrchestrator(
             providers: [
                 MockProvider(identifier: .onDevice,
@@ -372,27 +372,27 @@ struct TokenAwarenessTests {
         #expect(try await kit.respond(to: "x") == "openai")
     }
 
-    @Test("Pre-flight: tutti i provider troppo piccoli → contextWindowExceeded")
+    @Test("Pre-flight: every window too small → contextWindowExceeded")
     func preflightThrowsWhenNothingFits() async {
         let kit = AIOrchestrator(providers: [
             MockProvider(identifier: .onDevice, contextSize: 100, tokenCount: 500),
             MockProvider(identifier: .openAI, contextSize: 200, tokenCount: 500)
         ])
         await #expect(throws: ProviderError.contextWindowExceeded) {
-            _ = try await kit.respond(to: "enorme")
+            _ = try await kit.respond(to: "huge")
         }
     }
 
-    @Test("Un provider che non sa contare non viene mai scartato dal pre-flight")
+    @Test("A provider that can't count is never discarded by pre-flight")
     func providerWithoutCountingIsNotSkipped() async throws {
         let kit = AIOrchestrator(providers: [
             MockProvider(identifier: .onDevice, outcome: .success("on-device"))
-            // contextSize/tokenCount nil → nessun pre-flight possibile.
+            // contextSize/tokenCount nil → no pre-flight possible.
         ])
-        #expect(try await kit.respond(to: "ciao") == "on-device")
+        #expect(try await kit.respond(to: "hello") == "on-device")
     }
 
-    @Test("contextUsage riporta token, finestra e provider risolto")
+    @Test("contextUsage reports tokens, window and resolved provider")
     func contextUsageReportsPressure() async {
         let kit = AIOrchestrator(providers: [
             MockProvider(identifier: .onDevice, contextSize: 4096, tokenCount: 1024)
@@ -402,7 +402,7 @@ struct TokenAwarenessTests {
         #expect(usage?.fraction == 0.25)
     }
 
-    @Test("contextUsage è nil se il provider risolto non sa contare")
+    @Test("contextUsage is nil when the resolved provider can't count")
     func contextUsageNilWithoutCapability() async {
         let kit = AIOrchestrator(providers: [
             MockProvider(identifier: .onDevice)
@@ -411,14 +411,14 @@ struct TokenAwarenessTests {
         #expect(usage == nil)
     }
 
-    @Test("OpenAI: finestre note per modello, nil per modelli sconosciuti")
+    @Test("OpenAI: known windows per model, nil for unknown models")
     func openAIKnownWindows() {
         #expect(OpenAIProvider.knownContextSize(forModel: "gpt-4o-mini") == 128_000)
         #expect(OpenAIProvider.knownContextSize(forModel: "gpt-4.1") == 1_047_576)
-        #expect(OpenAIProvider.knownContextSize(forModel: "modello-misterioso") == nil)
+        #expect(OpenAIProvider.knownContextSize(forModel: "mystery-model") == nil)
     }
 
-    @Test("OpenAI: la stima dei token usa ~4 caratteri/token su tutto il payload")
+    @Test("OpenAI: the token estimate uses ~4 characters/token over the whole payload")
     func openAITokenEstimate() async {
         let provider = OpenAIProvider(apiKey: "test")
         let estimate = await provider.tokenCount(
@@ -427,22 +427,22 @@ struct TokenAwarenessTests {
             history: [.user(String(repeating: "c", count: 100)),
                       .assistant(String(repeating: "d", count: 100))]
         )
-        #expect(estimate == 100)   // 400 caratteri / 4
+        #expect(estimate == 100)   // 400 characters / 4
     }
 }
 
-// MARK: - Configurazione globale
+// MARK: - Global configuration
 
-@Suite("Configurazione", .serialized)
+@Suite("Configuration", .serialized)
 struct ConfigurationTests {
 
-    @Test("configure imposta l'istanza attiva")
+    @Test("configure sets the active instance")
     func configureSetsActive() async {
         AIOrchestrator.configure {
             $0.enableOnDevice = false
             $0.developerKey = nil
         }
-        // Nessun provider costruito → nessuno disponibile.
+        // No providers built → none available.
         let available = await AIOrchestrator.active.availableProviders()
         #expect(available.isEmpty)
     }
@@ -453,12 +453,12 @@ struct ConfigurationTests {
 @Suite("OpenAIProvider parsing")
 struct OpenAIParsingTests {
 
-    @Test("Retry-After in secondi")
+    @Test("Retry-After in seconds")
     func retryAfterSeconds() {
         #expect(OpenAIProvider.parseRetryAfter("120") == 120)
     }
 
-    @Test("Retry-After come HTTP-date (futuro) → intervallo positivo")
+    @Test("Retry-After as a future HTTP-date → positive interval")
     func retryAfterDate() throws {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -470,9 +470,9 @@ struct OpenAIParsingTests {
         #expect(parsed > 80 && parsed <= 91)
     }
 
-    @Test("Retry-After assente o illeggibile → nil")
+    @Test("Retry-After missing or unreadable → nil")
     func retryAfterInvalid() {
         #expect(OpenAIProvider.parseRetryAfter(nil) == nil)
-        #expect(OpenAIProvider.parseRetryAfter("boh") == nil)
+        #expect(OpenAIProvider.parseRetryAfter("nope") == nil)
     }
 }

@@ -2,19 +2,19 @@
 //  ModelProvider.swift
 //  AIProviderKit
 //
-//  Il protocollo comune a tutti i provider di modelli.
-//  È l'evoluzione di `ChatGptRepository`: stessa idea (interfaccia + mock),
-//  ma astratta dal singolo provider così da poter ospitare on-device,
-//  developer key, e in futuro (iOS 27) PCC, Gemini, Claude.
+//  The protocol shared by all model providers.
+//  Evolution of the original `ChatGptRepository`: same idea (interface +
+//  mock), but provider-agnostic so it can host on-device, developer key,
+//  and in the future (iOS 27) PCC, Gemini, Claude.
 //
 
 import Foundation
 
-// MARK: - Identità del provider
+// MARK: - Provider identity
 
-/// Identificatore estensibile di un provider.
-/// Volutamente non è un enum chiuso: nuovi provider (pcc, gemini, claude)
-/// si aggiungono senza rompere il codice esistente.
+/// Extensible provider identifier.
+/// Deliberately not a closed enum: new providers (pcc, gemini, claude)
+/// can be added without breaking existing code.
 public struct ProviderIdentifier: Hashable, Sendable, CustomStringConvertible {
     public let rawValue: String
     public init(_ rawValue: String) { self.rawValue = rawValue }
@@ -25,35 +25,35 @@ public struct ProviderIdentifier: Hashable, Sendable, CustomStringConvertible {
     // iOS 27: .privateCloudCompute, .gemini, .claude
 }
 
-// MARK: - Livello di privacy
+// MARK: - Privacy level
 
-/// Quanto "lontano" dai dati dell'utente opera un provider.
-/// È comparabile perché l'orchestratore lo usa già su iOS 26 per rilevare
-/// i downgrade di privacy durante il fallback (vedi `PrivacyDisclosure`).
+/// How "far" from the user's data a provider operates.
+/// Comparable because the orchestrator already uses it on iOS 26 to detect
+/// privacy downgrades during fallback (see `PrivacyDisclosure`).
 public enum PrivacyLevel: Int, Sendable, Comparable {
-    case external   = 0   // i dati escono verso un provider terzo (es. OpenAI dev key)
+    case external   = 0   // data leaves for a third-party provider (e.g. OpenAI dev key)
     case appleCloud = 1   // Private Cloud Compute (iOS 27)
-    case onDevice   = 2   // non lascia mai il dispositivo
+    case onDevice   = 2   // never leaves the device
 
     public static func < (lhs: PrivacyLevel, rhs: PrivacyLevel) -> Bool {
         lhs.rawValue < rhs.rawValue
     }
 }
 
-// MARK: - Disponibilità
+// MARK: - Availability
 
 public enum ProviderAvailability: Sendable, Equatable {
     case available
     case unavailable(reason: String)
 }
 
-/// Fotografia dello stato di un provider, in ordine di preferenza.
-/// Pensata per UI (picker, diagnostica) ma indipendente da SwiftUI.
+/// Snapshot of a provider's state, in preference order.
+/// Designed for UI (pickers, diagnostics) but independent of SwiftUI.
 public struct ProviderStatus: Sendable, Identifiable {
     public let identifier: ProviderIdentifier
     public let privacyLevel: PrivacyLevel
     public let availability: ProviderAvailability
-    /// Finestra di contesto in token, se il provider la conosce (D13).
+    /// Context window in tokens, if the provider knows it (D13).
     public let contextSize: Int?
 
     public var id: ProviderIdentifier { identifier }
@@ -71,48 +71,48 @@ public struct ProviderStatus: Sendable, Identifiable {
     }
 }
 
-// MARK: - Errori tipizzati
+// MARK: - Typed errors
 
-/// Rimpiazza il `return nil` del manager originale: ogni fallimento porta con sé
-/// la sua causa, così l'orchestratore può decidere se fare fallback o fermarsi.
+/// Replaces the original manager's `return nil`: every failure carries its
+/// cause, so the orchestrator can decide whether to fall back or stop.
 public enum ProviderError: Error, Sendable, Equatable {
-    /// Quota/limite raggiunto (HTTP 429, o rate limit on-device in background).
-    /// Causa principale di fallback al provider successivo.
+    /// Quota/limit reached (HTTP 429, or on-device rate limit in background).
+    /// The main reason to fall back to the next provider.
     case rateLimited(retryAfter: TimeInterval?)
-    /// Chiave errata o mancante (HTTP 401/403). Terminale: inutile riprovare.
+    /// Wrong or missing key (HTTP 401/403). Terminal: retrying is pointless.
     case unauthorized
-    /// Problema di rete. Candidato a retry o fallback.
+    /// Network problem. Candidate for retry or fallback.
     case network(code: Int)
-    /// Risposta vuota dal server.
+    /// Empty response from the server.
     case emptyResponse
-    /// Errore di encoding della richiesta (lato client, prima della rete).
+    /// Request-encoding error (client side, before the network).
     case encoding(String)
-    /// Errore di decodifica della risposta.
+    /// Response-decoding error.
     case decoding(String)
-    /// Errore applicativo restituito dall'API del provider.
+    /// Application error returned by the provider's API.
     case api(message: String, code: String?)
-    /// Il prompt supera la finestra di contesto del modello.
-    /// Recuperabile: un provider successivo può avere una finestra più ampia.
+    /// The prompt exceeds the model's context window.
+    /// Recoverable: a later provider may have a larger window.
     case contextWindowExceeded
-    /// Guardrail di sicurezza scattato (on-device). Terminale per scelta:
-    /// inoltrare automaticamente a un provider esterno contenuto che Apple
-    /// considera non sicuro sarebbe un downgrade di privacy non richiesto.
+    /// Safety guardrail triggered (on-device). Terminal by choice:
+    /// auto-forwarding content Apple deemed unsafe to an external provider
+    /// would be an unrequested privacy downgrade.
     case guardrailViolation(String)
-    /// Lingua/locale non supportati dal modello. Recuperabile: i modelli
-    /// cloud coprono più lingue del modello on-device.
+    /// Language/locale not supported by the model. Recoverable: cloud
+    /// models cover more languages than the on-device model.
     case unsupportedLanguage
-    /// Altro errore di generazione on-device non mappato.
+    /// Other unmapped on-device generation error.
     case generation(String)
-    /// Nessun provider utilizzabile in questo momento.
+    /// No usable provider at the moment.
     case noProviderAvailable
-    /// Tutti i provider rimasti sono stati esclusi dalla policy di privacy
-    /// (`.denyDowngrade` o `.askOnPrivacyChange` rifiutato).
+    /// All remaining providers were excluded by the privacy policy
+    /// (`.denyDowngrade` or a declined `.askOnPrivacyChange`).
     case privacyRestricted
-    /// Operazione annullata.
+    /// Operation cancelled.
     case cancelled
 
-    /// Indica se l'errore consente di provare il provider successivo nella catena.
-    /// (Su iOS 27 questa stessa proprietà guiderà il fallback runtime con le quote PCC.)
+    /// Whether this error allows trying the next provider in the chain.
+    /// (On iOS 27 this same property will drive the quota-aware fallback.)
     public var isRecoverableByFallback: Bool {
         switch self {
         case .rateLimited, .network, .contextWindowExceeded,
@@ -125,39 +125,39 @@ public enum ProviderError: Error, Sendable, Equatable {
     }
 }
 
-// MARK: - Protocollo provider
+// MARK: - Provider protocol
 
 public protocol ModelProvider: Sendable {
     var identifier: ProviderIdentifier { get }
     var privacyLevel: PrivacyLevel { get }
 
-    /// Controllo a runtime: il provider è utilizzabile ora?
-    /// (On-device → Apple Intelligence presente/attivo/pronto.
-    ///  Developer key → chiave configurata. iOS 27 → anche quota residua.)
+    /// Runtime check: is the provider usable right now?
+    /// (On-device → Apple Intelligence present/enabled/ready.
+    ///  Developer key → key configured. iOS 27 → remaining quota too.)
     func availability() async -> ProviderAvailability
 
-    /// Risposta non-streaming. Firma stabile: resterà identica su iOS 27.
+    /// Non-streaming response. Stable signature: unchanged on iOS 27.
     ///
-    /// `history` sono i turni precedenti della conversazione, forniti
-    /// dall'app (D12): il provider non ricorda nulla tra una chiamata e
-    /// l'altra, ma ogni chiamata è autocontenuta e può quindi essere
-    /// servita da qualsiasi provider della catena di fallback.
+    /// `history` carries the previous conversation turns, supplied by the
+    /// app (D12): the provider remembers nothing between calls, but every
+    /// call is self-contained and can therefore be served by any provider
+    /// in the fallback chain.
     func respond(
         to prompt: String,
         instructions: String?,
         history: [ChatTurn]
     ) async throws -> String
 
-    // MARK: Capability opzionale: consapevolezza dei token (D13)
+    // MARK: Optional capability: token awareness (D13)
 
-    /// Dimensione della finestra di contesto in token, se nota.
-    /// `nil` = sconosciuta: l'orchestratore non farà pre-flight.
+    /// Context window size in tokens, if known.
+    /// `nil` = unknown: the orchestrator will skip pre-flight.
     var contextSize: Int? { get }
 
-    /// Numero di token che la chiamata occuperebbe (prompt + instructions +
-    /// history), se il provider sa contarli o stimarli. `nil` = non sa.
-    /// On-device: conteggio esatto da iOS 26.4, `nil` prima.
-    /// Cloud: stima onesta (nessun tokenizer ufficiale client-side).
+    /// Number of tokens the call would occupy (prompt + instructions +
+    /// history), if the provider can count or estimate them. `nil` = can't.
+    /// On-device: exact count from iOS 26.4, `nil` before.
+    /// Cloud: honest estimate (no official client-side tokenizer).
     func tokenCount(
         prompt: String,
         instructions: String?,
@@ -166,13 +166,13 @@ public protocol ModelProvider: Sendable {
 }
 
 public extension ModelProvider {
-    /// Convenience per la chiamata one-shot (senza conversazione).
+    /// Convenience for one-shot calls (no conversation).
     func respond(to prompt: String, instructions: String?) async throws -> String {
         try await respond(to: prompt, instructions: instructions, history: [])
     }
 
-    /// Default: capability non supportata. I provider custom esistenti
-    /// continuano a compilare e semplicemente non partecipano al pre-flight.
+    /// Default: capability unsupported. Existing custom providers keep
+    /// compiling and simply don't participate in pre-flight.
     var contextSize: Int? { nil }
 
     func tokenCount(
