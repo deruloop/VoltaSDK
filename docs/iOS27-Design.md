@@ -146,7 +146,12 @@ Matches the roadmap in CLAUDE.md:
 4. ~~Model picker component~~ shipped already (`ModelSelector` in VoltaSDKUI):
    the new providers appear in it automatically once wired into
    `buildProviders`; their OAuth flows attach via the existing `activation`
-   hook. Only the per-provider default labels need adding.
+   hook. Only the per-provider default labels need adding. One deliberate
+   revisit: the selector's auto-select candidate (today hardcoded to
+   on-device — the only gate-free provider on iOS 26; see the gate
+   invariant in the iOS 26 doc §5) should generalize to "the best
+   gate-free provider" — PCC qualifies (no auth, free tier), user-account
+   providers never do (OAuth gate).
 
 ## 7. Blockers
 

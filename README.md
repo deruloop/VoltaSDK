@@ -41,7 +41,7 @@ explains why).
 
 ```swift
 dependencies: [
-    .package(url: "<repo-url>", from: "0.3.0")
+    .package(url: "<repo-url>", from: "0.3.2")
 ]
 ```
 
@@ -54,7 +54,7 @@ UI.
 Add Local… → select the package folder. Note: a local dependency always uses
 the working copy; version tags don't apply.
 
-The current version is **0.3.0** (see [CHANGELOG.md](CHANGELOG.md)). VoltaSDK
+The current version is **0.3.2** (see [CHANGELOG.md](CHANGELOG.md)). VoltaSDK
 is in active development: 0.x minor versions may evolve the API; **1.0.0 will
 mark the complete feature set**, including the iOS 27 extension.
 
@@ -184,6 +184,16 @@ it expands the list of options (it stays compact however many providers exist
 orchestrator's real state: providers you didn't configure never appear;
 unavailable ones show their reason.
 
+**Initial state — the gate invariant.** Nothing is ever committed without
+passing through `onSelection`. When the `selection` binding starts `nil`, the
+selector auto-selects the **on-device model** if available — the only
+provider with no business gate behind it (free, private, no account) — and
+even that attempt runs through your handler. Cloud providers are **never
+preselected**: your configuration preference must not look like a user
+activation when a subscription (or, on iOS 27, an OAuth login) sits behind
+it. A non-`nil` initial binding (e.g. a persisted user choice) is never
+overridden.
+
 The default labels make **no business assumptions** — only you know whether
 the cloud model is "included with Pro", metered, or free. Brand the rows via
 `labels:`.
@@ -222,6 +232,12 @@ ModelSelector(
   the selector reflects it instantly. Nothing about the gate lives inside the
   component — it only reacts.
 
+`selection == nil` therefore means **no model committed yet**. The selector
+can't stop the orchestrator from answering — if your fallback chain contains
+a gated provider, it will serve calls regardless of any UI. Close the loop on
+your side: gate the chat until something is committed (what the demo does),
+or keep the developer key out of the configuration for unentitled users.
+
 Design customization: per-provider `labels`, `hidesUnavailable`, standard
 SwiftUI modifiers — and `ModelSelectorRow` is public, so you can rebuild the
 whole layout on top of `providerStatuses()` while keeping the rows.
@@ -248,7 +264,9 @@ The demo mirrors a real integration's two roles: a **Developer** side
 **User** side (the chat with the `ModelSelector` underneath) — so you can see
 the result of any configuration × user-preference combination, including the
 activation gate rejecting the cloud model when the simulated subscription is
-off.
+off. The chat stays disabled until a model is committed — the
+`selection == nil` contract that keeps gated providers from answering before
+activation.
 
 ## Tests
 

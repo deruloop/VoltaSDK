@@ -172,11 +172,25 @@ public struct DemoRootView: View {
     private var userPane: some View {
         VStack(spacing: 12) {
             // The chat: shows the result of configuration × user preference.
+            // Gated on a committed selection (`selection == nil` = "no model
+            // committed yet"): without this, a fallback preference would let
+            // a gated provider answer before ever passing the activation
+            // gate. This is the production pattern the selector's contract
+            // asks for.
             AIPlaygroundView(
                 orchestrator: orchestrator,
                 instructions: nil,
                 placeholder: "Try a prompt (e.g. \"Plan a weekend in Rome\")"
             )
+            .disabled(userSelection == nil)
+            .opacity(userSelection == nil ? 0.5 : 1)
+
+            if userSelection == nil {
+                Label("Choose a model below to start the conversation",
+                      systemImage: "arrow.down")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             Divider()
 

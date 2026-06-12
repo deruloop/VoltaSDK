@@ -18,6 +18,17 @@
 //     steps aside; when the app's flow succeeds, it commits the choice by
 //     setting the `selection` binding — the selector reflects it instantly.
 //
+//  Initial state — the gate invariant: NOTHING is ever committed without
+//  passing through `onSelection`. With a nil binding, the selector
+//  auto-selects the on-device model iff available — the only provider with
+//  no business gate behind it (free, private, no account) — and even that
+//  attempt goes through the handler. Cloud providers are NEVER preselected:
+//  a developer preference must not look like a user activation when a
+//  subscription or OAuth gate sits behind it. A non-nil initial binding
+//  (e.g. a persisted user choice) is never overridden. `selection == nil`
+//  therefore means "no model committed yet" — gate your chat on it, or keep
+//  gated providers out of the configuration entirely.
+//
 //  Customization:
 //   - `labels:` overrides title/subtitle/icon per provider. The defaults
 //     make NO business assumptions (no "included with subscription" claims —
@@ -218,6 +229,7 @@ public struct ModelSelector: View {
         .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
         .task(id: ObjectIdentifier(orchestrator)) {
             statuses = await orchestrator.providerStatuses()
+            await autoSelectIfNeeded()
         }
         .onChange(of: selection) {
             // External commits (e.g. the app's paywall/OAuth flow setting
@@ -270,6 +282,29 @@ public struct ModelSelector: View {
             selection.map { "Active model: \(label(for: $0).title)" } ?? "Choose a model"
         )
         .accessibilityHint("Shows the available models")
+    }
+
+    /// Auto-selects the only gate-free provider (on-device) when the app
+    /// hasn't committed anything yet. Cloud providers are never candidates:
+    /// they typically hide a business gate (subscription, OAuth) that only
+    /// the app can clear. Even this attempt passes through `onSelection`,
+    /// keeping the invariant that nothing commits without the gate's
+    /// consent; `.deny`/`.deferred` leave the selector unselected without
+    /// showing a failure (it wasn't a user action).
+    private func autoSelectIfNeeded() async {
+        guard selection == nil, activatingID == nil else { return }
+        guard let onDevice = statuses.first(where: { $0.identifier == .onDevice }),
+              onDevice.availability == .available else { return }
+
+        guard let onSelection else {
+            selection = .onDevice
+            return
+        }
+        activatingID = .onDevice
+        if case .activate = await onSelection(.onDevice) {
+            selection = .onDevice
+        }
+        activatingID = nil
     }
 
     private func select(_ status: ProviderStatus) {

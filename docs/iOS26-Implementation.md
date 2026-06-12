@@ -1,6 +1,6 @@
 # VoltaSDK — iOS 26 / 26.4 Implementation (internal source)
 
-> Internal documentation of what is **built and shipping** (v0.3.0): the iOS 26
+> Internal documentation of what is **built and shipping** (v0.3.2): the iOS 26
 > base tier and the iOS 26.4 token-aware tier. For the iOS 27 design see
 > `docs/iOS27-Design.md`. Keep this file in sync with every code change
 > (working agreement in CLAUDE.md).
@@ -9,7 +9,7 @@
 
 ## 1. Verified status
 
-Released **v0.3.0** (tags `0.1.0`–`0.3.0`, 2026-06-12). Pre-1.0 policy: 0.x while
+Released **v0.3.2** (tags `0.1.0`–`0.3.2`, 2026-06-13). Pre-1.0 policy: 0.x while
 in development; 1.0.0 is reserved for the complete feature set including the
 iOS 27 extension. `swift build` succeeds and **41 tests in 8 suites pass** on
 macOS 26.5 SDK / Xcode 26.6, Swift 6.2 tools. The iOS demo app builds and
@@ -292,6 +292,18 @@ additive and optional by definition.
 - Collapsed-by-default disclosure: resting footprint is one row regardless of
   provider count. External commits (setting the `selection` binding) collapse
   and refresh it.
+- **Gate invariant (June 2026 fix):** nothing is ever committed without
+  passing through `onSelection` — including the selector's own initial
+  state. With a nil binding it auto-selects on-device iff available (the
+  only gate-free provider: free, private, no account), running even that
+  through the handler; `.deny`/`.deferred` leave it unselected with no
+  failure message (not a user action). Cloud providers are **never
+  preselected** — a developer preference must not masquerade as a user
+  activation when a subscription/OAuth gate sits behind it. A non-nil
+  initial binding (persisted user choice) is never overridden.
+  `selection == nil` means "no model committed": the app must gate its chat
+  on it or keep gated providers out of the config — the selector cannot
+  stop the orchestrator from resolving them.
 - `onSelection: (ProviderIdentifier) async -> ModelSelectionResponse` with
   `.activate` / `.deny(message:)` / `.deferred`. `.deferred` is the
   extensibility point: the app presents its own view (paywall, settings,
@@ -344,7 +356,13 @@ macOS (developer | user), tabs (Developer / User) on iOS.
   vendor), shows the vendor's default as a placeholder, and a disclosure
   links to each vendor's model documentation (D15). Keyboard dismisses
   interactively by scrolling everywhere (form and chat).
-- **User side:** the chat on top, the `ModelSelector` below. The selector is
+- **User side:** the chat on top, the `ModelSelector` below. The chat is
+  **disabled until a model is committed** (the `selection == nil` contract:
+  without the gate, a fallback preference would let the cloud provider
+  answer before ever passing the activation gate). With on-device available
+  the selector auto-commits it through the handler, so the chat starts
+  enabled; without it, the user must pick — and the cloud option goes
+  through the entitlement gate. The selector is
   **collapsed by default** (a single row with the active choice + chevron;
   expanding shows the options — scales to iOS 27's longer provider list).
   The user's selection re-leads the chain (selection → preference mapping in

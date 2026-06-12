@@ -5,6 +5,25 @@ All notable changes to this package. Versioning: [SemVer](https://semver.org).
 evolve the API. **1.0.0 will mark the complete feature set**, including the
 iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
 
+## [0.3.2] — 2026-06-13
+
+- **`ModelSelector` no longer lets a configuration look like a user
+  activation (gate invariant):** nothing is ever committed without passing
+  through `onSelection`, including the initial state. With a nil
+  `selection` binding the selector auto-selects the on-device model iff
+  available — the only gate-free provider — running even that through the
+  handler; cloud providers are **never preselected**. Fixes the state where
+  a developer-key-first configuration appeared "already active" without the
+  entitlement gate ever firing. A non-nil initial binding (persisted user
+  choice) is never overridden.
+- Demo: the chat is disabled until a model is committed, demonstrating the
+  `selection == nil` ("no model committed") contract that keeps gated
+  providers from answering before activation.
+
+## [0.3.1] — 2026-06-12
+
+- Documentation text adjustments only; no code changes.
+
 ## [0.3.0] — 2026-06-12
 
 - **`ModelSelector` redesigned as a collapsed disclosure:** resting state is
