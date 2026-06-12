@@ -1,6 +1,6 @@
 //
 //  PrivacyDisclosure.swift
-//  AIProviderKit
+//  VoltaSDK
 //
 //  Disclosure of privacy downgrades during fallback.
 //

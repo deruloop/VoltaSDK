@@ -1,6 +1,6 @@
 //
 //  ChatTurn.swift
-//  AIProviderKit
+//  VoltaSDK
 //
 //  A conversation turn supplied BY THE APP to the framework (D12).
 //

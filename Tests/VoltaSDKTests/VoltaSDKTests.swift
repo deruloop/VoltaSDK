@@ -1,12 +1,12 @@
 //
-//  AIProviderKitTests.swift
-//  AIProviderKitTests
+//  VoltaSDKTests.swift
+//  VoltaSDKTests
 //
 
 import Foundation
 import Testing
 import Synchronization
-@testable import AIProviderKit
+@testable import VoltaSDK
 
 // MARK: - Selection and fallback
 

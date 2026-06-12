@@ -1,6 +1,6 @@
 //
 //  ProviderStatusList.swift
-//  AIProviderKitUI
+//  VoltaSDKUI
 //
 //  Status list for the providers in the fallback chain.
 //  Optional and composable: `ProviderStatusRow` is public, so anyone who
@@ -9,7 +9,7 @@
 //
 
 import SwiftUI
-import AIProviderKit
+import VoltaSDK
 
 /// Single row: provider name, availability (with reason) and privacy badge.
 public struct ProviderStatusRow: View {

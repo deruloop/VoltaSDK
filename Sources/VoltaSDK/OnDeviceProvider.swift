@@ -1,6 +1,6 @@
 //
 //  OnDeviceProvider.swift
-//  AIProviderKit
+//  VoltaSDK
 //
 //  Wraps Apple Intelligence's on-device model (Foundation Models, iOS 26).
 //  No network, no key, maximum privacy.

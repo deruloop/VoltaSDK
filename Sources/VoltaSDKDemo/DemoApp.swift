@@ -1,22 +1,22 @@
 //
 //  DemoApp.swift
-//  AIProviderKitDemo
+//  VoltaSDKDemo
 //
 //  macOS test app:
-//      swift run AIProviderKitDemo
+//      swift run VoltaSDKDemo
 //
-//  All the UI lives in AIProviderKitDemoUI (shared with the iOS demo in
+//  All the UI lives in VoltaSDKDemoUI (shared with the iOS demo in
 //  Examples/iOSDemo). This is only the macOS bootstrap.
 //
 
 import SwiftUI
-import AIProviderKitDemoUI
+import VoltaSDKDemoUI
 #if os(macOS)
 import AppKit
 #endif
 
 @main
-struct AIProviderKitDemoApp: App {
+struct VoltaSDKDemoApp: App {
     init() {
         #if os(macOS)
         // Run by `swift run` (no .app bundle): needed to bring the
@@ -29,7 +29,7 @@ struct AIProviderKitDemoApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("AIProviderKit Demo") {
+        WindowGroup("VoltaSDK Demo") {
             DemoRootView()
                 .frame(minWidth: 760, minHeight: 520)
         }

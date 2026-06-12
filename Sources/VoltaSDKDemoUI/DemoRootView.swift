@@ -1,8 +1,8 @@
 //
 //  DemoRootView.swift
-//  AIProviderKitDemoUI
+//  VoltaSDKDemoUI
 //
-//  Test UI shared between the macOS demo (`swift run AIProviderKitDemo`)
+//  Test UI shared between the macOS demo (`swift run VoltaSDKDemo`)
 //  and the iOS demo app (Examples/iOSDemo). Same logic on both platforms:
 //  live configuration, fallback-chain status (with unavailability reasons,
 //  e.g. a device without Apple Intelligence), a playground with response
@@ -14,8 +14,8 @@
 //
 
 import SwiftUI
-import AIProviderKit
-import AIProviderKitUI
+import VoltaSDK
+import VoltaSDKUI
 
 /// Privacy-downgrade events collected by the `.notify` policy, surfaced
 /// in the test UI.
@@ -58,7 +58,7 @@ public struct DemoRootView: View {
             Tab("Configure", systemImage: "gearshape") {
                 NavigationStack {
                     configurationForm
-                        .navigationTitle("AIProviderKit")
+                        .navigationTitle("VoltaSDK")
                 }
             }
             Tab("Playground", systemImage: "bubble.left.and.text.bubble.right") {

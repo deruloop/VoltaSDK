@@ -4,11 +4,11 @@
 # only needed when this file changes.
 name: iOSDemo
 options:
-  bundleIdPrefix: com.aiproviderkit.demo
+  bundleIdPrefix: com.voltasdk.demo
   deploymentTarget:
     iOS: "26.0"
 packages:
-  AIProviderKit:
+  VoltaSDK:
     path: ../..
 targets:
   iOSDemo:
@@ -17,14 +17,14 @@ targets:
     sources:
       - Sources
     dependencies:
-      - package: AIProviderKit
-        product: AIProviderKitDemoUI
+      - package: VoltaSDK
+        product: VoltaSDKDemoUI
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        PRODUCT_BUNDLE_IDENTIFIER: com.aiproviderkit.demo.ios
+        PRODUCT_BUNDLE_IDENTIFIER: com.voltasdk.demo.ios
         SWIFT_VERSION: "6.0"
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_STYLE: Automatic

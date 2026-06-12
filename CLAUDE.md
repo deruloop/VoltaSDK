@@ -1,4 +1,4 @@
-# AIProviderKit — Project Context
+# VoltaSDK — Project Context
 
 > Entry point for working on this project. The detailed documentation is split
 > into dedicated artifacts (map below); this file holds the working agreement,
@@ -12,13 +12,16 @@
 
 ## 1. TL;DR — what this is
 
-AIProviderKit is a Swift Package that **resolves which AI model to use** at
-runtime (on-device Foundation Models vs developer-key OpenAI today; PCC and
-user-account providers on iOS 27) with automatic fallback, privacy disclosure,
-transcript-transparent conversations, and token awareness. It does **not**
-invent an agent abstraction — on iOS 27 it *feeds* Apple's native Dynamic
-Profiles rather than wrapping them. One stable public API across all phases
-(SemVer: iOS 27 stays additive in 1.x).
+VoltaSDK (**VOLTA** = *Versatile Orchestration Layer for Tiered AI*; named
+after Alessandro Volta — battery = stacked cells = fallback chain — and the
+Italian *volta*, "turn", as in multi-turn) is a Swift Package that **resolves
+which AI model to use** at runtime (on-device Foundation Models vs
+developer-key OpenAI today; PCC and user-account providers on iOS 27) with
+automatic fallback, privacy disclosure, transcript-transparent conversations,
+and token awareness. It does **not** invent an agent abstraction — on iOS 27
+it *feeds* Apple's native Dynamic Profiles rather than wrapping them. One
+stable public API across all phases (SemVer: iOS 27 stays additive within the
+current major, 2.x).
 
 ## 2. Documentation map
 
@@ -36,11 +39,13 @@ questions doc into the design doc; release → CHANGELOG + state here.
 
 ## 3. Current state (June 2026)
 
-- **iOS 26 / 26.4: fully working and released — v1.0.1** (tags `1.0.0`,
-  `1.0.1`, 2026-06-12; 1.0.1 = full English translation, no behavior change).
-  34 tests in 7 suites green; builds verified on macOS 26.5, iOS 26.5
-  simulator, and signed for a physical iPhone. First adoption in the author's
-  app is in progress. The 26.4 token-aware tier lights up by itself at
+- **iOS 26 / 26.4: fully working and released — v2.0.0** (tags `1.0.0` first
+  release, `1.0.1` English translation, `2.0.0` rename AIProviderKit →
+  VoltaSDK; all 2026-06-12. The major bump is the module rename only — the
+  feature set is the 1.x one). 34 tests in 7 suites green; builds verified on
+  macOS 26.5, iOS 26.5 simulator, and signed for a physical iPhone. First
+  adoption in the author's app is in progress (must update its dependency to
+  the new module names). The 26.4 token-aware tier lights up by itself at
   runtime; on 26.0–26.3 context handling stays reactive-only, by design.
 - **iOS 27: designed, NOT implemented — zero iOS 27 code exists.** The design
   is substantial (see `docs/iOS27-Design.md`: founding decisions, provider
@@ -81,5 +86,5 @@ questions doc into the design doc; release → CHANGELOG + state here.
 7. **Per-need fallback chain** (`.lightweight/.reasoning/.largeContext`) —
    blocked with 6.
 8. **`preferred(_ need:)` bridge** for Dynamic Profiles — blocked with 6.
-9. **Model picker component** in AIProviderKitUI — meaningful once >1
+9. **Model picker component** in VoltaSDKUI — meaningful once >1
    user-visible option exists.

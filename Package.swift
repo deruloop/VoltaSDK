@@ -2,38 +2,38 @@
 import PackageDescription
 
 let package = Package(
-    name: "AIProviderKit",
+    name: "VoltaSDK",
     platforms: [
         .iOS(.v26),
         .macOS(.v26)
     ],
     products: [
-        // Il core: nessuna dipendenza UI, configurabile headless.
-        .library(name: "AIProviderKit", targets: ["AIProviderKit"]),
-        // Componenti SwiftUI opzionali: l'app può ignorarli del tutto.
-        .library(name: "AIProviderKitUI", targets: ["AIProviderKitUI"]),
-        // UI della demo, condivisa tra macOS e iOS (Examples/iOSDemo).
-        .library(name: "AIProviderKitDemoUI", targets: ["AIProviderKitDemoUI"]),
-        // App di prova (macOS): `swift run AIProviderKitDemo`.
-        .executable(name: "AIProviderKitDemo", targets: ["AIProviderKitDemo"])
+        // The core: no UI dependency, configurable headless.
+        .library(name: "VoltaSDK", targets: ["VoltaSDK"]),
+        // Optional SwiftUI components: apps can ignore them entirely.
+        .library(name: "VoltaSDKUI", targets: ["VoltaSDKUI"]),
+        // Demo UI, shared between macOS and iOS (Examples/iOSDemo).
+        .library(name: "VoltaSDKDemoUI", targets: ["VoltaSDKDemoUI"]),
+        // Test app (macOS): `swift run VoltaSDKDemo`.
+        .executable(name: "VoltaSDKDemo", targets: ["VoltaSDKDemo"])
     ],
     targets: [
-        .target(name: "AIProviderKit"),
+        .target(name: "VoltaSDK"),
         .target(
-            name: "AIProviderKitUI",
-            dependencies: ["AIProviderKit"]
+            name: "VoltaSDKUI",
+            dependencies: ["VoltaSDK"]
         ),
         .target(
-            name: "AIProviderKitDemoUI",
-            dependencies: ["AIProviderKit", "AIProviderKitUI"]
+            name: "VoltaSDKDemoUI",
+            dependencies: ["VoltaSDK", "VoltaSDKUI"]
         ),
         .executableTarget(
-            name: "AIProviderKitDemo",
-            dependencies: ["AIProviderKitDemoUI"]
+            name: "VoltaSDKDemo",
+            dependencies: ["VoltaSDKDemoUI"]
         ),
         .testTarget(
-            name: "AIProviderKitTests",
-            dependencies: ["AIProviderKit"]
+            name: "VoltaSDKTests",
+            dependencies: ["VoltaSDK"]
         )
     ]
 )

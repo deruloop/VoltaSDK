@@ -1,6 +1,6 @@
-# AIProviderKit — iOS 26 / 26.4 Implementation (internal source)
+# VoltaSDK — iOS 26 / 26.4 Implementation (internal source)
 
-> Internal documentation of what is **built and shipping** (v1.0.0): the iOS 26
+> Internal documentation of what is **built and shipping** (v2.0.0): the iOS 26
 > base tier and the iOS 26.4 token-aware tier. For the iOS 27 design see
 > `docs/iOS27-Design.md`. Keep this file in sync with every code change
 > (working agreement in CLAUDE.md).
@@ -9,24 +9,25 @@
 
 ## 1. Verified status
 
-Released **v1.0.1** (git tags `1.0.0`, `1.0.1`, 2026-06-12; 1.0.1 translated
-all comments, docs, and user-facing strings to English — no behavior change).
-`swift build` succeeds and
-**34 tests in 7 suites pass** on macOS 26.5 SDK / Xcode 26.6, Swift 6.2 tools.
-The iOS demo app builds and runs on the iOS 26.5 simulator (verified on
-iPhone 17 Pro) and signs correctly for a physical iPhone 15 Pro Max.
+Released **v2.0.0** (git tag `2.0.0`, 2026-06-12): the rename from
+AIProviderKit to **VoltaSDK** — module names changed, hence the major bump;
+the feature set is the 1.x one (1.0.0 first release, 1.0.1 full English
+translation). `swift build` succeeds and **34 tests in 7 suites pass** on
+macOS 26.5 SDK / Xcode 26.6, Swift 6.2 tools. The iOS demo app builds and
+runs on the iOS 26.5 simulator (verified on iPhone 17 Pro) and signs
+correctly for a physical iPhone 15 Pro Max.
 
 File map:
 
 ```
-AIProvider/                                (repo root)
+(repo root)
 ├── Package.swift                          // tools 6.2, iOS 26 / macOS 26
 ├── README.md                              // public guide (GitHub-facing)
 ├── CHANGELOG.md                           // SemVer release notes
 ├── CLAUDE.md                              // index + state + roadmap
 ├── docs/                                  // internal sources (this file & co.)
 ├── Sources/
-│   ├── AIProviderKit/                     // CORE — no UI dependency, ever
+│   ├── VoltaSDK/                          // CORE — no UI dependency, ever
 │   │   ├── ModelProvider.swift            // protocol + identifiers + statuses + typed errors
 │   │   ├── ChatTurn.swift                 // app-supplied conversation turn (D12)
 │   │   ├── PrivacyDisclosure.swift        // downgrade event + disclosure policy
@@ -34,20 +35,20 @@ AIProvider/                                (repo root)
 │   │   ├── OpenAIProvider.swift           // rewritten ChatGptManager (Codable, typed errors)
 │   │   ├── AIOrchestrator.swift           // orchestrator + config + fallback + resolution
 │   │   └── Mocks.swift                    // MockProvider (public, for adopters' tests too)
-│   ├── AIProviderKitUI/                   // OPTIONAL SwiftUI components (separate product)
+│   ├── VoltaSDKUI/                        // OPTIONAL SwiftUI components (separate product)
 │   │   ├── PrivacyLevelBadge.swift        // badge for a PrivacyLevel
 │   │   ├── ProviderStatusList.swift       // fallback-chain status list (+ public Row)
 │   │   └── AIPlaygroundView.swift         // conversational playground with provenance
-│   ├── AIProviderKitDemoUI/               // demo UI shared macOS+iOS (adaptive layout)
+│   ├── VoltaSDKDemoUI/                    // demo UI shared macOS+iOS (adaptive layout)
 │   │   └── DemoRootView.swift             // HSplitView on macOS, TabView on iOS
-│   └── AIProviderKitDemo/                 // macOS bootstrap: `swift run AIProviderKitDemo`
+│   └── VoltaSDKDemo/                      // macOS bootstrap: `swift run VoltaSDKDemo`
 │       └── DemoApp.swift
 ├── Examples/iOSDemo/                      // iPhone/iPad demo app (Xcode project)
 │   ├── project.yml                        // XcodeGen spec (carries DEVELOPMENT_TEAM)
 │   ├── iOSDemo.xcodeproj
 │   └── Sources/iOSDemoApp.swift           // @main wrapper around DemoRootView
-└── Tests/AIProviderKitTests/
-    └── AIProviderKitTests.swift           // fallback, privacy, history, tokens, parsing
+└── Tests/VoltaSDKTests/
+    └── VoltaSDKTests.swift                // fallback, privacy, history, tokens, parsing
 ```
 
 ## 2. The pieces
@@ -134,8 +135,8 @@ privacy threshold triggers a configurable disclosure. Only the developer knows
 their app's sensitivity, so they choose the policy. (The iOS 27 per-need chain
 extends this — see `docs/iOS27-Design.md`.)
 
-### D8 — The orchestrator type is `AIOrchestrator`, not `AIProviderKit`
-A type named like its own module shadows the module: `AIProviderKit.Xyz` would
+### D8 — The orchestrator type is `AIOrchestrator`, not `VoltaSDK`
+A type named like its own module shadows the module: `VoltaSDK.Xyz` would
 always resolve the type, never the module — a permanent ergonomic tax on every
 client. Renamed before anyone adopted the API. The name also says what the
 thing is: an orchestrator/resolver, not an agent runtime.
@@ -163,7 +164,7 @@ deliberate choice (never auto-forward content Apple blocked).
 ### D11 — UI is optional by construction
 The core target has zero UI dependencies and is fully configurable headless;
 the developer can build any UI on `providerStatuses()` / `respondDetailed()`.
-`AIProviderKitUI` is a **separate library product** with drop-in, customizable
+`VoltaSDKUI` is a **separate library product** with drop-in, customizable
 SwiftUI components (`PrivacyLevelBadge`, `ProviderStatusRow`/`ProviderStatusList`,
 `AIPlaygroundView`). Rows/badges are public so developers can recompose them.
 Nothing in the core ever imports SwiftUI.
@@ -251,7 +252,7 @@ struct ContextUsage { tokens, contextSize, provider, fraction } // (D13)
 ```
 
 Adding iOS 27 providers/quota/Dynamic-Profiles bridge must extend these, not
-break them (SemVer: iOS 27 stays in 1.x). `AIProviderKitUI` components are
+break them (SemVer: iOS 27 stays in 1.x). `VoltaSDKUI` components are
 additive and optional by definition.
 
 ## 6. Demo & verification
@@ -263,7 +264,7 @@ additive and optional by definition.
   token pre-flight incl. response reserve and the no-capability case (D13),
   context-usage reporting, OpenAI window table + estimate,
   global configure, Retry-After parsing.
-- `swift run AIProviderKitDemo` — macOS test UI.
+- `swift run VoltaSDKDemo` — macOS test UI.
 - **iOS demo:** open `Examples/iOSDemo/iOSDemo.xcodeproj` and run on an
   iPhone/iPad (or simulator with an iOS 26 runtime — Xcode 26.6 ships iPhone 17
   family simulators). The project was generated with XcodeGen from
@@ -272,7 +273,7 @@ additive and optional by definition.
   (`DEVELOPMENT_TEAM`), so it survives regeneration — don't set it only in
   Xcode's Signing pane, that edit lives in the generated pbxproj.
 
-Both demos render the same `DemoRootView` (target `AIProviderKitDemoUI`):
+Both demos render the same `DemoRootView` (target `VoltaSDKDemoUI`):
 configure providers/key/preference live, see the fallback chain status with
 real availability reasons, send prompts, see which provider answered with its
 privacy badge, and watch privacy-downgrade notifications. Layout is adaptive —

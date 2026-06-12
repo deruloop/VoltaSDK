@@ -1,6 +1,6 @@
 //
 //  AIOrchestrator.swift
-//  AIProviderKit
+//  VoltaSDK
 //
 //  The orchestrator and the stable public API.
 //  On iOS 26 it resolves between two providers (on-device + developer key)
@@ -8,9 +8,9 @@
 //  will carry iOS 27, which adds PCC, user-account providers, and the
 //  per-need chain (.lightweight / .reasoning / .largeContext).
 //
-//  Naming note: the type is NOT named after the module (AIProviderKit)
+//  Naming note: the type is NOT named after the module (VoltaSDK)
 //  because in Swift a type that shadows its own module makes it impossible
-//  to qualify other symbols (`AIProviderKit.Xyz` would always resolve the
+//  to qualify other symbols (`VoltaSDK.Xyz` would always resolve the
 //  type, never the module). "Orchestrator" also reflects the framework's
 //  real value: model resolution, not agent execution.
 //

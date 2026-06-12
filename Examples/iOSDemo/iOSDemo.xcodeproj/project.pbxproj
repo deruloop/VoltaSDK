@@ -3,17 +3,17 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 52;
+	objectVersion = 51;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		427805B00F7719CE1CCE11ED /* AIProviderKitDemoUI in Frameworks */ = {isa = PBXBuildFile; productRef = C38D9B2CCF9A0488A08A3EE4 /* AIProviderKitDemoUI */; };
+		427805B00F7719CE1CCE11ED /* VoltaSDKDemoUI in Frameworks */ = {isa = PBXBuildFile; productRef = BCC7779D6173AFBDC263A1C8 /* VoltaSDKDemoUI */; };
 		F6CE83C4B4FFCFE3520EAD7F /* iOSDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9993C5358C1ECE89FE7CB90 /* iOSDemoApp.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		7B57388DF75171F241E09BAF /* AIProvider */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AIProvider; path = ../..; sourceTree = SOURCE_ROOT; };
-		B161B8B436DF0E418C592968 /* iOSDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iOSDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B161B8B436DF0E418C592968 /* iOSDemo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = iOSDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B9993C5358C1ECE89FE7CB90 /* iOSDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSDemoApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -22,7 +22,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				427805B00F7719CE1CCE11ED /* AIProviderKitDemoUI in Frameworks */,
+				427805B00F7719CE1CCE11ED /* VoltaSDKDemoUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,7 +78,7 @@
 			);
 			name = iOSDemo;
 			packageProductDependencies = (
-				C38D9B2CCF9A0488A08A3EE4 /* AIProviderKitDemoUI */,
+				BCC7779D6173AFBDC263A1C8 /* VoltaSDKDemoUI */,
 			);
 			productName = iOSDemo;
 			productReference = B161B8B436DF0E418C592968 /* iOSDemo.app */;
@@ -93,6 +93,7 @@
 				LastUpgradeCheck = 1200;
 				TargetAttributes = {
 					E7BC14F5D970E77DF29D5DC2 = {
+						DevelopmentTeam = J6HPZ958W6;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -203,7 +204,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.aiproviderkit.demo.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = com.voltasdk.demo.ios;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -280,7 +281,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.aiproviderkit.demo.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = com.voltasdk.demo.ios;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -311,9 +312,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		C38D9B2CCF9A0488A08A3EE4 /* AIProviderKitDemoUI */ = {
+		BCC7779D6173AFBDC263A1C8 /* VoltaSDKDemoUI */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = AIProviderKitDemoUI;
+			productName = VoltaSDKDemoUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

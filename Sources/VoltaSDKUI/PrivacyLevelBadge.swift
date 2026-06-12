@@ -1,13 +1,13 @@
 //
 //  PrivacyLevelBadge.swift
-//  AIProviderKitUI
+//  VoltaSDKUI
 //
 //  Compact badge communicating where the data is processed.
 //  Optional component: the core never depends on SwiftUI.
 //
 
 import SwiftUI
-import AIProviderKit
+import VoltaSDK
 
 /// Badge for a `PrivacyLevel` (icon + label). Customizable via the standard
 /// `tint(_:)`/`font(_:)` modifiers; for a fully custom look the developer

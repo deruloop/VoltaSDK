@@ -1,6 +1,6 @@
 //
 //  Mocks.swift
-//  AIProviderKit
+//  VoltaSDK
 //
 //  Inherits the pattern of the original ChatGptManagerMock, generalized.
 //  Lets you test the orchestrator and the fallback without network or a

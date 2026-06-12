@@ -1,15 +1,30 @@
-# AIProviderKit
+# VoltaSDK
+
+**VOLTA** — *Versatile Orchestration Layer for Tiered AI*
 
 A Swift framework that **resolves at runtime which AI model to use** —
 on-device (Apple Intelligence) or cloud — with automatic fallback, privacy
-disclosure, and multi-turn conversations. The app asks for a response; the
-framework picks the right model based on availability, preference, context
-window, and privacy policy.
+disclosure, and multi-turn conversations. The app asks for a response; Volta
+picks the right model based on availability, preference, context window, and
+privacy policy.
 
 This is not an agent framework: it owns no sessions and no conversations. Its
 only job is **model resolution**, designed to extend to iOS 27
 (multi-provider, Private Cloud Compute, Dynamic Profiles) **without changing
 the API**.
+
+## Why "Volta"
+
+- **The acronym says what it does:** a *Versatile Orchestration Layer* that
+  manages *Tiered AI* — the tiers being both the capability tiers it ships
+  (iOS 26.0 base → 26.4 token-aware → 27 multi-provider) and the fallback
+  chain it walks at runtime (on-device → cloud).
+- **Alessandro Volta** invented the battery — a stack of cells where, when one
+  layer alone isn't enough, the stack delivers the power. That is exactly the
+  fallback chain.
+- In Italian, *volta* also means **"turn"** — and turn-by-turn conversations,
+  with the history travelling on every call, are one of the SDK's defining
+  design choices.
 
 ## Version support
 
@@ -17,11 +32,11 @@ the API**.
 |---|---|
 | **iOS / macOS 26.0+** | The whole core: fallback chain, typed errors, privacy disclosure, multi-turn conversations, optional UI components. Context handling is *reactive* (error → fallback). |
 | **iOS / macOS 26.4+** | The *token-aware* tier lights up on its own: exact on-device token counting, automatic context-window pre-flight, `contextUsage` to know how full the window is. |
-| **iOS 27** | In development (multi-provider, PCC, Dynamic Profiles bridge). Will ship as an additive 1.x update: same API, no rewrite. |
+| **iOS 27** | In development (multi-provider, PCC, Dynamic Profiles bridge). Will ship as an additive update: same API, no rewrite. |
 
 Requirements: Swift 6.2 / Xcode 26. The on-device model needs a device with
-Apple Intelligence (detected at runtime: if absent, the framework excludes it
-and explains why).
+Apple Intelligence (detected at runtime: if absent, Volta excludes it and
+explains why).
 
 ## Installation (Swift Package Manager)
 
@@ -29,27 +44,28 @@ and explains why).
 
 ```swift
 dependencies: [
-    .package(url: "<repo-url>", from: "1.0.1")
+    .package(url: "<repo-url>", from: "2.0.0")
 ]
 ```
 
 In Xcode: File → Add Package Dependencies… → paste the URL → add the
-**`AIProviderKit`** product to your app target. Add **`AIProviderKitUI`** only
-if you want the ready-made SwiftUI components: the core is fully usable
-without any UI.
+**`VoltaSDK`** product to your app target. Add **`VoltaSDKUI`** only if you
+want the ready-made SwiftUI components: the core is fully usable without any
+UI.
 
 **Local package (same machine):** File → Add Package Dependencies… →
 Add Local… → select the package folder. Note: a local dependency always uses
 the working copy; version tags don't apply.
 
-The current version is **1.0.1** (see [CHANGELOG.md](CHANGELOG.md)).
+The current version is **2.0.0** (see [CHANGELOG.md](CHANGELOG.md) — 2.0.0 is
+the rename from AIProviderKit; the feature set is the 1.x one).
 
 ## Usage
 
 ### 1. Configuration (at app launch)
 
 ```swift
-import AIProviderKit
+import VoltaSDK
 
 AIOrchestrator.configure {
     $0.enableOnDevice = true
@@ -80,8 +96,8 @@ print(response.text, response.provider, response.privacyLevel)
 
 ### 3. Multi-turn conversations
 
-The framework is **stateless**: it remembers nothing between calls. The
-conversation belongs to the app, which passes it with every call:
+Volta is **stateless**: it remembers nothing between calls. The conversation
+belongs to the app, which passes it with every call:
 
 ```swift
 var history: [ChatTurn] = []
@@ -101,10 +117,10 @@ trim the history remains the app's choice.
 
 ### 4. Token awareness (26.4+)
 
-The framework runs an automatic **pre-flight**: if it knows a call cannot fit
-a provider's context window, it skips that provider without paying for a
-doomed generation. On 26.0–26.3 on-device counting isn't available and only
-the reactive behavior remains.
+Volta runs an automatic **pre-flight**: if it knows a call cannot fit a
+provider's context window, it skips that provider without paying for a doomed
+generation. On 26.0–26.3 on-device counting isn't available and only the
+reactive behavior remains.
 
 ```swift
 if let usage = await kit.contextUsage(history: history), usage.fraction > 0.8 {
@@ -132,10 +148,10 @@ let kit = AIOrchestrator(configuration: config)
 let answer = try await kit.respond(to: "...")
 ```
 
-## Optional UI (`AIProviderKitUI`)
+## Optional UI (`VoltaSDKUI`)
 
 ```swift
-import AIProviderKitUI
+import VoltaSDKUI
 
 // Fallback-chain status (for debugging or a settings screen):
 ProviderStatusList(orchestrator: kit)
@@ -154,7 +170,7 @@ and `respondDetailed()`.
 **macOS:**
 
 ```bash
-swift run AIProviderKitDemo
+swift run VoltaSDKDemo
 ```
 
 **iPhone / iPad:** open `Examples/iOSDemo/iOSDemo.xcodeproj` and Run on a

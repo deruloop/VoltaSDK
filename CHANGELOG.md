@@ -2,7 +2,17 @@
 
 All notable changes to this package. Versioning: [SemVer](https://semver.org).
 Stability promise (see docs, D3): the iOS 27 extensions will be additive on
-the same API — they stay in the 1.x series.
+the same API — they stay within the current major series.
+
+## [2.0.0] — 2026-06-12
+
+- **Renamed the package from AIProviderKit to VoltaSDK** (**VOLTA** =
+  *Versatile Orchestration Layer for Tiered AI*). Products and modules:
+  `AIProviderKit` → `VoltaSDK`, `AIProviderKitUI` → `VoltaSDKUI`. Major bump
+  because module names are part of the API (`import VoltaSDK`); there are no
+  functional changes — the feature set is exactly 1.0.1's.
+- Migration: update the package dependency and the `import` statements; all
+  type names (`AIOrchestrator`, `ChatTurn`, `ProviderError`, …) are unchanged.
 
 ## [1.0.1] — 2026-06-12
 

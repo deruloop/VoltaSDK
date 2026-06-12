@@ -1,6 +1,6 @@
 //
 //  OpenAIProvider.swift
-//  AIProviderKit
+//  VoltaSDK
 //
 //  Evolution of the original ChatGptManager.
 //  Key differences from the primitive version:

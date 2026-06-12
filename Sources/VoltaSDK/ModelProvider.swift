@@ -1,6 +1,6 @@
 //
 //  ModelProvider.swift
-//  AIProviderKit
+//  VoltaSDK
 //
 //  The protocol shared by all model providers.
 //  Evolution of the original `ChatGptRepository`: same idea (interface +

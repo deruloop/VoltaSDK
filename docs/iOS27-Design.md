@@ -1,4 +1,4 @@
-# AIProviderKit — iOS 27 Design (internal source)
+# VoltaSDK — iOS 27 Design (internal source)
 
 > Internal documentation of the **iOS 27 extension: designed, NOT implemented**.
 > No iOS 27 code exists in the package (and none can compile until the iOS 27
@@ -14,11 +14,11 @@
 
 On iOS 27 Apple opens the Foundation Models stack: a public `LanguageModel`
 protocol (multi-provider), `PrivateCloudComputeLanguageModel` (PCC), and
-Dynamic Profiles (declarative agents). AIProviderKit's job stays the same —
+Dynamic Profiles (declarative agents). VoltaSDK's job stays the same —
 **model resolution** — but the chain grows: on-device, PCC, developer key, and
 user-account providers (Gemini/Claude), selected per call by need, auth, quota,
 availability, and privacy policy. The public API does not change: iOS 27
-features are additive (SemVer 1.x).
+features are additive (SemVer: within the current major, 2.x).
 
 ## 2. Founding decisions
 
@@ -133,7 +133,7 @@ Matches the roadmap in CLAUDE.md:
    replacing/extending `ModelPreference` (kept at 4 cases on purpose — a third
    provider makes a closed enum combinatorial).
 3. `preferred(_ need:)` bridge for Dynamic Profiles, evolving `resolveProvider()`.
-4. Model picker component in AIProviderKitUI (meaningful once >1 user-visible
+4. Model picker component in VoltaSDKUI (meaningful once >1 user-visible
    option; `ProviderStatusList` is the embryo).
 
 ## 7. Blockers

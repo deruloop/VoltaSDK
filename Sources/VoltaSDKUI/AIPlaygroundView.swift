@@ -1,6 +1,6 @@
 //
 //  AIPlaygroundView.swift
-//  AIProviderKitUI
+//  VoltaSDKUI
 //
 //  Ready-to-use prompt→response view, showing which provider answered and
 //  at which privacy level.
@@ -13,7 +13,7 @@
 //
 
 import SwiftUI
-import AIProviderKit
+import VoltaSDK
 
 /// A single prompt → response exchange, with provenance.
 public struct PlaygroundExchange: Identifiable, Sendable {
