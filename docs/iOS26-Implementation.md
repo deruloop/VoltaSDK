@@ -1,6 +1,6 @@
 # VoltaSDK — iOS 26 / 26.4 Implementation (internal source)
 
-> Internal documentation of what is **built and shipping** (v0.1.0): the iOS 26
+> Internal documentation of what is **built and shipping** (v0.3.0): the iOS 26
 > base tier and the iOS 26.4 token-aware tier. For the iOS 27 design see
 > `docs/iOS27-Design.md`. Keep this file in sync with every code change
 > (working agreement in CLAUDE.md).
@@ -9,7 +9,7 @@
 
 ## 1. Verified status
 
-Released **v0.1.0** (git tag `0.1.0`, 2026-06-12). Pre-1.0 policy: 0.x while
+Released **v0.3.0** (tags `0.1.0`–`0.3.0`, 2026-06-12). Pre-1.0 policy: 0.x while
 in development; 1.0.0 is reserved for the complete feature set including the
 iOS 27 extension. `swift build` succeeds and **41 tests in 8 suites pass** on
 macOS 26.5 SDK / Xcode 26.6, Swift 6.2 tools. The iOS demo app builds and
@@ -40,7 +40,7 @@ File map:
 │   ├── VoltaSDKUI/                        // OPTIONAL SwiftUI components (separate product)
 │   │   ├── PrivacyLevelBadge.swift        // badge for a PrivacyLevel
 │   │   ├── ProviderStatusList.swift       // fallback-chain status list (+ public Row)
-│   │   ├── ModelSelector.swift            // USER-side picker + activation gate (+ public Row)
+│   │   ├── ModelSelector.swift            // USER-side collapsed picker + onSelection hook (+ public Row)
 │   │   └── AIPlaygroundView.swift         // conversational playground with provenance
 │   ├── VoltaSDKDemoUI/                    // demo UI shared macOS+iOS (adaptive layout)
 │   │   └── DemoRootView.swift             // HSplitView on macOS, TabView on iOS
@@ -287,6 +287,33 @@ Adding iOS 27 providers/quota/Dynamic-Profiles bridge must extend these, not
 break them (SemVer: iOS 27 stays in 1.x). `VoltaSDKUI` components are
 additive and optional by definition.
 
+### ModelSelector contract (VoltaSDKUI)
+
+- Collapsed-by-default disclosure: resting footprint is one row regardless of
+  provider count. External commits (setting the `selection` binding) collapse
+  and refresh it.
+- `onSelection: (ProviderIdentifier) async -> ModelSelectionResponse` with
+  `.activate` / `.deny(message:)` / `.deferred`. `.deferred` is the
+  extensibility point: the app presents its own view (paywall, settings,
+  iOS 27 OAuth page) and commits later via the binding. The selector never
+  owns business logic; it reacts.
+- Default labels are neutral on purpose: no "included with subscription"
+  claims — the developer brands rows via `labels:`.
+
+### How apps express roles/personas today (pre-Dynamic Profiles)
+
+There is deliberately no `Agent` type (D2). A "role" today is a value the
+app owns: **instructions + its own history + optionally a preferred
+provider**. Because the core is stateless and transcript-transparent (D12),
+an app can run any number of personas in parallel — each is just a different
+`instructions` string and a separate `[ChatTurn]` array passed per call
+(`respond(to:instructions:history:)`). On-device, instructions become the
+session/Transcript `Instructions` entry; on cloud vendors they become the
+system message. On iOS 27, Dynamic Profiles replace the app-side struct:
+instructions/tools move into Apple's declarative `DynamicProfile`, and Volta's
+contribution narrows to `.model(orchestrator.preferred(.reasoning))` — which
+is why we never built a role abstraction that would now be in the way.
+
 ## 6. Demo & verification
 
 - `swift build` — builds core + UI + demo (macOS side).
@@ -317,12 +344,16 @@ macOS (developer | user), tabs (Developer / User) on iOS.
   vendor), shows the vendor's default as a placeholder, and a disclosure
   links to each vendor's model documentation (D15). Keyboard dismisses
   interactively by scrolling everywhere (form and chat).
-- **User side:** the chat on top, the `ModelSelector` below. The user's
-  selection re-leads the chain (selection → preference mapping in
-  `DemoRootView.effectivePreference`); the cloud-model row is gated on the
-  simulated subscription via the selector's `activation` hook (700 ms fake
-  paywall), demonstrating the blocking-logic pattern that iOS 27 OAuth flows
-  will reuse. The active badge confirms the committed choice.
+- **User side:** the chat on top, the `ModelSelector` below. The selector is
+  **collapsed by default** (a single row with the active choice + chevron;
+  expanding shows the options — scales to iOS 27's longer provider list).
+  The user's selection re-leads the chain (selection → preference mapping in
+  `DemoRootView.effectivePreference`). Tapping an option runs the demo's
+  `onSelection` handler: on-device → `.activate`; cloud model → entitlement
+  check, then `.activate` if the simulated subscription is on, otherwise
+  `.deferred` + a paywall sheet — the app-owned custom flow that later
+  commits by setting the `selection` binding (exactly how an iOS 27 OAuth
+  page will work). The collapsed row doubles as the "active" confirmation.
 The playground is a real conversation (D12): follow-ups work because the view
 holds the history and passes it per call; "New conversation" resets it. It
 also shows the context pressure ("context N% of \<window\>", orange above

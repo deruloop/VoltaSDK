@@ -44,7 +44,7 @@ explains why).
 
 ```swift
 dependencies: [
-    .package(url: "<repo-url>", from: "0.2.0")
+    .package(url: "<repo-url>", from: "0.3.0")
 ]
 ```
 
@@ -57,7 +57,7 @@ UI.
 Add Local… → select the package folder. Note: a local dependency always uses
 the working copy; version tags don't apply.
 
-The current version is **0.2.0** (see [CHANGELOG.md](CHANGELOG.md)). VoltaSDK
+The current version is **0.3.0** (see [CHANGELOG.md](CHANGELOG.md)). VoltaSDK
 is in active development: 0.x minor versions may evolve the API; **1.0.0 will
 mark the complete feature set**, including the iOS 27 extension.
 
@@ -181,9 +181,17 @@ AIPlaygroundView(orchestrator: kit, instructions: "Be concise.")
 ### User-side model selector
 
 `ModelSelector` is a drop-in view that lets **your users** choose which model
-to use. The options derive from the orchestrator's real state: providers you
-didn't configure never appear; unavailable ones show their reason. An "active"
-badge confirms which preference is currently committed.
+to use. Collapsed, it occupies a single row showing the active choice; tapping
+it expands the list of options (it stays compact however many providers exist
+— on iOS 27 the new ones appear automatically). Options derive from the
+orchestrator's real state: providers you didn't configure never appear;
+unavailable ones show their reason.
+
+The default labels make **no business assumptions** — only you know whether
+the cloud model is "included with Pro", metered, or free. Brand the rows via
+`labels:`.
+
+Selection is a conversation with your app through `onSelection`:
 
 ```swift
 @State private var userChoice: ProviderIdentifier?
@@ -198,29 +206,28 @@ ModelSelector(
             systemImage: "sparkles"
         )
     ],
-    activation: { provider in
-        switch provider {
-        case .openAI:
-            // Your blocking logic: paywall, entitlement check, …
-            return await paywall.userHasActiveSubscription()
-        default:
-            return true   // on-device activates immediately
+    onSelection: { provider in
+        guard provider != .onDevice else { return .activate }   // immediate
+        if await entitlements.hasActiveSubscription() {
+            return .activate                                    // commit now
         }
+        showPaywall = true                                      // your own view
+        return .deferred                                        // app takes over
     }
 )
 ```
 
-Selecting a row runs your `activation` gate before committing: the row shows
-a spinner, and the selection only becomes active when the gate returns
-`true`. On-device needs no gate; the developer-key model is typically gated
-behind a subscription (see the "included with the app" model); on iOS 27 the
-user-account providers (Gemini, Claude, …) will appear in the same list and
-run their OAuth flow through this same hook.
+- **`.activate`** commits the selection immediately.
+- **`.deny(message:)`** refuses it, with an optional message under the selector.
+- **`.deferred`** hands control to *your* flow — a paywall, a settings screen,
+  or (iOS 27 user-account providers) a page that runs the OAuth login. When
+  your flow succeeds, commit the choice by setting the `selection` binding;
+  the selector reflects it instantly. Nothing about the gate lives inside the
+  component — it only reacts.
 
-Design customization: per-provider `labels` (title/subtitle/icon),
-`showsActiveBadge` and `hidesUnavailable` flags, standard SwiftUI modifiers
-(`.tint`, `.font`, …) — and `ModelSelectorRow` is public, so you can rebuild
-the whole layout on top of `providerStatuses()` while keeping the rows.
+Design customization: per-provider `labels`, `hidesUnavailable`, standard
+SwiftUI modifiers — and `ModelSelectorRow` is public, so you can rebuild the
+whole layout on top of `providerStatuses()` while keeping the rows.
 
 All component building blocks (`ProviderStatusRow`, `PrivacyLevelBadge`,
 `ModelSelectorRow`) are public: recompose them into custom layouts using the

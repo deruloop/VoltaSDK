@@ -44,6 +44,10 @@ public struct DemoRootView: View {
     // User-side state: what the end user picked in the ModelSelector.
     @State private var userSelection: ProviderIdentifier?
 
+    // Custom-flow demo state: the provider waiting on the paywall sheet.
+    @State private var pendingProvider: ProviderIdentifier?
+    @State private var showsPaywall = false
+
     @State private var orchestrator = AIOrchestrator(configuration: AIConfiguration())
     @State private var downgradeLog = DowngradeLog()
 
@@ -96,27 +100,25 @@ public struct DemoRootView: View {
                 Toggle("On-device model", isOn: $enableOnDevice)
                 SecureField("API key (OpenAI, Claude, or Gemini)", text: $apiKey)
                     .textContentType(.password)
-                if let vendor = detectedVendor {
-                    Label("Detected: \(vendor.rawValue)", systemImage: "checkmark.circle")
-                        .font(.caption)
-                        .foregroundStyle(.green)
-                } else if !apiKey.isEmpty {
-                    Label("Unknown key format — OpenAI will be assumed",
-                          systemImage: "questionmark.circle")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-                TextField(modelPlaceholder, text: $model)
-                    .autocorrectionDisabled()
-                Text("The model name belongs to the key's vendor — an OpenAI key takes OpenAI model names, a Claude key takes Claude ones. Leave empty for the vendor's default (\(defaultModelHint)).")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                DisclosureGroup("Where do I find model names?") {
-                    ForEach(CloudVendor.allCases, id: \.self) { vendor in
-                        Link(destination: vendor.modelDocumentationURL) {
-                            Label("\(vendor.rawValue) models", systemImage: "arrow.up.right.square")
-                                .font(.caption)
-                        }
+                // The model is a CONSEQUENCE of the key: the field appears
+                // once a key exists, scoped to the detected vendor.
+                if !apiKey.isEmpty {
+                    if let vendor = detectedVendor {
+                        Label("\(vendor.rawValue) key detected", systemImage: "checkmark.circle")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    } else {
+                        Label("Unknown key format — OpenAI assumed",
+                              systemImage: "questionmark.circle")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                    TextField("\(effectiveVendor.rawValue) model — default: \(effectiveVendor.defaultModel)", text: $model)
+                        .autocorrectionDisabled()
+                    Link(destination: effectiveVendor.modelDocumentationURL) {
+                        Label("\(effectiveVendor.rawValue) model catalog",
+                              systemImage: "arrow.up.right.square")
+                            .font(.caption)
                     }
                 }
                 Picker("Default preference", selection: $preference) {
@@ -138,7 +140,7 @@ public struct DemoRootView: View {
             }
             Section("Simulated entitlements") {
                 Toggle("User has an active subscription", isOn: $userHasSubscription)
-                Text("The \"Cloud model\" option in the user-side selector is gated on this — flip it off and try selecting it.")
+                Text("On: selecting the cloud model on the User side activates directly. Off: the selection defers to a demo paywall sheet — the custom-flow path your app controls (on iOS 27, e.g. a page that runs a provider's OAuth).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -160,12 +162,9 @@ public struct DemoRootView: View {
         apiKey.isEmpty ? nil : CloudVendor.detect(fromKey: apiKey)
     }
 
-    private var modelPlaceholder: String {
-        "Model (e.g. \((detectedVendor ?? .openAI).defaultModel))"
-    }
-
-    private var defaultModelHint: String {
-        (detectedVendor ?? .openAI).defaultModel
+    /// Detection result with the documented fallback (unknown → OpenAI).
+    private var effectiveVendor: CloudVendor {
+        detectedVendor ?? .openAI
     }
 
     // MARK: User side
@@ -181,21 +180,63 @@ public struct DemoRootView: View {
 
             Divider()
 
-            // The user-side selector, with the developer's activation gate.
+            // The user-side selector. The handler decides per tap:
+            // activate, deny, or defer to a custom flow the app owns.
             ModelSelector(
                 orchestrator: orchestrator,
                 selection: $userSelection,
-                activation: { [userHasSubscription] provider in
-                    // On-device is immediate; the cloud model simulates a
-                    // paywall/entitlement check (in a real app: StoreKit,
-                    // or on iOS 27 an OAuth flow for user-account providers).
-                    guard provider != .onDevice else { return true }
-                    try? await Task.sleep(for: .milliseconds(700))
-                    return userHasSubscription
+                onSelection: { provider in
+                    // On-device is immediate.
+                    guard provider != .onDevice else { return .activate }
+                    // Entitlement check (in a real app: StoreKit).
+                    try? await Task.sleep(for: .milliseconds(400))
+                    if userHasSubscription { return .activate }
+                    // Not entitled: the APP takes over with its own view —
+                    // here a paywall sheet; on iOS 27 it could be a page
+                    // that runs the provider's OAuth flow. The sheet commits
+                    // the choice later by setting `userSelection`.
+                    pendingProvider = provider
+                    showsPaywall = true
+                    return .deferred
                 }
             )
         }
         .padding()
+        .sheet(isPresented: $showsPaywall) { paywallSheet }
+    }
+
+    /// Stand-in for the app's own gate: a paywall today, a provider's
+    /// OAuth page on iOS 27. The selector returned `.deferred`; this view
+    /// commits the user's choice by setting the `userSelection` binding.
+    private var paywallSheet: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "sparkles")
+                .font(.largeTitle)
+                .foregroundStyle(.tint)
+            Text("Go Premium")
+                .font(.title2.bold())
+            Text("The cloud model is part of the premium plan. This sheet stands in for whatever flow your app needs — a paywall, a settings page, or an OAuth login for iOS 27 user-account providers.")
+                .font(.callout)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+            Button("Subscribe") {
+                userHasSubscription = true
+                // External commit: the selector reflects it instantly.
+                userSelection = pendingProvider
+                pendingProvider = nil
+                showsPaywall = false
+            }
+            .buttonStyle(.borderedProminent)
+            Button("Not now") {
+                pendingProvider = nil
+                showsPaywall = false
+            }
+            .buttonStyle(.borderless)
+        }
+        .padding(24)
+        #if os(macOS)
+        .frame(minWidth: 360)
+        #endif
     }
 
     // MARK: Configuration

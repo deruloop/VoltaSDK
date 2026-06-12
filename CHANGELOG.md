@@ -5,6 +5,25 @@ All notable changes to this package. Versioning: [SemVer](https://semver.org).
 evolve the API. **1.0.0 will mark the complete feature set**, including the
 iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
 
+## [0.3.0] — 2026-06-12
+
+- **`ModelSelector` redesigned as a collapsed disclosure:** resting state is
+  a single row with the active choice; tapping expands the options. Scales
+  to the longer iOS 27 provider list.
+- **Selection is now a three-way response** (`ModelSelectionResponse`):
+  `.activate`, `.deny(message:)`, or `.deferred` — the app takes over with
+  its own view (paywall, settings, future OAuth page) and commits later by
+  setting the `selection` binding. Replaces the boolean `activation:` hook.
+- Default labels no longer claim "included with your subscription" — the
+  component makes no business assumptions; brand rows via `labels:`.
+- Demo: the developer-model field now appears as a consequence of entering
+  a key (scoped to the detected vendor, with that vendor's catalog link);
+  the cloud-model selection demonstrates the `.deferred` path with a
+  paywall sheet that commits externally.
+- Migration from 0.2.0: replace `activation: { … true/false }` with
+  `onSelection: { … .activate / .deny() }`; `showsActiveBadge` was removed
+  (the collapsed row itself is the confirmation).
+
 ## [0.2.0] — 2026-06-12
 
 - **Multi-vendor developer key (D15):** the `developerKey` slot now accepts

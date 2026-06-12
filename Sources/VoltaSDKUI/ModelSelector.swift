@@ -4,36 +4,51 @@
 //
 //  USER-side model picker, ready to use out of the box.
 //
-//  The developer decides which providers exist (configuration); this view
-//  lets the END USER choose which one leads the chain. The options shown
-//  derive from the orchestrator's real state, so a provider the developer
-//  didn't configure never appears, and an unavailable one shows its reason.
+//  Layout: collapsed by default — a single row showing the current choice.
+//  Tapping it expands the list of options; picking one (or an external
+//  commit) collapses it again. This scales to any number of providers
+//  (iOS 27 adds PCC and user-account vendors) without growing the resting
+//  footprint.
 //
-//  Activation gating: selecting a row can be subject to developer logic via
-//  the `activation` handler — e.g. on-device activates immediately (return
-//  true), the cloud model requires an active subscription (run a paywall,
-//  then return the outcome), and on iOS 27 user-account providers will run
-//  their OAuth flow in the same hook. While the handler runs, the row shows
-//  a spinner and the active badge says "Activating…"; the selection only
-//  commits when the handler returns true.
+//  Selection is a three-way conversation with the app via `onSelection`:
+//   - `.activate`  → commit immediately (on-device is the typical case);
+//   - `.deny`      → refuse, with an optional message under the selector;
+//   - `.deferred`  → the APP takes over: present a paywall, a settings page,
+//     or (iOS 27) a page that runs a provider's OAuth flow. The selector
+//     steps aside; when the app's flow succeeds, it commits the choice by
+//     setting the `selection` binding — the selector reflects it instantly.
 //
 //  Customization:
-//   - `labels:` overrides title/subtitle/icon per provider (e.g. brand the
-//     developer-key row as "Included with Premium").
-//   - `showsActiveBadge` / `hidesUnavailable` flags.
+//   - `labels:` overrides title/subtitle/icon per provider. The defaults
+//     make NO business assumptions (no "included with subscription" claims —
+//     only the developer knows their model); brand the rows via labels.
+//   - `hidesUnavailable` flag; standard SwiftUI modifiers (.tint, .font, …).
 //   - `ModelSelectorRow` is public: recompose your own layout on top of
 //     `providerStatuses()` if you need full design control.
-//   - Standard SwiftUI modifiers (.tint, .font, …) apply.
 //
 
 import SwiftUI
 import VoltaSDK
 
+// MARK: - Selection response
+
+/// What the app decides when the user taps an option.
+public enum ModelSelectionResponse: Sendable {
+    /// Commit the selection immediately.
+    case activate
+    /// Refuse the selection. The optional message is shown under the
+    /// selector; pass `nil` for a generic one.
+    case deny(message: String? = nil)
+    /// The app is taking over with its own flow (paywall, OAuth page, …).
+    /// The selector does nothing now; commit later by setting the
+    /// `selection` binding from your flow.
+    case deferred
+}
+
 // MARK: - Labels
 
-/// Display metadata for one selectable provider. Defaults are provided;
-/// override per provider to brand the options (see D4: the developer key
-/// should read as "included with the app", not as an API key).
+/// Display metadata for one selectable provider. Defaults are deliberately
+/// neutral — brand the options (e.g. "Included with Premium") via `labels:`.
 public struct ModelSelectorLabel: Sendable {
     public let title: String
     public let subtitle: String?
@@ -54,12 +69,10 @@ public struct ModelSelectorLabel: Sendable {
                 systemImage: "iphone"
             )
         case .openAI, .anthropic, .gemini:
-            // All developer-key vendors read as the same user-facing option:
-            // a cloud model included with the app (D4) — the vendor is an
-            // implementation detail unless the developer brands it.
+            // One neutral face for any developer-key vendor: no assumptions
+            // about the developer's business model.
             return ModelSelectorLabel(
                 title: "Cloud model",
-                subtitle: "Included with your subscription",
                 systemImage: "sparkles"
             )
         default:
@@ -123,10 +136,6 @@ public struct ModelSelectorRow: View {
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 8)
-        .background(
-            isSelected ? Color.accentColor.opacity(0.08) : Color.clear,
-            in: RoundedRectangle(cornerRadius: 8)
-        )
         .opacity(isAvailable ? 1 : 0.5)
         .contentShape(Rectangle())
     }
@@ -134,25 +143,22 @@ public struct ModelSelectorRow: View {
 
 // MARK: - Selector
 
-/// Ready-to-use user-side selector. On iOS 26 the options are on-device and
-/// the developer-key model; on iOS 27 the new providers (PCC, Gemini,
-/// Claude, …) will appear automatically once configured, and their OAuth
-/// flows attach through the same `activation` hook.
+/// Ready-to-use user-side selector. Collapsed it occupies a single row;
+/// on iOS 27 new providers (PCC, user-account vendors) appear in the
+/// expanded list automatically once configured, and their custom flows
+/// (OAuth pages) attach through the same `onSelection` hook via `.deferred`.
 public struct ModelSelector: View {
-    /// Developer gate run before committing a selection. Return `true` to
-    /// activate the option, `false` to reject it (e.g. paywall dismissed,
-    /// OAuth cancelled). Rows without blocking logic should just return
-    /// `true` — that's why on-device activates immediately.
-    public typealias ActivationHandler = @Sendable (ProviderIdentifier) async -> Bool
+    public typealias SelectionHandler =
+        @MainActor (ProviderIdentifier) async -> ModelSelectionResponse
 
     private let orchestrator: AIOrchestrator
     @Binding private var selection: ProviderIdentifier?
     private let labels: [ProviderIdentifier: ModelSelectorLabel]
-    private let activation: ActivationHandler?
-    private let showsActiveBadge: Bool
+    private let onSelection: SelectionHandler?
     private let hidesUnavailable: Bool
 
     @State private var statuses: [ProviderStatus] = []
+    @State private var isExpanded = false
     @State private var activatingID: ProviderIdentifier?
     @State private var failureText: String?
 
@@ -160,16 +166,14 @@ public struct ModelSelector: View {
         orchestrator: AIOrchestrator,
         selection: Binding<ProviderIdentifier?>,
         labels: [ProviderIdentifier: ModelSelectorLabel] = [:],
-        activation: ActivationHandler? = nil,
-        showsActiveBadge: Bool = true,
-        hidesUnavailable: Bool = false
+        hidesUnavailable: Bool = false,
+        onSelection: SelectionHandler? = nil
     ) {
         self.orchestrator = orchestrator
         self._selection = selection
         self.labels = labels
-        self.activation = activation
-        self.showsActiveBadge = showsActiveBadge
         self.hidesUnavailable = hidesUnavailable
+        self.onSelection = onSelection
     }
 
     private func label(for identifier: ProviderIdentifier) -> ModelSelectorLabel {
@@ -183,79 +187,120 @@ public struct ModelSelector: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if showsActiveBadge {
-                activeBadge
-            }
-            ForEach(visibleStatuses) { status in
-                Button {
-                    select(status)
-                } label: {
-                    ModelSelectorRow(
-                        label: label(for: status.identifier),
-                        status: status,
-                        isSelected: selection == status.identifier,
-                        isActivating: activatingID == status.identifier
-                    )
+        VStack(alignment: .leading, spacing: 4) {
+            collapsedHeader
+
+            if isExpanded {
+                Divider()
+                ForEach(visibleStatuses) { status in
+                    Button {
+                        select(status)
+                    } label: {
+                        ModelSelectorRow(
+                            label: label(for: status.identifier),
+                            status: status,
+                            isSelected: selection == status.identifier,
+                            isActivating: activatingID == status.identifier
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(status.availability != .available || activatingID != nil)
                 }
-                .buttonStyle(.plain)
-                .disabled(status.availability != .available || activatingID != nil)
             }
+
             if let failureText {
                 Text(failureText)
                     .font(.caption)
                     .foregroundStyle(.red)
             }
         }
+        .padding(6)
+        .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
         .task(id: ObjectIdentifier(orchestrator)) {
             statuses = await orchestrator.providerStatuses()
         }
+        .onChange(of: selection) {
+            // External commits (e.g. the app's paywall/OAuth flow setting
+            // the binding) close the list and show the new active row.
+            withAnimation { isExpanded = false }
+        }
     }
 
-    /// The confirmation element: tells the user which preference is active
-    /// right now (selection only commits after the activation gate passes).
-    @ViewBuilder
-    private var activeBadge: some View {
-        HStack(spacing: 6) {
-            if let activatingID {
-                ProgressView().controlSize(.small)
-                Text("Activating \(label(for: activatingID).title)…")
-                    .font(.caption)
+    /// The resting state: one row showing the active choice (or a prompt),
+    /// tappable to expand the options.
+    private var collapsedHeader: some View {
+        Button {
+            withAnimation { isExpanded.toggle() }
+        } label: {
+            HStack(spacing: 10) {
+                if let activatingID {
+                    ProgressView().controlSize(.small)
+                    Text("Activating \(label(for: activatingID).title)…")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                } else if let selection {
+                    Image(systemName: label(for: selection).systemImage)
+                        .frame(width: 22)
+                        .foregroundStyle(Color.accentColor)
+                    Text(label(for: selection).title)
+                        .font(.body.weight(.semibold))
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundStyle(.green)
+                        .accessibilityLabel("Active")
+                } else {
+                    Image(systemName: "cpu")
+                        .frame(width: 22)
+                        .foregroundStyle(.secondary)
+                    Text("Choose a model")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.down")
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
-            } else if let selection {
-                Image(systemName: "checkmark.seal.fill")
-                    .foregroundStyle(.green)
-                Text("Active: \(label(for: selection).title)")
-                    .font(.caption.weight(.medium))
-            } else {
-                Image(systemName: "circle.dashed")
-                    .foregroundStyle(.secondary)
-                Text("No model selected")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
             }
+            .padding(.vertical, 6)
+            .padding(.horizontal, 8)
+            .contentShape(Rectangle())
         }
-        .accessibilityElement(children: .combine)
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            selection.map { "Active model: \(label(for: $0).title)" } ?? "Choose a model"
+        )
+        .accessibilityHint("Shows the available models")
     }
 
     private func select(_ status: ProviderStatus) {
         let identifier = status.identifier
-        guard identifier != selection, activatingID == nil else { return }
+        guard activatingID == nil else { return }
+        if identifier == selection {
+            withAnimation { isExpanded = false }
+            return
+        }
         failureText = nil
 
-        // No gate attached: the selection commits immediately.
-        guard let activation else {
+        // No handler attached: selections commit immediately.
+        guard let onSelection else {
             selection = identifier
+            withAnimation { isExpanded = false }
             return
         }
 
         activatingID = identifier
-        Task {
-            let approved = await activation(identifier)
-            if approved {
+        Task { @MainActor in
+            let response = await onSelection(identifier)
+            switch response {
+            case .activate:
                 selection = identifier
-            } else {
-                failureText = "\(label(for: identifier).title) couldn't be activated."
+                withAnimation { isExpanded = false }
+            case .deny(let message):
+                failureText = message ?? "\(label(for: identifier).title) couldn't be activated."
+            case .deferred:
+                // The app is presenting its own flow; it will commit by
+                // setting the `selection` binding when (and if) it succeeds.
+                withAnimation { isExpanded = false }
             }
             activatingID = nil
         }
