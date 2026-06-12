@@ -44,7 +44,7 @@ explains why).
 
 ```swift
 dependencies: [
-    .package(url: "<repo-url>", from: "2.0.0")
+    .package(url: "<repo-url>", from: "0.1.0")
 ]
 ```
 
@@ -57,8 +57,9 @@ UI.
 Add Local… → select the package folder. Note: a local dependency always uses
 the working copy; version tags don't apply.
 
-The current version is **2.0.0** (see [CHANGELOG.md](CHANGELOG.md) — 2.0.0 is
-the rename from AIProviderKit; the feature set is the 1.x one).
+The current version is **0.1.0** (see [CHANGELOG.md](CHANGELOG.md)). VoltaSDK
+is in active development: 0.x minor versions may evolve the API; **1.0.0 will
+mark the complete feature set**, including the iOS 27 extension.
 
 ## Usage
 
@@ -161,9 +162,53 @@ ProviderStatusList(orchestrator: kit)
 AIPlaygroundView(orchestrator: kit, instructions: "Be concise.")
 ```
 
-Rows (`ProviderStatusRow`) and badges (`PrivacyLevelBadge`) are public: they
-can be recomposed into custom layouts using the core's `providerStatuses()`
-and `respondDetailed()`.
+### User-side model selector
+
+`ModelSelector` is a drop-in view that lets **your users** choose which model
+to use. The options derive from the orchestrator's real state: providers you
+didn't configure never appear; unavailable ones show their reason. An "active"
+badge confirms which preference is currently committed.
+
+```swift
+@State private var userChoice: ProviderIdentifier?
+
+ModelSelector(
+    orchestrator: kit,
+    selection: $userChoice,
+    labels: [
+        .openAI: ModelSelectorLabel(
+            title: "Premium cloud model",
+            subtitle: "Included with your Pro plan",
+            systemImage: "sparkles"
+        )
+    ],
+    activation: { provider in
+        switch provider {
+        case .openAI:
+            // Your blocking logic: paywall, entitlement check, …
+            return await paywall.userHasActiveSubscription()
+        default:
+            return true   // on-device activates immediately
+        }
+    }
+)
+```
+
+Selecting a row runs your `activation` gate before committing: the row shows
+a spinner, and the selection only becomes active when the gate returns
+`true`. On-device needs no gate; the developer-key model is typically gated
+behind a subscription (see the "included with the app" model); on iOS 27 the
+user-account providers (Gemini, Claude, …) will appear in the same list and
+run their OAuth flow through this same hook.
+
+Design customization: per-provider `labels` (title/subtitle/icon),
+`showsActiveBadge` and `hidesUnavailable` flags, standard SwiftUI modifiers
+(`.tint`, `.font`, …) — and `ModelSelectorRow` is public, so you can rebuild
+the whole layout on top of `providerStatuses()` while keeping the rows.
+
+All component building blocks (`ProviderStatusRow`, `PrivacyLevelBadge`,
+`ModelSelectorRow`) are public: recompose them into custom layouts using the
+core's `providerStatuses()` and `respondDetailed()`.
 
 ## Demo apps
 
@@ -177,6 +222,13 @@ swift run VoltaSDKDemo
 device or on a simulator with an iOS 26 runtime. On a device with Apple
 Intelligence the on-device provider is real; otherwise the list shows the
 unavailability reason and the fallback switches to the developer key.
+
+The demo mirrors a real integration's two roles: a **Developer** side
+(configuration, privacy policy, a simulated subscription entitlement) and a
+**User** side (the chat with the `ModelSelector` underneath) — so you can see
+the result of any configuration × user-preference combination, including the
+activation gate rejecting the cloud model when the simulated subscription is
+off.
 
 ## Tests
 

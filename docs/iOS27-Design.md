@@ -121,7 +121,8 @@ Practical constraint: iOS 27 code physically requires the iOS 27 SDK
 | D13 capability surface (`contextSize`/`tokenCount`) | per-model token reading lands here (pending Q10) |
 | `ChatTurn` history (D12) | answers transcript portability across providers (pending Q6/Q7 for KV-cache) |
 | — | `PrivateCloudComputeProvider` |
-| — | user-account providers (Gemini/Claude) + model picker UI |
+| `ModelSelector` (VoltaSDKUI, shipped) | gains the new providers automatically; OAuth flows attach via its existing `activation` hook |
+| — | user-account providers (Gemini/Claude) |
 
 ## 6. Implementation order (when unblocked)
 
@@ -133,8 +134,10 @@ Matches the roadmap in CLAUDE.md:
    replacing/extending `ModelPreference` (kept at 4 cases on purpose — a third
    provider makes a closed enum combinatorial).
 3. `preferred(_ need:)` bridge for Dynamic Profiles, evolving `resolveProvider()`.
-4. Model picker component in VoltaSDKUI (meaningful once >1 user-visible
-   option; `ProviderStatusList` is the embryo).
+4. ~~Model picker component~~ shipped already (`ModelSelector` in VoltaSDKUI):
+   the new providers appear in it automatically once wired into
+   `buildProviders`; their OAuth flows attach via the existing `activation`
+   hook. Only the per-provider default labels need adding.
 
 ## 7. Blockers
 

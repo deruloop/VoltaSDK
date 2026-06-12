@@ -20,8 +20,8 @@ developer-key OpenAI today; PCC and user-account providers on iOS 27) with
 automatic fallback, privacy disclosure, transcript-transparent conversations,
 and token awareness. It does **not** invent an agent abstraction — on iOS 27
 it *feeds* Apple's native Dynamic Profiles rather than wrapping them. One
-stable public API across all phases (SemVer: iOS 27 stays additive within the
-current major, 2.x).
+stable public API across all phases (SemVer: 0.x during development; **1.0.0
+is reserved for the complete feature set, including iOS 27**).
 
 ## 2. Documentation map
 
@@ -39,13 +39,14 @@ questions doc into the design doc; release → CHANGELOG + state here.
 
 ## 3. Current state (June 2026)
 
-- **iOS 26 / 26.4: fully working and released — v2.0.0** (tags `1.0.0` first
-  release, `1.0.1` English translation, `2.0.0` rename AIProviderKit →
-  VoltaSDK; all 2026-06-12. The major bump is the module rename only — the
-  feature set is the 1.x one). 34 tests in 7 suites green; builds verified on
-  macOS 26.5, iOS 26.5 simulator, and signed for a physical iPhone. First
-  adoption in the author's app is in progress (must update its dependency to
-  the new module names). The 26.4 token-aware tier lights up by itself at
+- **Versioning policy (user decision, June 2026): 1.0.0 is reserved for the
+  complete feature set, including iOS 27.** The earlier 1.0.0/1.0.1/2.0.0
+  tags were deleted (never pushed anywhere); current release line is **0.x**,
+  starting at `0.1.0`. During 0.x, minor versions may evolve the API.
+- **iOS 26 / 26.4: fully working — v0.1.0** (tag `0.1.0`, 2026-06-12).
+  34 tests in 7 suites green; builds verified on macOS 26.5, iOS 26.5
+  simulator, and signed for a physical iPhone. First adoption in the author's
+  app is in progress. The 26.4 token-aware tier lights up by itself at
   runtime; on 26.0–26.3 context handling stays reactive-only, by design.
 - **iOS 27: designed, NOT implemented — zero iOS 27 code exists.** The design
   is substantial (see `docs/iOS27-Design.md`: founding decisions, provider
@@ -86,5 +87,7 @@ questions doc into the design doc; release → CHANGELOG + state here.
 7. **Per-need fallback chain** (`.lightweight/.reasoning/.largeContext`) —
    blocked with 6.
 8. **`preferred(_ need:)` bridge** for Dynamic Profiles — blocked with 6.
-9. **Model picker component** in VoltaSDKUI — meaningful once >1
-   user-visible option exists.
+9. ~~Model picker component~~ ✅ (June 2026): `ModelSelector` in VoltaSDKUI —
+   user-side picker with activation gating (paywall today, OAuth on iOS 27)
+   and an "active" confirmation badge. iOS 27 providers will appear in it
+   automatically once wired into `buildProviders`.

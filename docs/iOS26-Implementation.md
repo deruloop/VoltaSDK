@@ -1,6 +1,6 @@
 # VoltaSDK — iOS 26 / 26.4 Implementation (internal source)
 
-> Internal documentation of what is **built and shipping** (v2.0.0): the iOS 26
+> Internal documentation of what is **built and shipping** (v0.1.0): the iOS 26
 > base tier and the iOS 26.4 token-aware tier. For the iOS 27 design see
 > `docs/iOS27-Design.md`. Keep this file in sync with every code change
 > (working agreement in CLAUDE.md).
@@ -9,10 +9,9 @@
 
 ## 1. Verified status
 
-Released **v2.0.0** (git tag `2.0.0`, 2026-06-12): the rename from
-AIProviderKit to **VoltaSDK** — module names changed, hence the major bump;
-the feature set is the 1.x one (1.0.0 first release, 1.0.1 full English
-translation). `swift build` succeeds and **34 tests in 7 suites pass** on
+Released **v0.1.0** (git tag `0.1.0`, 2026-06-12). Pre-1.0 policy: 0.x while
+in development; 1.0.0 is reserved for the complete feature set including the
+iOS 27 extension. `swift build` succeeds and **34 tests in 7 suites pass** on
 macOS 26.5 SDK / Xcode 26.6, Swift 6.2 tools. The iOS demo app builds and
 runs on the iOS 26.5 simulator (verified on iPhone 17 Pro) and signs
 correctly for a physical iPhone 15 Pro Max.
@@ -38,6 +37,7 @@ File map:
 │   ├── VoltaSDKUI/                        // OPTIONAL SwiftUI components (separate product)
 │   │   ├── PrivacyLevelBadge.swift        // badge for a PrivacyLevel
 │   │   ├── ProviderStatusList.swift       // fallback-chain status list (+ public Row)
+│   │   ├── ModelSelector.swift            // USER-side picker + activation gate (+ public Row)
 │   │   └── AIPlaygroundView.swift         // conversational playground with provenance
 │   ├── VoltaSDKDemoUI/                    // demo UI shared macOS+iOS (adaptive layout)
 │   │   └── DemoRootView.swift             // HSplitView on macOS, TabView on iOS
@@ -273,17 +273,26 @@ additive and optional by definition.
   (`DEVELOPMENT_TEAM`), so it survives regeneration — don't set it only in
   Xcode's Signing pane, that edit lives in the generated pbxproj.
 
-Both demos render the same `DemoRootView` (target `VoltaSDKDemoUI`):
-configure providers/key/preference live, see the fallback chain status with
-real availability reasons, send prompts, see which provider answered with its
-privacy badge, and watch privacy-downgrade notifications. Layout is adaptive —
-split view on macOS, tabs (Configure / Playground) on iOS. The playground is a
-real conversation (D12): follow-ups work because the view holds the history and
-passes it per call; "New conversation" resets it. It also shows the context
-pressure ("context N% of \<window\>", orange above 80%) for the provider that
-would answer next, and the status list shows each provider's window size. On
-26.0–26.3 the on-device pressure indicator simply doesn't appear (no counting
-API): that's the base tier behaving as designed.
+Both demos render the same `DemoRootView` (target `VoltaSDKDemoUI`), split
+into the two roles of a real integration. Layout is adaptive — split view on
+macOS (developer | user), tabs (Developer / User) on iOS.
+- **Developer side:** providers/key/default-preference form, privacy policy,
+  a simulated subscription entitlement toggle, "Apply configuration", and the
+  fallback-chain status with real availability reasons and window sizes.
+- **User side:** the chat on top, the `ModelSelector` below. The user's
+  selection re-leads the chain (selection → preference mapping in
+  `DemoRootView.effectivePreference`); the cloud-model row is gated on the
+  simulated subscription via the selector's `activation` hook (700 ms fake
+  paywall), demonstrating the blocking-logic pattern that iOS 27 OAuth flows
+  will reuse. The active badge confirms the committed choice.
+The playground is a real conversation (D12): follow-ups work because the view
+holds the history and passes it per call; "New conversation" resets it. It
+also shows the context pressure ("context N% of \<window\>", orange above
+80%) for the provider that would answer next. On 26.0–26.3 the on-device
+pressure indicator simply doesn't appear (no counting API): that's the base
+tier behaving as designed. Conversations survive an orchestrator rebuild
+(configuration or selector change) — the history lives in the view, another
+D12 consequence.
 
 Model-limitation behavior to expect:
 - Simulator / non-Apple-Intelligence device: on-device row shows the reason
