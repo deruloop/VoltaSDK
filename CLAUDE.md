@@ -426,8 +426,18 @@ ProviderStatusList, AIPlaygroundView) are additive and optional by definition.
   iPhone/iPad (or simulator with an iOS 26 runtime — Xcode 26.6 ships iPhone 17
   family simulators). The project was generated with XcodeGen from
   `project.yml`; it's committed, so regenerate (`xcodegen generate`) only after
-  editing the spec. To run on a physical iPhone set your development team in
-  Signing & Capabilities.
+  editing the spec. The development team is set in `project.yml`
+  (`DEVELOPMENT_TEAM`), so it survives regeneration — don't set it only in
+  Xcode's Signing pane, that edit lives in the generated pbxproj.
+  **Device-install troubleshooting (learned June 2026):** Xcode's
+  "Install Application not available (DVTCoreDevice code 4)" can mean the
+  *phone* doesn't expose the `com.apple.coredevice.feature.installapp`
+  capability — i.e. app installation is blocked on the device (typically
+  Screen Time → Content & Privacy Restrictions → Installing Apps = Don't
+  Allow, or an MDM profile), even with Developer Mode on and pairing fine.
+  Diagnose with `xcrun devicectl device install app --device <id> <app>`
+  (real error) and `xcrun devicectl device info details --device <id>`
+  (capability list, developerModeStatus).
 
 Both demos render the same `DemoRootView` (target `AIProviderKitDemoUI`):
 configure providers/key/preference live, see the fallback chain status with
