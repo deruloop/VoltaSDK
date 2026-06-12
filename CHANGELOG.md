@@ -5,6 +5,23 @@ All notable changes to this package. Versioning: [SemVer](https://semver.org).
 evolve the API. **1.0.0 will mark the complete feature set**, including the
 iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
 
+## [0.2.0] — 2026-06-12
+
+- **Multi-vendor developer key (D15):** the `developerKey` slot now accepts
+  OpenAI, Anthropic (Claude), or Google (Gemini) keys. The vendor is
+  auto-detected from the key format (`sk-ant-…`/`AIza…`/`sk-…`), overridable
+  via `developerKeyVendor`. New `AnthropicProvider` and `GeminiProvider`
+  with the same typed errors, history mapping (D12), and token awareness
+  (D13) as the OpenAI provider.
+- `developerKeyModel` is now optional (`nil` = the vendor's default model)
+  and no longer pre-filled in the demo: the model name belongs to the key's
+  vendor. `CloudVendor.modelDocumentationURL` links to each vendor's model
+  catalog; the demo surfaces detection and the links.
+- Demo: keyboard now dismisses interactively by scrolling everywhere.
+- Migration from 0.1.0: if you set `developerKeyModel`, the type changed
+  from `String` to `String?` — existing assignments keep compiling; only
+  reads need unwrapping.
+
 ## [0.1.0] — 2026-06-12
 
 Initial development release: the full iOS 26 / macOS 26 base, Swift 6.2.

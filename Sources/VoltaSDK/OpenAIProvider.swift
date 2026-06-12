@@ -178,18 +178,9 @@ public struct OpenAIProvider: ModelProvider {
         }
     }
 
-    /// `Retry-After` can be seconds ("120") or an HTTP-date.
+    /// `Retry-After` parsing, shared with the other cloud providers.
     static func parseRetryAfter(_ value: String?) -> TimeInterval? {
-        guard let value else { return nil }
-        if let seconds = TimeInterval(value) { return seconds }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(identifier: "GMT")
-        formatter.dateFormat = "EEE',' dd MMM yyyy HH:mm:ss 'GMT'"
-        if let date = formatter.date(from: value) {
-            return max(0, date.timeIntervalSinceNow)
-        }
-        return nil
+        RetryAfterParser.parse(value)
     }
 }
 

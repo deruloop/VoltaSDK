@@ -431,6 +431,79 @@ struct TokenAwarenessTests {
     }
 }
 
+// MARK: - Multi-vendor developer key (D15)
+
+@Suite("Cloud vendor detection (D15)")
+struct CloudVendorTests {
+
+    @Test("Key prefixes map to the right vendor")
+    func detectsVendorFromKeyPrefix() {
+        #expect(CloudVendor.detect(fromKey: "sk-ant-api03-abc") == .anthropic)
+        #expect(CloudVendor.detect(fromKey: "AIzaSyD-abc") == .gemini)
+        #expect(CloudVendor.detect(fromKey: "sk-proj-abc") == .openAI)
+        #expect(CloudVendor.detect(fromKey: "sk-abc") == .openAI)
+        #expect(CloudVendor.detect(fromKey: "mystery") == nil)
+    }
+
+    @Test("Anthropic prefix wins over the OpenAI prefix it contains")
+    func anthropicPrefixPrecedence() {
+        // "sk-ant-…" also matches "sk-…": order must favor Anthropic.
+        #expect(CloudVendor.detect(fromKey: "sk-ant-xyz") != .openAI)
+    }
+
+    @Test("The configuration builds the provider matching the key vendor")
+    func buildsMatchingProvider() {
+        var config = AIConfiguration()
+
+        config.developerKey = "sk-ant-test"
+        #expect(AIOrchestrator.buildCloudProvider(from: config)?.identifier == .anthropic)
+
+        config.developerKey = "AIzaTest"
+        #expect(AIOrchestrator.buildCloudProvider(from: config)?.identifier == .gemini)
+
+        config.developerKey = "sk-test"
+        #expect(AIOrchestrator.buildCloudProvider(from: config)?.identifier == .openAI)
+
+        // Explicit vendor overrides detection.
+        config.developerKeyVendor = .gemini
+        #expect(AIOrchestrator.buildCloudProvider(from: config)?.identifier == .gemini)
+
+        config.developerKey = nil
+        config.developerKeyVendor = nil
+        #expect(AIOrchestrator.buildCloudProvider(from: config) == nil)
+    }
+
+    @Test("Each vendor has a default model and documentation link")
+    func vendorDefaults() {
+        for vendor in CloudVendor.allCases {
+            #expect(!vendor.defaultModel.isEmpty)
+            #expect(vendor.modelDocumentationURL.scheme == "https")
+        }
+    }
+
+    @Test("Anthropic: known windows per model, nil for unknown models")
+    func anthropicKnownWindows() {
+        #expect(AnthropicProvider.knownContextSize(forModel: "claude-opus-4-8") == 1_000_000)
+        #expect(AnthropicProvider.knownContextSize(forModel: "claude-haiku-4-5") == 200_000)
+        #expect(AnthropicProvider.knownContextSize(forModel: "mystery-model") == nil)
+    }
+
+    @Test("Gemini: known windows per model, nil for unknown models")
+    func geminiKnownWindows() {
+        #expect(GeminiProvider.knownContextSize(forModel: "gemini-2.5-flash") == 1_048_576)
+        #expect(GeminiProvider.knownContextSize(forModel: "gemini-1.5-pro") == 2_097_152)
+        #expect(GeminiProvider.knownContextSize(forModel: "mystery-model") == nil)
+    }
+
+    @Test("Cloud providers are unavailable without a key")
+    func unavailableWithoutKey() async {
+        #expect(await AnthropicProvider(apiKey: "").availability()
+            == .unavailable(reason: "API key not configured"))
+        #expect(await GeminiProvider(apiKey: "").availability()
+            == .unavailable(reason: "API key not configured"))
+    }
+}
+
 // MARK: - Global configuration
 
 @Suite("Configuration", .serialized)

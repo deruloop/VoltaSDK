@@ -100,6 +100,7 @@ public struct AIPlaygroundView: View {
                     }
                     .padding(.vertical, 4)
                 }
+                .scrollDismissesKeyboard(.interactively)
                 .onChange(of: exchanges.count) {
                     if let last = exchanges.last {
                         withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }

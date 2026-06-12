@@ -39,12 +39,23 @@ public struct AIConfiguration: Sendable {
     /// Enables the on-device model (requires Apple Intelligence on the device).
     public var enableOnDevice: Bool = true
 
-    /// Cloud provider developer key (e.g. OpenAI). Injected by the app,
-    /// typically from an Xcode secret. If nil, the cloud provider isn't created.
+    /// Cloud provider developer key. Accepts OpenAI, Anthropic (Claude),
+    /// or Google (Gemini) keys — the vendor is auto-detected from the key
+    /// format (D15). Injected by the app, typically from an Xcode secret.
+    /// If nil, no cloud provider is created.
     public var developerKey: String? = nil
 
-    /// Model to use with the developer key.
-    public var developerKeyModel: String = "gpt-4o-mini"
+    /// Vendor the key belongs to. `nil` = auto-detect from the key format
+    /// (`sk-ant-…` → Anthropic, `AIza…` → Gemini, `sk-…` → OpenAI);
+    /// set explicitly when detection isn't possible.
+    public var developerKeyVendor: CloudVendor? = nil
+
+    /// Model to use with the developer key. The model name belongs to the
+    /// key's vendor (e.g. "gpt-4o-mini" for OpenAI, "claude-opus-4-8" for
+    /// Anthropic, "gemini-2.5-flash" for Gemini — find the current names at
+    /// each vendor's `CloudVendor.modelDocumentationURL`). `nil` = the
+    /// vendor's default model.
+    public var developerKeyModel: String? = nil
 
     public var maxTokens: Int = 1000
     public var temperature: Double = 0.3
@@ -332,26 +343,50 @@ public actor AIOrchestrator {
 
     private static func buildProviders(from config: AIConfiguration) -> [any ModelProvider] {
         let onDevice: (any ModelProvider)? = config.enableOnDevice ? OnDeviceProvider() : nil
-
-        let openAI: (any ModelProvider)? = {
-            guard let key = config.developerKey, !key.isEmpty else { return nil }
-            return OpenAIProvider(
-                apiKey: key,
-                model: config.developerKeyModel,
-                maxTokens: config.maxTokens,
-                temperature: config.temperature
-            )
-        }()
+        let cloud = buildCloudProvider(from: config)
 
         switch config.preference {
         case .preferOnDevice:
-            return [onDevice, openAI].compactMap { $0 }
+            return [onDevice, cloud].compactMap { $0 }
         case .preferDeveloperKey:
-            return [openAI, onDevice].compactMap { $0 }
+            return [cloud, onDevice].compactMap { $0 }
         case .onDeviceOnly:
             return [onDevice].compactMap { $0 }
         case .developerKeyOnly:
-            return [openAI].compactMap { $0 }
+            return [cloud].compactMap { $0 }
+        }
+    }
+
+    /// The developer key is vendor-agnostic (D15): explicit vendor wins,
+    /// otherwise it's detected from the key format, with OpenAI as the
+    /// documented fallback for unrecognized formats.
+    static func buildCloudProvider(from config: AIConfiguration) -> (any ModelProvider)? {
+        guard let key = config.developerKey, !key.isEmpty else { return nil }
+        let vendor = config.developerKeyVendor ?? CloudVendor.detect(fromKey: key) ?? .openAI
+        let model = config.developerKeyModel ?? vendor.defaultModel
+
+        switch vendor {
+        case .openAI:
+            return OpenAIProvider(
+                apiKey: key,
+                model: model,
+                maxTokens: config.maxTokens,
+                temperature: config.temperature
+            )
+        case .anthropic:
+            // No temperature: recent Claude models reject sampling params.
+            return AnthropicProvider(
+                apiKey: key,
+                model: model,
+                maxTokens: config.maxTokens
+            )
+        case .gemini:
+            return GeminiProvider(
+                apiKey: key,
+                model: model,
+                maxTokens: config.maxTokens,
+                temperature: config.temperature
+            )
         }
     }
 }

@@ -102,18 +102,27 @@ Practical constraint: iOS 27 code physically requires the iOS 27 SDK
 | Provider | Auth | Cost | Privacy | Requirement | Phase |
 |---|---|---|---|---|---|
 | On-device (~3B) | none | free | max (offline) | Apple Intelligence | iOS 26 ✅ |
-| Developer Key (OpenAI) | dev key | dev pays | external | key configured | iOS 26 ✅ |
+| Developer Key — OpenAI, Anthropic, or Gemini (D15: one slot, vendor auto-detected) | dev key | dev pays | external | key configured | iOS 26 ✅ |
 | Private Cloud Compute | none | free w/ daily quota | high (no storage) | Apple Intelligence + app <2M dl | iOS 27 |
-| Google Gemini | OAuth (Firebase) | user tokens | provider-dependent | user account | iOS 27 |
-| Anthropic Claude | user API key | user tokens | provider-dependent | user account | iOS 27 |
-| OpenAI ChatGPT | user API key | user tokens | provider-dependent | user account | iOS 27 |
+| Google Gemini (user account) | OAuth (Firebase) | user tokens | provider-dependent | user account | iOS 27 |
+| Anthropic Claude (user account) | user API key | user tokens | provider-dependent | user account | iOS 27 |
+| OpenAI ChatGPT (user account) | user API key | user tokens | provider-dependent | user account | iOS 27 |
+
+Note the distinction sharpened by D15: **Claude and Gemini are already
+available on iOS 26 as developer-key providers** (the developer pays, REST
+clients in the core). What remains iOS 27 is the **user-account** variant of
+the same vendors (the user pays via OAuth/own key, through the public
+`LanguageModel` protocol) — different auth and billing, same vendor. The
+existing `AnthropicProvider`/`GeminiProvider` REST clients can serve as the
+transport layer for the user-account variants if the Utilities' Chat
+Completions `LanguageModel` (Q8) turns out not to cover them.
 
 ## 5. Mapping: what exists today → what it becomes
 
 | iOS 26 (shipped) | iOS 27 (extension) |
 |---|---|
 | `OnDeviceProvider` | unchanged |
-| `OpenAIProvider` (URLSession) | provider conforming to the `LanguageModel` protocol |
+| `OpenAIProvider`/`AnthropicProvider`/`GeminiProvider` (URLSession, dev key, D15) | providers conforming to the `LanguageModel` protocol; user-account variants added |
 | `ModelPreference` (4 cases, deliberately frozen) | per-need fallback chain + PCC quotas |
 | `resolveProvider()` (D9) | `preferred(_ need:)` returning a `LanguageModel` for Dynamic Profiles |
 | `PrivacyDisclosure` (live since 26) | unchanged; `.appleCloud` level becomes reachable (PCC) |
@@ -122,7 +131,7 @@ Practical constraint: iOS 27 code physically requires the iOS 27 SDK
 | `ChatTurn` history (D12) | answers transcript portability across providers (pending Q6/Q7 for KV-cache) |
 | — | `PrivateCloudComputeProvider` |
 | `ModelSelector` (VoltaSDKUI, shipped) | gains the new providers automatically; OAuth flows attach via its existing `activation` hook |
-| — | user-account providers (Gemini/Claude) |
+| — | user-account providers (Gemini/Claude): OAuth flow attaches via `ModelSelector`'s existing `activation` hook |
 
 ## 6. Implementation order (when unblocked)
 

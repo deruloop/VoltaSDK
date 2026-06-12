@@ -53,7 +53,10 @@ public struct ModelSelectorLabel: Sendable {
                 subtitle: "Private — runs entirely on this device",
                 systemImage: "iphone"
             )
-        case .openAI:
+        case .openAI, .anthropic, .gemini:
+            // All developer-key vendors read as the same user-facing option:
+            // a cloud model included with the app (D4) — the vendor is an
+            // implementation detail unless the developer brands it.
             return ModelSelectorLabel(
                 title: "Cloud model",
                 subtitle: "Included with your subscription",

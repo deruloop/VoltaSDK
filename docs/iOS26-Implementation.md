@@ -11,7 +11,7 @@
 
 Released **v0.1.0** (git tag `0.1.0`, 2026-06-12). Pre-1.0 policy: 0.x while
 in development; 1.0.0 is reserved for the complete feature set including the
-iOS 27 extension. `swift build` succeeds and **34 tests in 7 suites pass** on
+iOS 27 extension. `swift build` succeeds and **41 tests in 8 suites pass** on
 macOS 26.5 SDK / Xcode 26.6, Swift 6.2 tools. The iOS demo app builds and
 runs on the iOS 26.5 simulator (verified on iPhone 17 Pro) and signs
 correctly for a physical iPhone 15 Pro Max.
@@ -30,8 +30,11 @@ File map:
 │   │   ├── ModelProvider.swift            // protocol + identifiers + statuses + typed errors
 │   │   ├── ChatTurn.swift                 // app-supplied conversation turn (D12)
 │   │   ├── PrivacyDisclosure.swift        // downgrade event + disclosure policy
+│   │   ├── CloudVendor.swift              // vendor detection + defaults + doc links (D15)
 │   │   ├── OnDeviceProvider.swift         // wraps SystemLanguageModel, maps GenerationError
-│   │   ├── OpenAIProvider.swift           // rewritten ChatGptManager (Codable, typed errors)
+│   │   ├── OpenAIProvider.swift           // Chat Completions (Codable, typed errors)
+│   │   ├── AnthropicProvider.swift        // Claude Messages API (x-api-key, no temperature)
+│   │   ├── GeminiProvider.swift           // Gemini generateContent (x-goog-api-key)
 │   │   ├── AIOrchestrator.swift           // orchestrator + config + fallback + resolution
 │   │   └── Mocks.swift                    // MockProvider (public, for adopters' tests too)
 │   ├── VoltaSDKUI/                        // OPTIONAL SwiftUI components (separate product)
@@ -84,6 +87,21 @@ File map:
   `context_length_exceeded` → `.contextWindowExceeded`). Uses
   `max_completion_tokens` (the non-deprecated parameter). History → messages
   array (system → turns → current prompt).
+- **`AnthropicProvider`** — Claude Messages API (`x-api-key` +
+  `anthropic-version: 2023-06-01`, top-level `system`, required `max_tokens`).
+  Deliberately sends **no temperature**: Claude Opus 4.7+ rejects sampling
+  parameters with a 400. 429 → rateLimited (retry-after), 5xx incl. 529
+  "overloaded" → `.network` (recoverable), "prompt is too long" 400 →
+  `.contextWindowExceeded`.
+- **`GeminiProvider`** — Gemini `generateContent` (`x-goog-api-key`, history
+  roles are user/"model", `systemInstruction` top-level). Invalid key
+  surfaces as 400 "API key not valid" → mapped to `.unauthorized`.
+- **`CloudVendor`** (D15) — which vendor a developer key belongs to:
+  auto-detected from the key prefix (`sk-ant-` → Anthropic, `AIza` → Gemini,
+  `sk-` → OpenAI; order matters), overridable via
+  `AIConfiguration.developerKeyVendor`. Carries each vendor's default model
+  and `modelDocumentationURL` (surfaced in the demo so the model field is
+  never an opaque string).
 - **`AIOrchestrator`** (actor) — builds the ordered provider list from
   preference; `respond`/`respondDetailed` walk the chain skipping unavailable
   providers, running the token pre-flight (D13), applying the privacy gate,
@@ -218,6 +236,19 @@ Design:
   same division of labor as D10/D12: we detect, the developer decides.
 - This capability surface is where iOS 27's per-model token reading will land.
 
+### D15 — The developer key is vendor-agnostic
+One configuration slot (`developerKey`) accepts OpenAI, Anthropic (Claude),
+or Google (Gemini) keys. The vendor is auto-detected from the key format and
+overridable (`developerKeyVendor`); the model name travels WITH the key
+(`developerKeyModel`, `nil` = vendor default) because a model string only
+makes sense for the vendor that issued the key. Rationale: D4 frames the dev
+key as "AI included in the app's subscription" — which vendor backs it is the
+developer's business decision, and the framework shouldn't privilege one.
+Implementation notes: Anthropic sends no `temperature` (Opus 4.7+ 400s on
+sampling params); every vendor has list-models endpoints (OpenAI/Anthropic
+`GET /v1/models`, Gemini `ListModels`) — fetching them to populate a model
+picker is a roadmap item, not yet built.
+
 ## 5. Public API that must stay stable
 
 ```swift
@@ -245,6 +276,7 @@ enum PrivacyLevel { external < appleCloud < onDevice }
 enum PrivacyDisclosure { silent, notify(…), askOnPrivacyChange(…), denyDowngrade }
 struct PrivacyDowngrade { from, to, provider }
 enum ModelPreference { preferOnDevice, preferDeveloperKey, onDeviceOnly, developerKeyOnly }
+enum CloudVendor { openAI, anthropic, gemini; detect(fromKey:); defaultModel; modelDocumentationURL } // (D15)
 struct ChatTurn { role (.user/.assistant), text }               // app-supplied turn (D12)
 struct AIResponse { text, provider, privacyLevel }
 struct ProviderStatus { identifier, privacyLevel, availability, contextSize }
@@ -258,7 +290,8 @@ additive and optional by definition.
 ## 6. Demo & verification
 
 - `swift build` — builds core + UI + demo (macOS side).
-- `swift test` — 34 tests: fallback chain, terminal vs recoverable errors,
+- `swift test` — 41 tests: fallback chain, terminal vs recoverable errors,
+  vendor detection and provider construction (D15),
   privacy disclosure policies (all four), resolution primitive, provider
   statuses, conversation-history pass-through incl. across fallback (D12),
   token pre-flight incl. response reserve and the no-capability case (D13),
@@ -279,6 +312,11 @@ macOS (developer | user), tabs (Developer / User) on iOS.
 - **Developer side:** providers/key/default-preference form, privacy policy,
   a simulated subscription entitlement toggle, "Apply configuration", and the
   fallback-chain status with real availability reasons and window sizes.
+  The key field accepts any vendor's key and shows the detected vendor; the
+  model field is deliberately NOT pre-filled (the name belongs to the key's
+  vendor), shows the vendor's default as a placeholder, and a disclosure
+  links to each vendor's model documentation (D15). Keyboard dismisses
+  interactively by scrolling everywhere (form and chat).
 - **User side:** the chat on top, the `ModelSelector` below. The user's
   selection re-leads the chain (selection → preference mapping in
   `DemoRootView.effectivePreference`); the cloud-model row is gated on the

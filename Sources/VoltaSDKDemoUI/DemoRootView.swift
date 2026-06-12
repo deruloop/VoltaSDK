@@ -33,7 +33,7 @@ public struct DemoRootView: View {
     // Developer configuration (recreates the orchestrator on "Apply").
     @State private var enableOnDevice = true
     @State private var apiKey = ""
-    @State private var model = "gpt-4o-mini"
+    @State private var model = ""
     @State private var preference: ModelPreference = .preferOnDevice
     @State private var notifyDowngrades = true
 
@@ -94,10 +94,31 @@ public struct DemoRootView: View {
         Form {
             Section("Providers") {
                 Toggle("On-device model", isOn: $enableOnDevice)
-                SecureField("OpenAI API key", text: $apiKey)
+                SecureField("API key (OpenAI, Claude, or Gemini)", text: $apiKey)
                     .textContentType(.password)
-                TextField("Developer key model", text: $model)
+                if let vendor = detectedVendor {
+                    Label("Detected: \(vendor.rawValue)", systemImage: "checkmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                } else if !apiKey.isEmpty {
+                    Label("Unknown key format — OpenAI will be assumed",
+                          systemImage: "questionmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+                TextField(modelPlaceholder, text: $model)
                     .autocorrectionDisabled()
+                Text("The model name belongs to the key's vendor — an OpenAI key takes OpenAI model names, a Claude key takes Claude ones. Leave empty for the vendor's default (\(defaultModelHint)).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                DisclosureGroup("Where do I find model names?") {
+                    ForEach(CloudVendor.allCases, id: \.self) { vendor in
+                        Link(destination: vendor.modelDocumentationURL) {
+                            Label("\(vendor.rawValue) models", systemImage: "arrow.up.right.square")
+                                .font(.caption)
+                        }
+                    }
+                }
                 Picker("Default preference", selection: $preference) {
                     Text("On-device first").tag(ModelPreference.preferOnDevice)
                     Text("Developer key first").tag(ModelPreference.preferDeveloperKey)
@@ -132,6 +153,19 @@ public struct DemoRootView: View {
             }
         }
         .formStyle(.grouped)
+        .scrollDismissesKeyboard(.interactively)
+    }
+
+    private var detectedVendor: CloudVendor? {
+        apiKey.isEmpty ? nil : CloudVendor.detect(fromKey: apiKey)
+    }
+
+    private var modelPlaceholder: String {
+        "Model (e.g. \((detectedVendor ?? .openAI).defaultModel))"
+    }
+
+    private var defaultModelHint: String {
+        (detectedVendor ?? .openAI).defaultModel
     }
 
     // MARK: User side
@@ -155,7 +189,7 @@ public struct DemoRootView: View {
                     // On-device is immediate; the cloud model simulates a
                     // paywall/entitlement check (in a real app: StoreKit,
                     // or on iOS 27 an OAuth flow for user-account providers).
-                    guard provider == .openAI else { return true }
+                    guard provider != .onDevice else { return true }
                     try? await Task.sleep(for: .milliseconds(700))
                     return userHasSubscription
                 }
@@ -171,7 +205,7 @@ public struct DemoRootView: View {
         var config = AIConfiguration()
         config.enableOnDevice = enableOnDevice
         config.developerKey = apiKey.isEmpty ? nil : apiKey
-        config.developerKeyModel = model
+        config.developerKeyModel = model.isEmpty ? nil : model
         config.preference = effectivePreference
         if notifyDowngrades {
             config.privacyDisclosure = .notify { downgrade in
@@ -189,9 +223,12 @@ public struct DemoRootView: View {
     /// form preference is the default until the user picks something.
     private var effectivePreference: ModelPreference {
         switch userSelection {
-        case .onDevice: return .preferOnDevice
-        case .openAI:   return .preferDeveloperKey
-        default:        return preference
+        case .onDevice:
+            return .preferOnDevice
+        case .openAI, .anthropic, .gemini:
+            return .preferDeveloperKey
+        default:
+            return preference
         }
     }
 }

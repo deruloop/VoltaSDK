@@ -20,9 +20,11 @@ public struct ProviderIdentifier: Hashable, Sendable, CustomStringConvertible {
     public init(_ rawValue: String) { self.rawValue = rawValue }
     public var description: String { rawValue }
 
-    public static let onDevice = ProviderIdentifier("on-device")
-    public static let openAI   = ProviderIdentifier("openai")
-    // iOS 27: .privateCloudCompute, .gemini, .claude
+    public static let onDevice  = ProviderIdentifier("on-device")
+    public static let openAI    = ProviderIdentifier("openai")
+    public static let anthropic = ProviderIdentifier("anthropic")
+    public static let gemini    = ProviderIdentifier("gemini")
+    // iOS 27: .privateCloudCompute, plus user-account variants of the above
 }
 
 // MARK: - Privacy level
