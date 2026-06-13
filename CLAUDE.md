@@ -44,11 +44,13 @@ questions doc into the design doc; release → CHANGELOG + state here.
   complete feature set, including iOS 27.** The earlier 1.0.0/1.0.1/2.0.0
   tags were deleted (never pushed anywhere); current release line is **0.x**,
   starting at `0.1.0`. During 0.x, minor versions may evolve the API.
-- **iOS 26 / 26.4: fully working — v0.3.2** (tags `0.1.0`–`0.3.2`,
+- **iOS 26 / 26.4: fully working — v0.3.3** (tags `0.1.0`–`0.3.3`,
   2026-06-12/13; 0.2.0 = vendor-agnostic developer key D15, 0.3.0 = collapsed
   ModelSelector with `.activate/.deny/.deferred` selection responses,
   0.3.1 = docs-only, 0.3.2 = ModelSelector gate invariant — never preselects
-  gated providers, auto-selects on-device only, through `onSelection`).
+  gated providers, auto-selects on-device only, through `onSelection`,
+  0.3.3 = docs-only: **builds require Xcode 26.4+** / runs on 26.0+,
+  learned from an adopter's CI failure).
   41 tests in 8 suites green; builds verified on macOS 26.5, iOS 26.5
   simulator, and signed for a physical iPhone. First adoption in the author's
   app is in progress. The 26.4 token-aware tier lights up by itself at

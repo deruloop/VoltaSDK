@@ -31,9 +31,14 @@ the API**.
 | **iOS / macOS 26.4+** | The *token-aware* tier lights up on its own: exact on-device token counting, automatic context-window pre-flight, `contextUsage` to know how full the window is. |
 | **iOS 27** | In development (multi-provider, PCC, Dynamic Profiles bridge). Will ship as an additive update: same API, no rewrite. |
 
-Requirements: Swift 6.2 / Xcode 26. The on-device model needs a device with
-Apple Intelligence (detected at runtime: if absent, Volta excludes it and
-explains why).
+Requirements: Swift 6.2, and **Xcode 26.4 or newer to build** — the 26.4
+token-counting API the token-aware tier references is declared only in the
+26.4 SDK, so older toolchains (e.g. a CI runner pinned to Xcode 26.0.x)
+fail to compile the package even though the `#available` gate keeps it
+running fine on iOS/macOS **26.0+** at runtime. Build requirement and
+deployment target are independent: build with 26.4+, deploy from 26.0.
+The on-device model needs a device with Apple Intelligence (detected at
+runtime: if absent, Volta excludes it and explains why).
 
 ## Installation (Swift Package Manager)
 
@@ -41,7 +46,7 @@ explains why).
 
 ```swift
 dependencies: [
-    .package(url: "<repo-url>", from: "0.3.2")
+    .package(url: "<repo-url>", from: "0.3.3")
 ]
 ```
 
@@ -54,7 +59,7 @@ UI.
 Add Local… → select the package folder. Note: a local dependency always uses
 the working copy; version tags don't apply.
 
-The current version is **0.3.2** (see [CHANGELOG.md](CHANGELOG.md)). VoltaSDK
+The current version is **0.3.3** (see [CHANGELOG.md](CHANGELOG.md)). VoltaSDK
 is in active development: 0.x minor versions may evolve the API; **1.0.0 will
 mark the complete feature set**, including the iOS 27 extension.
 

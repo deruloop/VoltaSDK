@@ -1,6 +1,6 @@
 # VoltaSDK — iOS 26 / 26.4 Implementation (internal source)
 
-> Internal documentation of what is **built and shipping** (v0.3.2): the iOS 26
+> Internal documentation of what is **built and shipping** (v0.3.3): the iOS 26
 > base tier and the iOS 26.4 token-aware tier. For the iOS 27 design see
 > `docs/iOS27-Design.md`. Keep this file in sync with every code change
 > (working agreement in CLAUDE.md).
@@ -9,10 +9,12 @@
 
 ## 1. Verified status
 
-Released **v0.3.2** (tags `0.1.0`–`0.3.2`, 2026-06-13). Pre-1.0 policy: 0.x while
+Released **v0.3.3** (tags `0.1.0`–`0.3.3`, 2026-06-13). Pre-1.0 policy: 0.x while
 in development; 1.0.0 is reserved for the complete feature set including the
 iOS 27 extension. `swift build` succeeds and **41 tests in 8 suites pass** on
-macOS 26.5 SDK / Xcode 26.6, Swift 6.2 tools. The iOS demo app builds and
+macOS 26.5 SDK / Xcode 26.6, Swift 6.2 tools. **Building requires
+Xcode 26.4+** (see the toolchain-requirement note in §6); running requires
+only iOS/macOS 26.0. The iOS demo app builds and
 runs on the iOS 26.5 simulator (verified on iPhone 17 Pro) and signs
 correctly for a physical iPhone 15 Pro Max.
 
@@ -390,6 +392,20 @@ Model-limitation behavior to expect:
   answers carry the "On device" badge.
 - Context-window overflow / unsupported language on-device fall through to the
   cloud provider per D10; guardrail violations surface as errors (terminal).
+
+**Toolchain requirement (learned June 2026, from an adopter's CI failure):**
+the package **builds only with Xcode 26.4+** (the 26.4 SDK).
+`OnDeviceProvider.tokenCount` references
+`SystemLanguageModel.tokenCount(for:)`, declared only from the 26.4 SDK —
+the `#available(iOS 26.4, …)` gate is a *runtime* check and does not remove
+the compile-time dependency on the declaration. Symptom: a CI runner pinned
+to Xcode 26.0.x fails to compile VoltaSDK while local builds on a newer
+Xcode pass. Fix: update the runner. Deliberately NOT worked around with
+compile-time conditionals: building with an old toolchain would silently
+strip the token-aware tier for every user regardless of their OS, breaking
+D14's promise that capabilities depend on the device at runtime, not the
+build environment (and `#if compiler` can't distinguish the toolchains
+anyway — Xcode 26.0 and 26.6 both report Swift 6.2 tools).
 
 **Device-install troubleshooting (learned June 2026):** Xcode's
 "Install Application not available (DVTCoreDevice code 4)" can mean the

@@ -5,6 +5,18 @@ All notable changes to this package. Versioning: [SemVer](https://semver.org).
 evolve the API. **1.0.0 will mark the complete feature set**, including the
 iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
 
+## [0.3.3] — 2026-06-13
+
+- Documentation only, no code changes: the build requirement is now stated
+  precisely. **Building requires Xcode 26.4+** — the token-counting API the
+  26.4 tier references is declared only in the 26.4 SDK, and the
+  `#available` gate is a runtime check, so older toolchains (e.g. a CI
+  runner pinned to Xcode 26.0.x) fail to compile the package. Running still
+  requires only iOS/macOS 26.0. The CI symptom and the reason this is not
+  worked around with compile-time conditionals (it would silently strip the
+  token-aware tier) are documented in the implementation doc's
+  troubleshooting notes.
+
 ## [0.3.2] — 2026-06-13
 
 - **`ModelSelector` no longer lets a configuration look like a user
