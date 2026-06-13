@@ -1,6 +1,6 @@
 # VoltaSDK — iOS 26 / 26.4 Implementation (internal source)
 
-> Internal documentation of what is **built and shipping** (v0.3.3): the iOS 26
+> Internal documentation of what is **built and shipping** (v0.3.4): the iOS 26
 > base tier and the iOS 26.4 token-aware tier. For the iOS 27 design see
 > `docs/iOS27-Design.md`. Keep this file in sync with every code change
 > (working agreement in CLAUDE.md).
@@ -9,7 +9,7 @@
 
 ## 1. Verified status
 
-Released **v0.3.3** (tags `0.1.0`–`0.3.3`, 2026-06-13). Pre-1.0 policy: 0.x while
+Released **v0.3.4** (tags `0.1.0`–`0.3.4`, 2026-06-13). Pre-1.0 policy: 0.x while
 in development; 1.0.0 is reserved for the complete feature set including the
 iOS 27 extension. `swift build` succeeds and **41 tests in 8 suites pass** on
 macOS 26.5 SDK / Xcode 26.6, Swift 6.2 tools. **Building requires

@@ -50,7 +50,9 @@ questions doc into the design doc; release → CHANGELOG + state here.
   0.3.1 = docs-only, 0.3.2 = ModelSelector gate invariant — never preselects
   gated providers, auto-selects on-device only, through `onSelection`,
   0.3.3 = docs-only: **builds require Xcode 26.4+** / runs on 26.0+,
-  learned from an adopter's CI failure).
+  learned from an adopter's CI failure,
+  0.3.4 = docs-only: public README stripped of iOS 27 forward-references
+  (design docs keep them; nothing iOS 27 is implemented)).
   41 tests in 8 suites green; builds verified on macOS 26.5, iOS 26.5
   simulator, and signed for a physical iPhone. First adoption in the author's
   app is in progress. The 26.4 token-aware tier lights up by itself at

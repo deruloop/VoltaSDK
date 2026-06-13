@@ -9,16 +9,14 @@ picks the right model based on availability, preference, context window, and
 privacy policy.
 
 This is not an agent framework: it owns no sessions and no conversations. Its
-only job is **model resolution**, designed to extend to iOS 27
-(multi-provider, Private Cloud Compute, Dynamic Profiles) **without changing
-the API**.
+only job is **model resolution**.
 
 ## Why "Volta"
 
 - **The acronym says what it does:** a *Versatile Orchestration Layer* that
   manages *Tiered AI* — the tiers being both the capability tiers it ships
-  (iOS 26.0 base → 26.4 token-aware → 27 multi-provider) and the fallback
-  chain it walks at runtime (on-device → cloud).
+  (iOS 26.0 base → 26.4 token-aware) and the fallback chain it walks at
+  runtime (on-device → cloud).
 - **Alessandro Volta** invented the battery — a stack of cells where, when one
   layer alone isn't enough, the stack delivers the power. That is exactly the
   fallback chain.
@@ -29,7 +27,6 @@ the API**.
 |---|---|
 | **iOS / macOS 26.0+** | The whole core: fallback chain, typed errors, privacy disclosure, multi-turn conversations, vendor-agnostic developer key (OpenAI / Claude / Gemini), optional UI components. Context handling is *reactive* (error → fallback). |
 | **iOS / macOS 26.4+** | The *token-aware* tier lights up on its own: exact on-device token counting, automatic context-window pre-flight, `contextUsage` to know how full the window is. |
-| **iOS 27** | In development (multi-provider, PCC, Dynamic Profiles bridge). Will ship as an additive update: same API, no rewrite. |
 
 Requirements: Swift 6.2, and **Xcode 26.4 or newer to build** — the 26.4
 token-counting API the token-aware tier references is declared only in the
@@ -46,7 +43,7 @@ runtime: if absent, Volta excludes it and explains why).
 
 ```swift
 dependencies: [
-    .package(url: "<repo-url>", from: "0.3.3")
+    .package(url: "<repo-url>", from: "0.3.4")
 ]
 ```
 
@@ -59,9 +56,9 @@ UI.
 Add Local… → select the package folder. Note: a local dependency always uses
 the working copy; version tags don't apply.
 
-The current version is **0.3.3** (see [CHANGELOG.md](CHANGELOG.md)). VoltaSDK
+The current version is **0.3.4** (see [CHANGELOG.md](CHANGELOG.md)). VoltaSDK
 is in active development: 0.x minor versions may evolve the API; **1.0.0 will
-mark the complete feature set**, including the iOS 27 extension.
+mark the complete feature set**.
 
 ## Usage
 
@@ -154,8 +151,7 @@ passed off as a count).
 
 ```swift
 let provider = try await AIOrchestrator.active.resolveProvider()
-// On iOS 27 this becomes `preferred(_ need:)`, returning a
-// LanguageModel to pass into a native Dynamic Profile.
+// Resolves the chain's first usable provider without executing anything.
 ```
 
 ### 6. Explicit instance (no global state)
@@ -184,10 +180,9 @@ AIPlaygroundView(orchestrator: kit, instructions: "Be concise.")
 
 `ModelSelector` is a drop-in view that lets **your users** choose which model
 to use. Collapsed, it occupies a single row showing the active choice; tapping
-it expands the list of options (it stays compact however many providers exist
-— on iOS 27 the new ones appear automatically). Options derive from the
-orchestrator's real state: providers you didn't configure never appear;
-unavailable ones show their reason.
+it expands the list of options (it stays compact however many providers
+exist). Options derive from the orchestrator's real state: providers you
+didn't configure never appear; unavailable ones show their reason.
 
 **Initial state — the gate invariant.** Nothing is ever committed without
 passing through `onSelection`. When the `selection` binding starts `nil`, the
@@ -195,9 +190,8 @@ selector auto-selects the **on-device model** if available — the only
 provider with no business gate behind it (free, private, no account) — and
 even that attempt runs through your handler. Cloud providers are **never
 preselected**: your configuration preference must not look like a user
-activation when a subscription (or, on iOS 27, an OAuth login) sits behind
-it. A non-`nil` initial binding (e.g. a persisted user choice) is never
-overridden.
+activation when a subscription (or another gate) sits behind it. A non-`nil`
+initial binding (e.g. a persisted user choice) is never overridden.
 
 The default labels make **no business assumptions** — only you know whether
 the cloud model is "included with Pro", metered, or free. Brand the rows via
@@ -232,10 +226,10 @@ ModelSelector(
 - **`.activate`** commits the selection immediately.
 - **`.deny(message:)`** refuses it, with an optional message under the selector.
 - **`.deferred`** hands control to *your* flow — a paywall, a settings screen,
-  or (iOS 27 user-account providers) a page that runs the OAuth login. When
-  your flow succeeds, commit the choice by setting the `selection` binding;
-  the selector reflects it instantly. Nothing about the gate lives inside the
-  component — it only reacts.
+  or any view that gates the choice. When your flow succeeds, commit the
+  choice by setting the `selection` binding; the selector reflects it
+  instantly. Nothing about the gate lives inside the component — it only
+  reacts.
 
 `selection == nil` therefore means **no model committed yet**. The selector
 can't stop the orchestrator from answering — if your fallback chain contains

@@ -5,6 +5,16 @@ All notable changes to this package. Versioning: [SemVer](https://semver.org).
 evolve the API. **1.0.0 will mark the complete feature set**, including the
 iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
 
+## [0.3.4] — 2026-06-13
+
+- Documentation only, no code changes: the public README no longer
+  describes the unimplemented iOS 27 extension (multi-provider, PCC,
+  Dynamic Profiles, OAuth user-account flows) — there is no iOS 27 code
+  yet, so the forward-looking references were noise for adopters. The
+  internal design docs (`docs/iOS27-Design.md`,
+  `docs/iOS27-OpenQuestions.md`) keep the full design and remain linked
+  from the README's contributors section.
+
 ## [0.3.3] — 2026-06-13
 
 - Documentation only, no code changes: the build requirement is now stated
