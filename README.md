@@ -43,7 +43,7 @@ runtime: if absent, Volta excludes it and explains why).
 
 ```swift
 dependencies: [
-    .package(url: "<repo-url>", from: "0.3.4")
+    .package(url: "https://github.com/deruloop/VoltaSDK.git", from: "0.3.4")
 ]
 ```
 
