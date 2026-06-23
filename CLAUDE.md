@@ -44,7 +44,7 @@ questions doc into the design doc; release → CHANGELOG + state here.
   complete feature set, including iOS 27.** The earlier 1.0.0/1.0.1/2.0.0
   tags were deleted (never pushed anywhere); current release line is **0.x**,
   starting at `0.1.0`. During 0.x, minor versions may evolve the API.
-- **iOS 26 / 26.4: fully working — v0.3.3** (tags `0.1.0`–`0.3.3`,
+- **iOS 26 / 26.4: fully working — v0.3.5** (tags `0.1.0`–`0.3.5`,
   2026-06-12/13; 0.2.0 = vendor-agnostic developer key D15, 0.3.0 = collapsed
   ModelSelector with `.activate/.deny/.deferred` selection responses,
   0.3.1 = docs-only, 0.3.2 = ModelSelector gate invariant — never preselects
@@ -52,7 +52,11 @@ questions doc into the design doc; release → CHANGELOG + state here.
   0.3.3 = docs-only: **builds require Xcode 26.4+** / runs on 26.0+,
   learned from an adopter's CI failure,
   0.3.4 = docs-only: public README stripped of iOS 27 forward-references
-  (design docs keep them; nothing iOS 27 is implemented)).
+  (design docs keep them; nothing iOS 27 is implemented),
+  0.3.5 = docs-only: real repo URL in the SPM snippet).
+  **0.3.5 is the stable iOS 26 line and the designated Xcode-26.4 anchor**
+  (the last release that compiles with Xcode 26.4 — the iOS 27 line will
+  require Xcode 27).
   41 tests in 8 suites green; builds verified on macOS 26.5, iOS 26.5
   simulator, and signed for a physical iPhone. First adoption in the author's
   app is in progress. The 26.4 token-aware tier lights up by itself at
@@ -62,7 +66,46 @@ questions doc into the design doc; release → CHANGELOG + state here.
   table, tiering strategy D14, implementation order) but implementation is
   blocked on (a) the open questions in `docs/iOS27-OpenQuestions.md` and
   (b) the iOS 27 SDK, without which nothing compiles.
-- No git remote configured yet; the package is consumed locally.
+- **Git: remote is `https://github.com/deruloop/VoltaSDK.git` (public).**
+  Branching strategy (user decision, June 2026):
+  - **`main`** = the iOS 26 line. Stays at `0.3.x` (now `0.3.5`), builds on
+    Xcode 26.4+, runs on iOS 26+. Public README describes only this.
+  - **`xcode27`** (pushed, currently identical to `main`) = the iOS 27 work.
+    Requires Xcode 27 (iOS 27 SDK); `@available(iOS 27, *)` so it still
+    deploys to iOS 26+. **Merged into `main` when iOS 27 ships (~September),
+    at which point `main` becomes the `1.0` line.** Periodically sync
+    `main → xcode27` to avoid drift. Its README will advertise the Xcode 27
+    requirement and point Xcode-26.4 users to pin `0.3.5`.
+  - Toolchain note (settled): no `#if canImport` gymnastics needed. The
+    iOS-27 release simply *requires Xcode 27 to build* (documented like the
+    26.4 note); `@available` handles runtime; deployment target stays iOS 26;
+    adopters on older Xcode pin to `0.3.5`. SemVer covers the rest.
+
+### ACTIVE WORK — iOS 27, resume here (June 2026)
+Decided to implement iOS 27 by **learn-by-building** against the real SDK
+(better than docs/memory for API-shape questions). Next steps, in order:
+1. **On the new PC, install the Xcode 27 beta + iOS 27 SDK** (this machine
+   had only iOS 26.5). Verify with `xcodebuild -showsdks`. **Nothing iOS 27
+   compiles until this exists** — hard gate.
+2. `git switch xcode27`. Scaffold `Examples/iOS27Demo` (a standalone demo
+   target allowed to require the beta; keep the core package clean for now).
+3. Build outward in `docs/iOS27-Design.md` §6 order: the public
+   `LanguageModel` protocol conformance first (writing it empirically
+   answers open questions Q9/Q5/Q10), then a **structural**
+   `PrivateCloudComputeProvider` (wire the shape; leave quota/error mapping
+   as a TODO — Q1–Q4 need a real Apple-Intelligence device + the PCC
+   entitlement to observe, NOT discoverable by compiling), then user-account
+   Gemini/Claude.
+4. As each `docs/iOS27-OpenQuestions.md` item gets a verified answer, fold it
+   into `docs/iOS27-Design.md` and delete it from the questions file (mark
+   answers "observed in iOS 27 beta N — verify at GA"; betas churn).
+
+Design decision already recorded under D7 in `docs/iOS27-Design.md`:
+**`.largeContext` is REACTIVE, not preemptive** — it reorders the chain to
+favour large-window providers but does NOT hard-route to cloud; on-device still
+answers any call that actually fits, and the handoff fires only when the token
+pre-flight shows real overflow. Privacy crossings stay driven by measured
+overflow, never inferred from the need.
 
 ## 4. Core principles (one-liners; full rationale in the linked docs)
 

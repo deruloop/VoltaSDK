@@ -61,6 +61,20 @@ expiry). Each model has a privacy rating; crossing the privacy threshold
 in iOS 26 (see D10 in the iOS 26 doc), so on iOS 27 it only gains the
 `.appleCloud` level in practice.
 
+**`.largeContext` is reactive, not preemptive (decided June 2026).** The need
+reorders the chain to *favour* large-window providers, but it does **not**
+hard-route to cloud. The need shapes ordering; the existing token pre-flight
+(D13) decides the per-call handoff. On-device still answers any call that
+actually fits; the transition to a larger-context provider fires only when the
+token count shows the on-device window would overflow — proactively on 26.4+,
+reactively otherwise via `.contextWindowExceeded`. Rationale: `.largeContext`
+means "this call *can* be large," not "*is* large now"; preemptively routing to
+cloud would infer largeness from a hint and trigger a privacy downgrade for a
+call that turned out small. The crossing must stay driven by measured overflow,
+consistent with "explicit beats inferred for privacy". (Possible future opt-in:
+a stricter mode that skips the on-device pre-flight when a developer *knows*
+inputs are always huge — explicit, never the default.)
+
 ### D14 — One package, three capability tiers — not three SDKs
 - **Tier 26.0 (base):** fallback + privacy + transcript transparency; context
   handling reactive only.
