@@ -39,6 +39,14 @@ public struct AIConfiguration: Sendable {
     /// Enables the on-device model (requires Apple Intelligence on the device).
     public var enableOnDevice: Bool = true
 
+    /// Enables Private Cloud Compute (iOS 27+): Apple's free "powered" tier —
+    /// no key, no account, a per-user daily quota (D6). Defaults on: it
+    /// degrades gracefully (skipped where the device/entitlement/quota make it
+    /// unavailable) and ignored entirely on iOS 26. Participates only in the
+    /// `.preferOnDevice` / `.preferDeveloperKey` chains, never in the strict
+    /// `.onDeviceOnly` / `.developerKeyOnly` modes.
+    public var enablePrivateCloudCompute: Bool = true
+
     /// Cloud provider developer key. Accepts OpenAI, Anthropic (Claude),
     /// or Google (Gemini) keys — the vendor is auto-detected from the key
     /// format (D15). Injected by the app, typically from an Xcode secret.
@@ -343,18 +351,35 @@ public actor AIOrchestrator {
 
     private static func buildProviders(from config: AIConfiguration) -> [any ModelProvider] {
         let onDevice: (any ModelProvider)? = config.enableOnDevice ? OnDeviceProvider() : nil
+        let pcc = buildPrivateCloudComputeProvider(from: config)
         let cloud = buildCloudProvider(from: config)
 
+        // Ordered by privacy: on-device (max) → PCC (.appleCloud) → developer
+        // key (external). PCC is a fallback tier, not a destination of its own,
+        // so it joins the two "prefer" chains but not the strict "only" modes.
         switch config.preference {
         case .preferOnDevice:
-            return [onDevice, cloud].compactMap { $0 }
+            return [onDevice, pcc, cloud].compactMap { $0 }
         case .preferDeveloperKey:
-            return [cloud, onDevice].compactMap { $0 }
+            return [cloud, pcc, onDevice].compactMap { $0 }
         case .onDeviceOnly:
             return [onDevice].compactMap { $0 }
         case .developerKeyOnly:
             return [cloud].compactMap { $0 }
         }
+    }
+
+    /// Private Cloud Compute is the single iOS 27 wire-in point (D14): a
+    /// type-level `@available` gate here, nothing scattered through the
+    /// orchestration logic — the chain just gets one provider longer on iOS 27.
+    static func buildPrivateCloudComputeProvider(
+        from config: AIConfiguration
+    ) -> (any ModelProvider)? {
+        guard config.enablePrivateCloudCompute else { return nil }
+        if #available(iOS 27.0, macOS 27.0, *) {
+            return PrivateCloudComputeProvider()
+        }
+        return nil
     }
 
     /// The developer key is vendor-agnostic (D15): explicit vendor wins,

@@ -504,6 +504,46 @@ struct CloudVendorTests {
     }
 }
 
+// MARK: - Private Cloud Compute wiring (iOS 27)
+
+@Suite("Private Cloud Compute (iOS 27)")
+struct PrivateCloudComputeTests {
+
+    @Test("Disabling PCC keeps it out of the chain, regardless of OS")
+    func disabledMeansNoProvider() {
+        var config = AIConfiguration()
+        config.enablePrivateCloudCompute = false
+        #expect(AIOrchestrator.buildPrivateCloudComputeProvider(from: config) == nil)
+    }
+
+    @available(iOS 27.0, macOS 27.0, *)
+    @Test("Default config builds PCC with the .appleCloud privacy level")
+    func defaultBuildsPCC() {
+        let provider = AIOrchestrator.buildPrivateCloudComputeProvider(from: AIConfiguration())
+        #expect(provider?.identifier == .privateCloudCompute)
+        #expect(provider?.privacyLevel == .appleCloud)
+    }
+
+    @available(iOS 27.0, macOS 27.0, *)
+    @Test("PCC joins the prefer chains but never the strict only modes")
+    func chainMembership() async {
+        func identifiers(_ preference: ModelPreference) async -> [ProviderIdentifier] {
+            var config = AIConfiguration()
+            config.preference = preference
+            config.developerKey = "sk-test"   // ensure a cloud provider exists
+            let statuses = await AIOrchestrator(configuration: config).providerStatuses()
+            return statuses.map(\.identifier)
+        }
+
+        // Privacy order in the prefer-on-device chain: on-device → PCC → key.
+        #expect(await identifiers(.preferOnDevice)
+            == [.onDevice, .privateCloudCompute, .openAI])
+        // Strict modes stay single-provider — PCC is a fallback tier, not a peer.
+        #expect(await identifiers(.onDeviceOnly) == [.onDevice])
+        #expect(await identifiers(.developerKeyOnly) == [.openAI])
+    }
+}
+
 // MARK: - Global configuration
 
 @Suite("Configuration", .serialized)
@@ -514,6 +554,7 @@ struct ConfigurationTests {
         AIOrchestrator.configure {
             $0.enableOnDevice = false
             $0.developerKey = nil
+            $0.enablePrivateCloudCompute = false   // PCC is default-on (iOS 27)
         }
         // No providers built → none available.
         let available = await AIOrchestrator.active.availableProviders()

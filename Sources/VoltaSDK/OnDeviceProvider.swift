@@ -65,7 +65,7 @@ public struct OnDeviceProvider: ModelProvider {
         history: [ChatTurn]
     ) async -> Int? {
         guard #available(iOS 26.4, macOS 26.4, *) else { return nil }
-        var entries = Self.transcriptEntries(instructions: instructions, history: history)
+        var entries = FoundationModelsTranscript.entries(instructions: instructions, history: history)
         if !prompt.isEmpty {
             entries.append(.prompt(Transcript.Prompt(
                 segments: [.text(Transcript.TextSegment(content: prompt))]
@@ -89,37 +89,8 @@ public struct OnDeviceProvider: ModelProvider {
             }
             return LanguageModelSession()
         }
-        let entries = transcriptEntries(instructions: instructions, history: history)
+        let entries = FoundationModelsTranscript.entries(instructions: instructions, history: history)
         return LanguageModelSession(transcript: Transcript(entries: entries))
-    }
-
-    /// Maps instructions + history (D12) into native `Transcript` entries.
-    /// Shared between session creation and token counting.
-    private static func transcriptEntries(
-        instructions: String?,
-        history: [ChatTurn]
-    ) -> [Transcript.Entry] {
-        var entries: [Transcript.Entry] = []
-        if let instructions, !instructions.isEmpty {
-            entries.append(.instructions(Transcript.Instructions(
-                segments: [.text(Transcript.TextSegment(content: instructions))],
-                toolDefinitions: []
-            )))
-        }
-        for turn in history {
-            switch turn.role {
-            case .user:
-                entries.append(.prompt(Transcript.Prompt(
-                    segments: [.text(Transcript.TextSegment(content: turn.text))]
-                )))
-            case .assistant:
-                entries.append(.response(Transcript.Response(
-                    assetIDs: [],
-                    segments: [.text(Transcript.TextSegment(content: turn.text))]
-                )))
-            }
-        }
-        return entries
     }
 
     /// Maps generation errors onto ProviderError, separating the cases the

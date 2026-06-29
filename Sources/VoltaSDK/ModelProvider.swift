@@ -24,7 +24,10 @@ public struct ProviderIdentifier: Hashable, Sendable, CustomStringConvertible {
     public static let openAI    = ProviderIdentifier("openai")
     public static let anthropic = ProviderIdentifier("anthropic")
     public static let gemini    = ProviderIdentifier("gemini")
-    // iOS 27: .privateCloudCompute, plus user-account variants of the above
+    /// Private Cloud Compute (iOS 27): Apple-hosted, free with a per-user
+    /// daily quota, no key. Sits between on-device and the developer key.
+    public static let privateCloudCompute = ProviderIdentifier("private-cloud-compute")
+    // iOS 27 (still to come): user-account variants of the above vendors
 }
 
 // MARK: - Privacy level
