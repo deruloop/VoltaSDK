@@ -20,11 +20,13 @@
 //
 //  Initial state — the gate invariant: NOTHING is ever committed without
 //  passing through `onSelection`. With a nil binding, the selector
-//  auto-selects the on-device model iff available — the only provider with
-//  no business gate behind it (free, private, no account) — and even that
-//  attempt goes through the handler. Cloud providers are NEVER preselected:
-//  a developer preference must not look like a user activation when a
-//  subscription or OAuth gate sits behind it. A non-nil initial binding
+//  auto-selects the best available GATE-FREE provider — on-device, or Private
+//  Cloud Compute when on-device is off/unavailable (both free, private, no
+//  account) — in the chain's preference order, and even that attempt goes
+//  through the handler. Gated providers (developer-key, user-account vendors)
+//  are NEVER preselected: a developer preference must not look like a user
+//  activation when a subscription or OAuth gate sits behind it. A non-nil
+//  initial binding
 //  (e.g. a persisted user choice) is never overridden. `selection == nil`
 //  therefore means "no model committed yet" — gate your chat on it, or keep
 //  gated providers out of the configuration entirely.
@@ -78,6 +80,12 @@ public struct ModelSelectorLabel: Sendable {
                 title: "On device",
                 subtitle: "Private — runs entirely on this device",
                 systemImage: "iphone"
+            )
+        case .privateCloudCompute:
+            return ModelSelectorLabel(
+                title: "Private Cloud Compute",
+                subtitle: "Apple-hosted — private, no account",
+                systemImage: "lock.icloud"
             )
         case .openAI, .anthropic, .gemini:
             // One neutral face for any developer-key vendor: no assumptions
@@ -229,6 +237,16 @@ public struct ModelSelector: View {
         .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
         .task(id: ObjectIdentifier(orchestrator)) {
             statuses = await orchestrator.providerStatuses()
+            // Drop a committed selection the (re)configured chain no longer
+            // offers — e.g. the user disabled the selected provider — so the
+            // header never shows a vanished model as active and auto-select can
+            // re-resolve to the next gate-free provider (on-device → PCC).
+            if let current = selection,
+               !statuses.contains(where: {
+                   $0.identifier == current && $0.availability == .available
+               }) {
+                selection = nil
+            }
             await autoSelectIfNeeded()
         }
         .onChange(of: selection) {
@@ -284,25 +302,38 @@ public struct ModelSelector: View {
         .accessibilityHint("Shows the available models")
     }
 
-    /// Auto-selects the only gate-free provider (on-device) when the app
-    /// hasn't committed anything yet. Cloud providers are never candidates:
-    /// they typically hide a business gate (subscription, OAuth) that only
-    /// the app can clear. Even this attempt passes through `onSelection`,
-    /// keeping the invariant that nothing commits without the gate's
-    /// consent; `.deny`/`.deferred` leave the selector unselected without
-    /// showing a failure (it wasn't a user action).
+    /// Identifiers that carry no app-side business gate (no account, no
+    /// subscription, no OAuth): on-device and Private Cloud Compute, both free
+    /// and private. These are the only providers eligible for auto-selection —
+    /// developer-key and user-account vendors typically hide a gate that only
+    /// the app can clear, so they are never preselected.
+    private func isGateFree(_ identifier: ProviderIdentifier) -> Bool {
+        identifier == .onDevice || identifier == .privateCloudCompute
+    }
+
+    /// Auto-selects the best available **gate-free** provider — the first one
+    /// in the chain's preference order (so on-device wins when present, and
+    /// Private Cloud Compute steps in when on-device is off/unavailable) — when
+    /// the app hasn't committed anything yet. Gated providers are never
+    /// candidates. Even this attempt passes through `onSelection`, keeping the
+    /// invariant that nothing commits without the gate's consent;
+    /// `.deny`/`.deferred` leave the selector unselected without showing a
+    /// failure (it wasn't a user action). When no gate-free provider is
+    /// available, nothing is selected and the header shows "Choose a model".
     private func autoSelectIfNeeded() async {
         guard selection == nil, activatingID == nil else { return }
-        guard let onDevice = statuses.first(where: { $0.identifier == .onDevice }),
-              onDevice.availability == .available else { return }
+        guard let candidate = statuses.first(where: {
+            isGateFree($0.identifier) && $0.availability == .available
+        }) else { return }
+        let identifier = candidate.identifier
 
         guard let onSelection else {
-            selection = .onDevice
+            selection = identifier
             return
         }
-        activatingID = .onDevice
-        if case .activate = await onSelection(.onDevice) {
-            selection = .onDevice
+        activatingID = identifier
+        if case .activate = await onSelection(identifier) {
+            selection = identifier
         }
         activatingID = nil
     }
