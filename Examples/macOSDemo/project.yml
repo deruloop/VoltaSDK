@@ -1,0 +1,53 @@
+# macOS demo app, generated with XcodeGen:
+#     cd Examples/macOSDemo && xcodegen generate
+#
+# ⚠️  The committed macOSDemo.xcodeproj is the source of truth and is
+# hand-patched: XcodeGen 2.33 emits the local Swift package as a legacy folder
+# reference (no XCLocalSwiftPackageReference), which Xcode 27 rejects with
+# "Missing package product". The committed project references the package the
+# modern way (XCLocalSwiftPackageReference, relativePath "../.."). If you
+# regenerate, re-apply that fix afterwards (or use a newer XcodeGen).
+#
+# This is the signed counterpart to the iOS demo: same shared chat UI
+# (VoltaSDKDemoUI), so it shows the full provider chain — including Private
+# Cloud Compute on macOS 27. PCC is OPT-IN (see the entitlement note below).
+name: macOSDemo
+options:
+  bundleIdPrefix: com.voltasdk.demo
+  deploymentTarget:
+    macOS: "26.0"      # runs on 26+; PCC (macOS 27+) is runtime-gated
+packages:
+  VoltaSDK:
+    path: ../..
+targets:
+  macOSDemo:
+    type: application
+    platform: macOS
+    sources:
+      - Sources
+    dependencies:
+      - package: VoltaSDK
+        product: VoltaSDKDemoUI
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.voltasdk.demo.macos
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        SWIFT_VERSION: "6.0"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: J6HPZ958W6
+        # ── Private Cloud Compute: OPT-IN ─────────────────────────────────
+        # Left unwired so this demo builds for everyone (PCC just shows
+        # "unavailable" and the chain falls back to on-device). To exercise
+        # LIVE PCC: request the entitlement from Apple (see ../../README.md),
+        # set your own DEVELOPMENT_TEAM above, then either add the "Private
+        # Cloud Compute" capability in Xcode (Signing & Capabilities) or
+        # uncomment the next line and re-run `xcodegen generate`:
+        # CODE_SIGN_ENTITLEMENTS: macOSDemo.entitlements
+schemes:
+  macOSDemo:
+    build:
+      targets:
+        macOSDemo: all
+    run:
+      config: Debug

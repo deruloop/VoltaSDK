@@ -32,6 +32,7 @@ final class DowngradeLog {
 public struct DemoRootView: View {
     // Developer configuration (recreates the orchestrator on "Apply").
     @State private var enableOnDevice = true
+    @State private var enablePrivateCloudCompute = true
     @State private var apiKey = ""
     @State private var model = ""
     @State private var preference: ModelPreference = .preferOnDevice
@@ -98,6 +99,10 @@ public struct DemoRootView: View {
         Form {
             Section("Providers") {
                 Toggle("On-device model", isOn: $enableOnDevice)
+                Toggle("Private Cloud Compute", isOn: $enablePrivateCloudCompute)
+                Text("Apple-hosted free tier (iOS/macOS 27). Needs the Private Cloud Compute entitlement to actually answer; without it the row stays unavailable and the chain falls back.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 SecureField("API key (OpenAI, Claude, or Gemini)", text: $apiKey)
                     .textContentType(.password)
                 // The model is a CONSEQUENCE of the key: the field appears
@@ -200,9 +205,13 @@ public struct DemoRootView: View {
                 orchestrator: orchestrator,
                 selection: $userSelection,
                 onSelection: { provider in
-                    // On-device is immediate.
-                    guard provider != .onDevice else { return .activate }
-                    // Entitlement check (in a real app: StoreKit).
+                    // On-device and Private Cloud Compute are free and need no
+                    // account — activate immediately, no paywall.
+                    guard provider != .onDevice, provider != .privateCloudCompute else {
+                        return .activate
+                    }
+                    // Developer-key cloud model — entitlement check (in a real
+                    // app: StoreKit).
                     try? await Task.sleep(for: .milliseconds(400))
                     if userHasSubscription { return .activate }
                     // Not entitled: the APP takes over with its own view —
@@ -259,6 +268,7 @@ public struct DemoRootView: View {
         let log = downgradeLog
         var config = AIConfiguration()
         config.enableOnDevice = enableOnDevice
+        config.enablePrivateCloudCompute = enablePrivateCloudCompute
         config.developerKey = apiKey.isEmpty ? nil : apiKey
         config.developerKeyModel = model.isEmpty ? nil : model
         config.preference = effectivePreference

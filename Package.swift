@@ -12,10 +12,9 @@ let package = Package(
         .library(name: "VoltaSDK", targets: ["VoltaSDK"]),
         // Optional SwiftUI components: apps can ignore them entirely.
         .library(name: "VoltaSDKUI", targets: ["VoltaSDKUI"]),
-        // Demo UI, shared between macOS and iOS (Examples/iOSDemo).
-        .library(name: "VoltaSDKDemoUI", targets: ["VoltaSDKDemoUI"]),
-        // Test app (macOS): `swift run VoltaSDKDemo`.
-        .executable(name: "VoltaSDKDemo", targets: ["VoltaSDKDemo"])
+        // Demo UI, shared between the iOS and macOS demo apps
+        // (Examples/iOSDemo, Examples/macOSDemo).
+        .library(name: "VoltaSDKDemoUI", targets: ["VoltaSDKDemoUI"])
     ],
     targets: [
         .target(name: "VoltaSDK"),
@@ -26,10 +25,6 @@ let package = Package(
         .target(
             name: "VoltaSDKDemoUI",
             dependencies: ["VoltaSDK", "VoltaSDKUI"]
-        ),
-        .executableTarget(
-            name: "VoltaSDKDemo",
-            dependencies: ["VoltaSDKDemoUI"]
         ),
         .testTarget(
             name: "VoltaSDKTests",
