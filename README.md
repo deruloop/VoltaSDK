@@ -27,7 +27,7 @@ only job is **model resolution**.
 |---|---|
 | **iOS / macOS 26.0+** | The whole core: fallback chain, typed errors, privacy disclosure, multi-turn conversations, vendor-agnostic developer key (OpenAI / Claude / Gemini), optional UI components. Context handling is *reactive* (error → fallback). |
 | **iOS / macOS 26.4+** | The *token-aware* tier lights up on its own: exact on-device token counting, automatic context-window pre-flight, `contextUsage` to know how full the window is. |
-| **iOS / macOS 27+** | **Private Cloud Compute** joins the chain as the free, Apple-hosted "powered" tier — see the section below. Opt-in via an Apple entitlement; gracefully absent otherwise. |
+| **iOS / macOS 27+** | **Private Cloud Compute** joins the chain as the free, Apple-hosted "powered" tier — see [Private Cloud Compute](#private-cloud-compute-ios--macos-27). Opt-in via an Apple entitlement; gracefully absent otherwise. |
 
 Requirements: Swift 6.2+, and **Xcode 27 or newer to build this line** — it
 references the iOS/macOS 27 SDK (Private Cloud Compute). The code is
@@ -37,79 +37,6 @@ use the **0.3.5** release (the last Xcode-26.4 line) instead. Build requirement
 and deployment target are independent. The on-device model needs a device with
 Apple Intelligence (detected at runtime: if absent, Volta excludes it and
 explains why).
-
-## Private Cloud Compute (iOS / macOS 27)
-
-On iOS/macOS 27 Volta adds **Private Cloud Compute (PCC)** — Apple's free,
-server-hosted "powered" model — to the fallback chain, between on-device and
-the developer key (privacy level `appleCloud`). It is **on by default** in the
-configuration but **costs you nothing to leave on**:
-
-- **No entitlement → no problem.** If your app isn't entitled for PCC, Volta
-  detects that at runtime and reports the provider as *unavailable*; the chain
-  simply falls back to on-device (or your developer key). **Nothing crashes,
-  and adopting VoltaSDK never forces you to request anything from Apple.** Set
-  `enablePrivateCloudCompute = false` if you'd rather it not appear at all.
-- **To actually use PCC, you must enable a capability — and that is on you,
-  the developer, not your users.** PCC requires the
-  `com.apple.developer.private-cloud-compute` entitlement, which Apple assigns
-  to **your developer account**. Steps:
-  1. Be enrolled in the **App Store Small Business Program** with **< 2 million**
-     first-time App Store downloads (PCC is free within these limits).
-  2. **Request the entitlement** at
-     <https://developer.apple.com/contact/request/private-cloud-compute/>;
-     Apple assigns it to your account/team.
-  3. **Register the capability and re-provision** (full walkthrough below), so
-     `com.apple.developer.private-cloud-compute` ships in your signed app.
-- Your **end users** need nothing beyond the usual Apple Intelligence
-  prerequisites; the entitlement lives in your signed app, not on their side.
-  PCC has a per-user **daily quota** — when it runs out, Volta surfaces it as a
-  recoverable error and the chain steps down automatically.
-
-The demo apps (`Examples/iOSDemo`, `Examples/macOSDemo`) are wired for this as
-**opt-in**: they build for everyone with PCC showing *unavailable*, and you
-flip it on by adding the capability with your own entitled team (see each
-demo's `project.yml`). The macOS demo's developer pane also has a **Private
-Cloud Compute toggle** so you can watch the chain react.
-
-### Registering the capability & provisioning profile
-
-The entitlement is *restricted*: you can't just type it into an `.entitlements`
-file — the App ID must be authorized for it, which only works once Apple has
-assigned PCC to your team (step 2). After that:
-
-**Automatic signing (simplest).**
-1. Xcode → your **target → Signing & Capabilities**.
-2. Set **Team** to the account Apple granted PCC to, with **Automatically
-   manage signing** checked.
-3. Click **+ Capability** and add **Private Cloud Compute**. Xcode adds
-   `com.apple.developer.private-cloud-compute` to your `.entitlements`, enables
-   the capability on the App ID, and regenerates the provisioning profile for
-   you.
-4. Build to a real Apple-Intelligence device (or an Apple-silicon Mac on
-   macOS 27). If signing fails with *"provisioning profile doesn't support the
-   Private Cloud Compute capability"*, the grant (step 2) hasn't propagated to
-   that App ID yet — hit **Try Again**, or use the manual route below.
-
-**Manual signing / CI.**
-1. At <https://developer.apple.com> → **Certificates, Identifiers & Profiles →
-   Identifiers**, open your **App ID** and enable the **Private Cloud Compute**
-   capability, then **Save**.
-2. Under **Profiles**, edit/regenerate the provisioning profile for that App ID
-   (it now includes the capability) and **download** it; double-click to
-   install (or let Xcode download it).
-3. Add `com.apple.developer.private-cloud-compute` (`Boolean = YES`) to your
-   app's `.entitlements`, set `CODE_SIGN_ENTITLEMENTS` to it, and sign with the
-   regenerated profile.
-
-**Verifying.** PCC `availability`/`quotaUsage` read fine even without the
-entitlement — but the *first generation traps* if the entitlement is missing.
-Volta guards against that (it checks the running binary's entitlements via
-`SecTask` and reports the provider *unavailable* instead of crashing), so the
-quickest confidence check is: with the capability added, the
-`private-cloud-compute` row turns **available** and answers at privacy level
-`appleCloud`. Testing is allowed via **TestFlight or ad-hoc distribution**, and
-test installs do **not** count toward the 2M-download limit.
 
 ## Installation (Swift Package Manager)
 
@@ -166,6 +93,16 @@ AIOrchestrator.configure {
 Inject the `developerKey` as an Xcode secret (`.xcconfig` → `Info.plist`);
 never write it in source code.
 
+**Privacy disclosure policy** — what happens when fallback crosses *down* to a
+less-private provider (e.g. on-device → cloud):
+
+- `.silent` — fall back without signalling.
+- `.notify { downgrade in … }` — proceed, but hand you the crossing (for a
+  banner/badge).
+- `.askOnPrivacyChange { downgrade in await … }` — ask first; return `false`
+  to refuse that provider and keep walking the chain.
+- `.denyDowngrade` — never cross below the preferred provider's privacy level.
+
 Where to find current model names for `developerKeyModel` (also linked from
 `CloudVendor.modelDocumentationURL` and inside the demo):
 
@@ -177,14 +114,19 @@ Where to find current model names for `developerKeyModel` (also linked from
 
 ### 2. Generation
 
+In the snippets below, `kit` is your orchestrator: after `configure` it is the
+shared `AIOrchestrator.active`; or build an explicit instance (§6).
+
 ```swift
-let answer = try await AIOrchestrator.active.respond(
+let kit = AIOrchestrator.active
+
+let answer = try await kit.respond(
     to: "Plan a weekend in Rome",
     instructions: "You are a concise travel expert."
 )
 
 // Or, with provenance (to show who answered):
-let response = try await AIOrchestrator.active.respondDetailed(to: "…")
+let response = try await kit.respondDetailed(to: "…")
 print(response.text, response.provider, response.privacyLevel)
 ```
 
@@ -228,7 +170,7 @@ passed off as a count).
 ### 5. Resolution without execution (the primitive)
 
 ```swift
-let provider = try await AIOrchestrator.active.resolveProvider()
+let provider = try await kit.resolveProvider()
 // Resolves the chain's first usable provider without executing anything.
 ```
 
@@ -325,6 +267,79 @@ whole layout on top of `providerStatuses()` while keeping the rows.
 All component building blocks (`ProviderStatusRow`, `PrivacyLevelBadge`,
 `ModelSelectorRow`) are public: recompose them into custom layouts using the
 core's `providerStatuses()` and `respondDetailed()`.
+
+## Private Cloud Compute (iOS / macOS 27)
+
+On iOS/macOS 27 Volta adds **Private Cloud Compute (PCC)** — Apple's free,
+server-hosted "powered" model — to the fallback chain, between on-device and
+the developer key (privacy level `appleCloud`). It is **on by default** in the
+configuration but **costs you nothing to leave on**:
+
+- **No entitlement → no problem.** If your app isn't entitled for PCC, Volta
+  detects that at runtime and reports the provider as *unavailable*; the chain
+  simply falls back to on-device (or your developer key). **Nothing crashes,
+  and adopting VoltaSDK never forces you to request anything from Apple.** Set
+  `enablePrivateCloudCompute = false` if you'd rather it not appear at all.
+- **To actually use PCC, you must enable a capability — and that is on you,
+  the developer, not your users.** PCC requires the
+  `com.apple.developer.private-cloud-compute` entitlement, which Apple assigns
+  to **your developer account**. Steps:
+  1. Be enrolled in the **App Store Small Business Program** with **< 2 million**
+     first-time App Store downloads (PCC is free within these limits).
+  2. **Request the entitlement** at
+     <https://developer.apple.com/contact/request/private-cloud-compute/>;
+     Apple assigns it to your account/team.
+  3. **Register the capability and re-provision** (full walkthrough below), so
+     `com.apple.developer.private-cloud-compute` ships in your signed app.
+- Your **end users** need nothing beyond the usual Apple Intelligence
+  prerequisites; the entitlement lives in your signed app, not on their side.
+  PCC has a per-user **daily quota** — when it runs out, Volta surfaces it as a
+  recoverable error and the chain steps down automatically.
+
+The demo apps (`Examples/iOSDemo`, `Examples/macOSDemo`) are wired for this as
+**opt-in**: they build for everyone with PCC showing *unavailable*, and you
+flip it on by adding the capability with your own entitled team (see each
+demo's `project.yml`). The macOS demo's developer pane also has a **Private
+Cloud Compute toggle** so you can watch the chain react.
+
+### Registering the capability & provisioning profile
+
+The entitlement is *restricted*: you can't just type it into an `.entitlements`
+file — the App ID must be authorized for it, which only works once Apple has
+assigned PCC to your team (step 2). After that:
+
+**Automatic signing (simplest).**
+1. Xcode → your **target → Signing & Capabilities**.
+2. Set **Team** to the account Apple granted PCC to, with **Automatically
+   manage signing** checked.
+3. Click **+ Capability** and add **Private Cloud Compute**. Xcode adds
+   `com.apple.developer.private-cloud-compute` to your `.entitlements`, enables
+   the capability on the App ID, and regenerates the provisioning profile for
+   you.
+4. Build to a real Apple-Intelligence device (or an Apple-silicon Mac on
+   macOS 27). If signing fails with *"provisioning profile doesn't support the
+   Private Cloud Compute capability"*, the grant (step 2) hasn't propagated to
+   that App ID yet — hit **Try Again**, or use the manual route below.
+
+**Manual signing / CI.**
+1. At <https://developer.apple.com> → **Certificates, Identifiers & Profiles →
+   Identifiers**, open your **App ID** and enable the **Private Cloud Compute**
+   capability, then **Save**.
+2. Under **Profiles**, edit/regenerate the provisioning profile for that App ID
+   (it now includes the capability) and **download** it; double-click to
+   install (or let Xcode download it).
+3. Add `com.apple.developer.private-cloud-compute` (`Boolean = YES`) to your
+   app's `.entitlements`, set `CODE_SIGN_ENTITLEMENTS` to it, and sign with the
+   regenerated profile.
+
+**Verifying.** PCC `availability`/`quotaUsage` read fine even without the
+entitlement — but the *first generation traps* if the entitlement is missing.
+Volta guards against that (it checks the running binary's entitlements via
+`SecTask` and reports the provider *unavailable* instead of crashing), so the
+quickest confidence check is: with the capability added, the
+`private-cloud-compute` row turns **available** and answers at privacy level
+`appleCloud`. Testing is allowed via **TestFlight or ad-hoc distribution**, and
+test installs do **not** count toward the 2M-download limit.
 
 ## Demo apps
 
