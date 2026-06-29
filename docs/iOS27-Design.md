@@ -1,12 +1,15 @@
 # VoltaSDK — iOS 27 Design (internal source)
 
-> Internal documentation of the **iOS 27 extension: designed, NOT implemented**.
-> No iOS 27 code exists in the package (and none can compile until the iOS 27
-> SDK ships). This file holds everything we know and have decided; the open
-> questions that still gate implementation live in
-> `docs/iOS27-OpenQuestions.md` and will be merged back here once answered.
-> The shipped iOS 26/26.4 implementation is documented in
-> `docs/iOS26-Implementation.md`.
+> Internal documentation of the **iOS 27 extension: in progress on the
+> `xcode27` branch**. As of June 2026 the first provider —
+> `PrivateCloudComputeProvider` — is implemented and compiles/tests green
+> against the real iOS 27 SDK (Xcode 27 beta, build 27A5209h); its runtime
+> behaviour still needs an Apple-Intelligence device with the PCC entitlement.
+> This file holds everything we know and have decided. **§8 records what was
+> verified directly against the SDK** (the source of truth for API shape); the
+> remaining open questions live in `docs/iOS27-OpenQuestions.md` and are merged
+> back here as they are answered. The shipped iOS 26/26.4 implementation is
+> documented in `docs/iOS26-Implementation.md`.
 
 ---
 
@@ -51,6 +54,14 @@ Private Cloud Compute: a large server model that integrates like on-device —
 higher with iCloud+. Crucial implication: **PCC quota can run out mid-use at
 runtime** — the main reason the fallback must be automatic and runtime, not a
 static setup choice.
+
+**Update (verified in the SDK, §8):** the quota is *also* readable
+**proactively** — `PrivateCloudComputeLanguageModel.quotaUsage`
+(`isLimitReached` / `isApproachingLimit` / `resetDate`). So the runtime
+fallback stays the safety net (quota can still flip mid-call → a distinct
+`.quotaLimitReached` error), but `PrivateCloudComputeProvider.availability()`
+*pre-skips* an already-exhausted PCC without paying for a doomed round-trip.
+Both paths exist; neither replaces the other.
 
 ### D7 (iOS 27 part) — Per-need chains + disclosure
 The developer expresses a *need* (`.lightweight` / `.reasoning` /
@@ -140,37 +151,173 @@ Completions `LanguageModel` (Q8) turns out not to cover them.
 | `ModelPreference` (4 cases, deliberately frozen) | per-need fallback chain + PCC quotas |
 | `resolveProvider()` (D9) | `preferred(_ need:)` returning a `LanguageModel` for Dynamic Profiles |
 | `PrivacyDisclosure` (live since 26) | unchanged; `.appleCloud` level becomes reachable (PCC) |
-| `ProviderError.isRecoverableByFallback` | extended with quota-specific cases (pending Q2/Q4) |
+| `ProviderError.isRecoverableByFallback` | PCC's `.quotaLimitReached` maps to the existing recoverable `.rateLimited(retryAfter:)`; `.serviceUnavailable`/`.networkFailure` map to recoverable `.network` (Q2/Q4 answered — no new enum case needed) |
 | D13 capability surface (`contextSize`/`tokenCount`) | per-model token reading lands here (pending Q10) |
 | `ChatTurn` history (D12) | answers transcript portability across providers (pending Q6/Q7 for KV-cache) |
-| — | `PrivateCloudComputeProvider` |
+| — | `PrivateCloudComputeProvider` ✅ (xcode27 branch: structural — compiles & tests green; runtime behaviour pending a device) |
 | `ModelSelector` (VoltaSDKUI, shipped) | gains the new providers automatically; OAuth flows attach via its existing `activation` hook |
 | — | user-account providers (Gemini/Claude): OAuth flow attaches via `ModelSelector`'s existing `activation` hook |
 
 ## 6. Implementation order (when unblocked)
 
 Matches the roadmap in CLAUDE.md:
-1. `PrivateCloudComputeProvider`, then user-account Gemini/Claude via the
-   `LanguageModel` protocol; wire them into the ordered list in
-   `buildProviders` (the only place that changes).
+1. **`PrivateCloudComputeProvider` ✅ (June 2026, xcode27 branch).** Wraps
+   `PrivateCloudComputeLanguageModel` behind the existing `ModelProvider`
+   surface; proactive quota-aware `availability()`; error mapping to the
+   existing `ProviderError` cases; wired into `buildProviders` at one
+   `@available(iOS 27, *)` gate (D14), default-on, joining the two `prefer`
+   chains between on-device and the developer key. **Next:** user-account
+   Gemini/Claude via the `LanguageModel` protocol (the Executor pattern, §8),
+   wired into the same place.
 2. Runtime fallback chain keyed on need (`.lightweight/.reasoning/.largeContext`),
    replacing/extending `ModelPreference` (kept at 4 cases on purpose — a third
    provider makes a closed enum combinatorial).
 3. `preferred(_ need:)` bridge for Dynamic Profiles, evolving `resolveProvider()`.
-4. ~~Model picker component~~ shipped already (`ModelSelector` in VoltaSDKUI):
-   the new providers appear in it automatically once wired into
-   `buildProviders`; their OAuth flows attach via the existing `activation`
-   hook. Only the per-provider default labels need adding. One deliberate
-   revisit: the selector's auto-select candidate (today hardcoded to
-   on-device — the only gate-free provider on iOS 26; see the gate
-   invariant in the iOS 26 doc §5) should generalize to "the best
-   gate-free provider" — PCC qualifies (no auth, free tier), user-account
-   providers never do (OAuth gate).
+4. ~~Model picker component~~ shipped (`ModelSelector` in VoltaSDKUI): the new
+   providers appear automatically once wired into `buildProviders`; their OAuth
+   flows attach via the existing `activation` hook. **Done (June 2026):** PCC
+   has a default label, and the deliberate revisit is implemented — the
+   auto-select candidate is no longer hardcoded to on-device. `isGateFree`
+   (`{.onDevice, .privateCloudCompute}`) defines the gate-free set, and
+   `autoSelectIfNeeded` picks the first available gate-free provider **in chain
+   order** (on-device when present, PCC when on-device is off/unavailable);
+   gated providers (developer-key, user-account) are never preselected. The
+   demo's `onSelection` likewise treats PCC as free (immediate `.activate`, no
+   paywall). User-account vendors will stay gated (OAuth) when added.
 
 ## 7. Blockers
 
 Implementation is gated on:
-- **The iOS 27 SDK** (Xcode beta) — nothing compiles before that.
-- **The open questions** in `docs/iOS27-OpenQuestions.md` (PCC quota semantics,
-  transcript portability, `LanguageModel` conformance requirements, …). When
-  answered, merge the answers into this file and delete that one.
+- ~~**The iOS 27 SDK** (Xcode beta)~~ ✅ resolved — Xcode 27 beta (27A5209h)
+  with the iOS 27.0 SDK is installed; the package builds and tests green on it
+  (Swift 6.4, macOS 27 SDK on the host).
+- **The remaining open questions** in `docs/iOS27-OpenQuestions.md`. The
+  high-priority block (PCC quota semantics, `LanguageModel` conformance,
+  transcript portability) is now **answered from the SDK** — see §8. What
+  stays open needs a real Apple-Intelligence device + PCC entitlement
+  (runtime values, not API shape) or external accounts: parity-on-fallback
+  (Q12/Q13), distribution (Q14–Q16), and the Utilities Chat-Completions
+  model (Q8, a separate open-source package).
+
+## 8. Verified against the iOS 27 SDK (Xcode 27 beta 27A5209h, June 2026)
+
+Read directly from
+`FoundationModels.framework/.../arm64e-apple-ios.swiftinterface` — the
+authoritative API shape (more reliable than WWDC notes). Mark these
+"observed in iOS 27 beta — re-verify at GA"; betas churn.
+
+**`LanguageModel` protocol (Q9).** Conformance is via an **Executor**, not a
+direct `respond`:
+```
+protocol LanguageModel: Sendable {
+    associatedtype Executor: LanguageModelExecutor where Self == Self.Executor.Model
+    var capabilities: LanguageModelCapabilities { get }
+    var executorConfiguration: Self.Executor.Configuration { get }
+}
+protocol LanguageModelExecutor: Sendable {
+    associatedtype Configuration: Hashable & Sendable
+    associatedtype Model: LanguageModel
+    init(configuration: Configuration) throws
+    func prewarm(model: Model, transcript: Transcript)
+    func respond(to: LanguageModelExecutorGenerationRequest, model: Model,
+                 streamingInto: LanguageModelExecutorGenerationChannel) async throws
+}
+```
+Implications: (a) **streaming is the primitive** — you implement one
+`respond(…streamingInto:)` that emits `Event`s (`TextFragment` w/ per-fragment
+`tokenCount`, `Usage`, tool calls, reasoning) into a channel; the non-streaming
+`LanguageModelSession.respond` is built on top. (b) **Capabilities are
+declared, not mandatory** — `LanguageModelCapabilities` of `.vision`,
+`.guidedGeneration`, `.reasoning`, `.toolCalling`; a provider advertises what
+it supports (informs Q12). (c) The request carries `transcript`,
+`enabledToolDefinitions`, `schema` (`GenerationSchema?`), `generationOptions`,
+`contextOptions`. → The user-account Gemini/Claude providers will be
+`LanguageModel`+`Executor` pairs whose executor drives the existing REST
+clients (`AnthropicProvider`/`GeminiProvider`) and translates the transcript
+in / fragments out.
+
+**Feeding a runtime model (Q5 — fully answered).** Both paths take a runtime
+value, so a Profile's model is **not** fixed at declaration:
+- `LanguageModelSession(model: some LanguageModel, tools:, instructions:|transcript:)`
+- `func model(_ model: any LanguageModel) -> some DynamicProfile` (the Dynamic
+  Profile modifier). → `preferred(_ need:)` (D1) should return
+  `any LanguageModel`, dropped straight into `.model(orchestrator.preferred(.reasoning))`.
+
+**Token usage, uniform (Q10).** `LanguageModelSession.usage` →
+`Usage(input:output:)` where `Input` has `totalTokenCount` + `cachedTokenCount`
+and `Output` has `totalTokenCount` + `reasoningTokenCount`; streaming exposes
+the same via the channel `Usage` event. This is **post-call** usage and is
+uniform across models. *Caveat:* **pre-call** counting is not uniform —
+`SystemLanguageModel.tokenCount(for:)` is on-device-specific, and
+`PrivateCloudComputeLanguageModel.contextSize` is `async throws` (not the
+synchronous `Int?` of our D13 `contextSize`). So PCC opts out of the proactive
+token pre-flight and relies on the reactive `.contextWindowExceeded` (matches
+D7). **Follow-up:** generalize the D13 capability surface to an async context
+read so cloud/PCC models can pre-flight too.
+
+**PCC quota + errors (Q1–Q4 — answered).**
+- **Q1 (proactive?):** yes. `PrivateCloudComputeLanguageModel.quotaUsage`
+  (`status: .belowLimit(isApproachingLimit:) | .limitReached`, `isLimitReached`,
+  `resetDate: Date?`, `limitIncreaseSuggestion?.show()`), plus `isAvailable`
+  and `availability` (`.deviceNotEligible` / `.systemNotReady`). The type is
+  `Observable`.
+- **Q2 (quota error type):** distinct — `PrivateCloudComputeLanguageModel.Error`
+  is `.quotaLimitReached(…)` / `.serviceUnavailable(…)` / `.networkFailure(…)`.
+  The generic surface also has `LanguageModelError.rateLimited(.resetDate)`.
+- **Q3 (reset time):** `resetDate: Date?` on both `QuotaUsage` and the
+  `.quotaLimitReached` payload → mapped to `ProviderError.rateLimited(retryAfter:)`.
+- **Q4 (out-of-quota vs PCC down):** the three error cases separate them
+  cleanly — `.quotaLimitReached` is the user's quota; `.serviceUnavailable` /
+  `.networkFailure` are transient outages.
+
+**PCC entitlement — the hard gate, observed at runtime (June 2026).** Tested on
+an M2 Mac, macOS 27 beta. `PrivateCloudComputeLanguageModel().availability`
+reported `.available` and `quotaUsage` read fine **even with no entitlement** —
+but the first `respond` **traps** (a *fatal error*, not a throwable Swift
+error):
+```
+Fatal error: Process is missing required entitlement:
+com.apple.developer.private-cloud-compute
+```
+Consequences folded into the implementation:
+- The required entitlement key is **`com.apple.developer.private-cloud-compute`**
+  (answers the "which entitlement" half of Q14; the *approval* process/timeline
+  is still open).
+- `availability` is **not** entitlement-aware, so it cannot be the safety gate.
+  Because the missing entitlement is a trap (uncatchable) and PCC is default-on,
+  `PrivateCloudComputeProvider.availability()` now checks the running binary's
+  own entitlements first — `SecTaskCreateFromSelf` +
+  `SecTaskCopyValueForEntitlement` — and reports `.unavailable` when the
+  entitlement is absent, turning a guaranteed crash into a graceful skip.
+- To *actually* call PCC you need a real **signed app** (not `swift run` / an
+  unsigned binary) whose App ID has the PCC capability granted by Apple and
+  whose `.entitlements` declares the key.
+
+**PCC access process (Q14 — answered from Apple's docs, June 2026).** The
+entitlement is **developer-side**, assigned to the *account*, not anything the
+end user grants (the user only needs the normal Apple Intelligence
+prerequisites; the per-user daily quota is the only user-facing dimension).
+Eligibility — **all** required: enrolled in the **App Store Small Business
+Program**, **< 2M** first-time App Store downloads across the account's apps,
+and the entitlement assigned. Request it via Apple's form
+(`developer.apple.com/contact/request/private-cloud-compute/`); Apple then
+assigns it to the account. Cost: **no cloud API fee** within those limits.
+Testing: PCC works via **TestFlight or ad-hoc distribution**, and test installs
+do **not** count toward the 2M. If an app later crosses 2M (or leaves the
+Small Business Program), Apple notifies the developer, who has 6 months to
+migrate off PCC. (Q15 partial: TestFlight/ad-hoc supported; whether dev vs prod
+quotas differ is still unconfirmed.)
+
+**Transcript portability / session migration (Q6/Q7 — answered).** Sessions
+are per-model: `LanguageModelSession(model:transcript:)` reconstructs a session
+on *any* model from a `Transcript`, but there is **no native cross-model
+KV-cache migration API**. → Confirms D12: switching provider mid-conversation
+works by **replaying app-supplied history** as a transcript (exactly what
+`OnDeviceProvider`/`PrivateCloudComputeProvider` do via the shared
+`FoundationModelsTranscript`). KV-cache reuse is a same-model optimisation, not
+a portability mechanism.
+
+**Runtime availability API (Q11 — answered, structurally).**
+`SystemLanguageModel.availability` (unchanged from 26) for on-device;
+`PrivateCloudComputeLanguageModel.availability` + `isAvailable` for PCC, with
+the reasons above.

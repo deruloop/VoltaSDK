@@ -27,15 +27,89 @@ only job is **model resolution**.
 |---|---|
 | **iOS / macOS 26.0+** | The whole core: fallback chain, typed errors, privacy disclosure, multi-turn conversations, vendor-agnostic developer key (OpenAI / Claude / Gemini), optional UI components. Context handling is *reactive* (error → fallback). |
 | **iOS / macOS 26.4+** | The *token-aware* tier lights up on its own: exact on-device token counting, automatic context-window pre-flight, `contextUsage` to know how full the window is. |
+| **iOS / macOS 27+** | **Private Cloud Compute** joins the chain as the free, Apple-hosted "powered" tier — see the section below. Opt-in via an Apple entitlement; gracefully absent otherwise. |
 
-Requirements: Swift 6.2, and **Xcode 26.4 or newer to build** — the 26.4
-token-counting API the token-aware tier references is declared only in the
-26.4 SDK, so older toolchains (e.g. a CI runner pinned to Xcode 26.0.x)
-fail to compile the package even though the `#available` gate keeps it
-running fine on iOS/macOS **26.0+** at runtime. Build requirement and
-deployment target are independent: build with 26.4+, deploy from 26.0.
-The on-device model needs a device with Apple Intelligence (detected at
-runtime: if absent, Volta excludes it and explains why).
+Requirements: Swift 6.2+, and **Xcode 27 or newer to build this line** — it
+references the iOS/macOS 27 SDK (Private Cloud Compute). The code is
+`@available`-gated, so the **deployment target stays iOS/macOS 26.0** and it
+runs fine on 26.x (PCC simply doesn't appear). If you are pinned to Xcode 26.4,
+use the **0.3.5** release (the last Xcode-26.4 line) instead. Build requirement
+and deployment target are independent. The on-device model needs a device with
+Apple Intelligence (detected at runtime: if absent, Volta excludes it and
+explains why).
+
+## Private Cloud Compute (iOS / macOS 27)
+
+On iOS/macOS 27 Volta adds **Private Cloud Compute (PCC)** — Apple's free,
+server-hosted "powered" model — to the fallback chain, between on-device and
+the developer key (privacy level `appleCloud`). It is **on by default** in the
+configuration but **costs you nothing to leave on**:
+
+- **No entitlement → no problem.** If your app isn't entitled for PCC, Volta
+  detects that at runtime and reports the provider as *unavailable*; the chain
+  simply falls back to on-device (or your developer key). **Nothing crashes,
+  and adopting VoltaSDK never forces you to request anything from Apple.** Set
+  `enablePrivateCloudCompute = false` if you'd rather it not appear at all.
+- **To actually use PCC, you must enable a capability — and that is on you,
+  the developer, not your users.** PCC requires the
+  `com.apple.developer.private-cloud-compute` entitlement, which Apple assigns
+  to **your developer account**. Steps:
+  1. Be enrolled in the **App Store Small Business Program** with **< 2 million**
+     first-time App Store downloads (PCC is free within these limits).
+  2. **Request the entitlement** at
+     <https://developer.apple.com/contact/request/private-cloud-compute/>;
+     Apple assigns it to your account/team.
+  3. **Register the capability and re-provision** (full walkthrough below), so
+     `com.apple.developer.private-cloud-compute` ships in your signed app.
+- Your **end users** need nothing beyond the usual Apple Intelligence
+  prerequisites; the entitlement lives in your signed app, not on their side.
+  PCC has a per-user **daily quota** — when it runs out, Volta surfaces it as a
+  recoverable error and the chain steps down automatically.
+
+The demo apps (`Examples/iOSDemo`, `Examples/macOSDemo`) are wired for this as
+**opt-in**: they build for everyone with PCC showing *unavailable*, and you
+flip it on by adding the capability with your own entitled team (see each
+demo's `project.yml`). The macOS demo's developer pane also has a **Private
+Cloud Compute toggle** so you can watch the chain react.
+
+### Registering the capability & provisioning profile
+
+The entitlement is *restricted*: you can't just type it into an `.entitlements`
+file — the App ID must be authorized for it, which only works once Apple has
+assigned PCC to your team (step 2). After that:
+
+**Automatic signing (simplest).**
+1. Xcode → your **target → Signing & Capabilities**.
+2. Set **Team** to the account Apple granted PCC to, with **Automatically
+   manage signing** checked.
+3. Click **+ Capability** and add **Private Cloud Compute**. Xcode adds
+   `com.apple.developer.private-cloud-compute` to your `.entitlements`, enables
+   the capability on the App ID, and regenerates the provisioning profile for
+   you.
+4. Build to a real Apple-Intelligence device (or an Apple-silicon Mac on
+   macOS 27). If signing fails with *"provisioning profile doesn't support the
+   Private Cloud Compute capability"*, the grant (step 2) hasn't propagated to
+   that App ID yet — hit **Try Again**, or use the manual route below.
+
+**Manual signing / CI.**
+1. At <https://developer.apple.com> → **Certificates, Identifiers & Profiles →
+   Identifiers**, open your **App ID** and enable the **Private Cloud Compute**
+   capability, then **Save**.
+2. Under **Profiles**, edit/regenerate the provisioning profile for that App ID
+   (it now includes the capability) and **download** it; double-click to
+   install (or let Xcode download it).
+3. Add `com.apple.developer.private-cloud-compute` (`Boolean = YES`) to your
+   app's `.entitlements`, set `CODE_SIGN_ENTITLEMENTS` to it, and sign with the
+   regenerated profile.
+
+**Verifying.** PCC `availability`/`quotaUsage` read fine even without the
+entitlement — but the *first generation traps* if the entitlement is missing.
+Volta guards against that (it checks the running binary's entitlements via
+`SecTask` and reports the provider *unavailable* instead of crashing), so the
+quickest confidence check is: with the capability added, the
+`private-cloud-compute` row turns **available** and answers at privacy level
+`appleCloud`. Testing is allowed via **TestFlight or ad-hoc distribution**, and
+test installs do **not** count toward the 2M-download limit.
 
 ## Installation (Swift Package Manager)
 
@@ -43,7 +117,7 @@ runtime: if absent, Volta excludes it and explains why).
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/deruloop/VoltaSDK.git", from: "0.3.4")
+    .package(url: "https://github.com/deruloop/VoltaSDK.git", from: "0.3.5")
 ]
 ```
 
@@ -56,9 +130,10 @@ UI.
 Add Local… → select the package folder. Note: a local dependency always uses
 the working copy; version tags don't apply.
 
-The current version is **0.3.4** (see [CHANGELOG.md](CHANGELOG.md)). VoltaSDK
-is in active development: 0.x minor versions may evolve the API; **1.0.0 will
-mark the complete feature set**.
+The latest released version is **0.3.5** (see [CHANGELOG.md](CHANGELOG.md)).
+VoltaSDK is in active development: 0.x minor versions may evolve the API. The
+iOS 27 line on this branch (Private Cloud Compute and beyond) is unreleased and
+will become **1.0.0**, which marks the complete feature set.
 
 ## Usage
 
@@ -73,6 +148,9 @@ import VoltaSDK
 
 AIOrchestrator.configure {
     $0.enableOnDevice = true
+    // Private Cloud Compute (iOS/macOS 27). On by default; harmless without the
+    // entitlement (reported unavailable, never crashes). See the PCC section.
+    $0.enablePrivateCloudCompute = true
     // Works with an OpenAI, Claude, or Gemini key — auto-detected:
     $0.developerKey = Bundle.main.object(forInfoDictionaryKey: "AI_API_KEY") as? String
     // Optional. The model name belongs to the key's vendor; nil = the
@@ -186,12 +264,15 @@ didn't configure never appear; unavailable ones show their reason.
 
 **Initial state — the gate invariant.** Nothing is ever committed without
 passing through `onSelection`. When the `selection` binding starts `nil`, the
-selector auto-selects the **on-device model** if available — the only
-provider with no business gate behind it (free, private, no account) — and
-even that attempt runs through your handler. Cloud providers are **never
-preselected**: your configuration preference must not look like a user
-activation when a subscription (or another gate) sits behind it. A non-`nil`
-initial binding (e.g. a persisted user choice) is never overridden.
+selector auto-selects the best available **gate-free** provider — on-device,
+or **Private Cloud Compute** when on-device is off/unavailable (both free,
+private, no account) — in the chain's preference order, and even that attempt
+runs through your handler. Gated providers (developer-key and user-account
+vendors) are **never preselected**: your configuration preference must not look
+like a user activation when a subscription or OAuth gate sits behind it. When
+no gate-free provider is available, nothing is selected and the row shows
+"Choose a model". A non-`nil` initial binding (e.g. a persisted user choice) is
+never overridden.
 
 The default labels make **no business assumptions** — only you know whether
 the cloud model is "included with Pro", metered, or free. Brand the rows via
@@ -247,16 +328,16 @@ core's `providerStatuses()` and `respondDetailed()`.
 
 ## Demo apps
 
-**macOS:**
+Both demos are signed Xcode apps sharing the same UI (`VoltaSDKDemoUI`), so
+they behave identically and can both exercise Private Cloud Compute when you
+opt in (see above):
 
-```bash
-swift run VoltaSDKDemo
-```
+- **iPhone / iPad:** `Examples/iOSDemo/iOSDemo.xcodeproj`
+- **macOS:** `Examples/macOSDemo/macOSDemo.xcodeproj`
 
-**iPhone / iPad:** open `Examples/iOSDemo/iOSDemo.xcodeproj` and Run on a
-device or on a simulator with an iOS 26 runtime. On a device with Apple
-Intelligence the on-device provider is real; otherwise the list shows the
-unavailability reason and the fallback switches to the developer key.
+Open the project, set the signing **Team** to your own, and Run. On a device
+with Apple Intelligence the on-device provider is real; otherwise the list
+shows the unavailability reason and the fallback switches to the developer key.
 
 The demo mirrors a real integration's two roles: a **Developer** side
 (configuration, privacy policy, a simulated subscription entitlement) and a
@@ -270,7 +351,7 @@ activation.
 ## Tests
 
 ```bash
-swift test   # 41 tests: fallback, privacy, conversations, tokens, parsing
+swift test   # 44 tests: fallback, privacy, conversations, tokens, PCC wiring, parsing
 ```
 
 ## For framework contributors
@@ -278,7 +359,8 @@ swift test   # 41 tests: fallback, privacy, conversations, tokens, parsing
 Internal documentation lives in `docs/`:
 - [docs/iOS26-Implementation.md](docs/iOS26-Implementation.md) — how the
   iOS 26 / 26.4 base is implemented (decisions, stable API, verification).
-- [docs/iOS27-Design.md](docs/iOS27-Design.md) — the design of the iOS 27
-  extension (not yet implemented).
-- [docs/iOS27-OpenQuestions.md](docs/iOS27-OpenQuestions.md) — the open
-  questions gating the iOS 27 implementation.
+- [docs/iOS27-Design.md](docs/iOS27-Design.md) — the iOS 27 extension: design
+  plus what's verified against the real SDK (§8). Private Cloud Compute is
+  implemented; user-account providers and the Dynamic Profiles bridge are next.
+- [docs/iOS27-OpenQuestions.md](docs/iOS27-OpenQuestions.md) — the remaining
+  open questions for the iOS 27 work.

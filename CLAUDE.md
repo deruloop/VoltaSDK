@@ -61,11 +61,39 @@ questions doc into the design doc; release → CHANGELOG + state here.
   simulator, and signed for a physical iPhone. First adoption in the author's
   app is in progress. The 26.4 token-aware tier lights up by itself at
   runtime; on 26.0–26.3 context handling stays reactive-only, by design.
-- **iOS 27: designed, NOT implemented — zero iOS 27 code exists.** The design
-  is substantial (see `docs/iOS27-Design.md`: founding decisions, provider
-  table, tiering strategy D14, implementation order) but implementation is
-  blocked on (a) the open questions in `docs/iOS27-OpenQuestions.md` and
-  (b) the iOS 27 SDK, without which nothing compiles.
+- **iOS 27: implementation STARTED on `xcode27` (June 2026).** The hard gate
+  is cleared — Xcode 27 beta (27A5209h) + iOS 27.0 SDK are installed at
+  `~/Downloads/Xcode-beta.app` (build with
+  `DEVELOPER_DIR=~/Downloads/Xcode-beta.app/Contents/Developer swift build|test`;
+  the machine's default `xcode-select` is still Command Line Tools). The
+  package builds and tests green on the beta (Swift 6.4, macOS 27 SDK on the
+  host, **44 tests in 9 suites**). First provider shipped on the branch:
+  **`PrivateCloudComputeProvider`** (`@available(iOS 27, *)`, wired into
+  `buildProviders` at one gate per D14, default-on via
+  `enablePrivateCloudCompute`, placed between on-device and the developer key
+  in the two `prefer` chains). **Validated end-to-end on the M2 host (macOS 27):
+  with the entitlement assigned to the account, PCC answers live at privacy
+  `appleCloud`.** Key runtime findings folded in: the required entitlement is
+  `com.apple.developer.private-cloud-compute` (developer-side; requested via
+  Apple's form, Small Business Program + <2M downloads); `availability` is NOT
+  entitlement-aware and a missing entitlement *traps* (uncatchable) on first
+  `respond`, so the provider gates on a `SecTask` self-check and degrades to a
+  graceful skip (matters because PCC is default-on — adopting VoltaSDK never
+  forces the entitlement). High-priority open questions answered from the SDK
+  and folded into `docs/iOS27-Design.md` §8 (Q1–Q7, Q9–Q11, Q14); what remains
+  (`docs/iOS27-OpenQuestions.md`: Q8, Q12–Q13, Q15–Q17) needs external accounts,
+  a separate package, or more runtime poking — not API shape.
+- **Demos restructured (June 2026): one signed Xcode app per platform.**
+  Dropped the unsigned `swift run VoltaSDKDemo` executable (a `swift run` binary
+  can't carry the PCC entitlement) and added **`Examples/macOSDemo`** — the
+  signed macOS twin of `Examples/iOSDemo`, same shared `VoltaSDKDemoUI` chat UI.
+  Both treat PCC as **opt-in** (build for everyone, PCC unavailable; enable live
+  PCC by adding the capability with your own entitled team). The transitional
+  `Examples/macOSPCCTest` was folded into `macOSDemo`. **XcodeGen 2.33 caveat:**
+  it emits local packages as a legacy folder reference that Xcode 27 rejects
+  ("Missing package product"); both demo `.xcodeproj` are hand-patched to use
+  `XCLocalSwiftPackageReference` and are the source of truth — re-apply that fix
+  if you regenerate.
 - **Git: remote is `https://github.com/deruloop/VoltaSDK.git` (public).**
   Branching strategy (user decision, June 2026):
   - **`main`** = the iOS 26 line. Stays at `0.3.x` (now `0.3.5`), builds on
@@ -82,23 +110,47 @@ questions doc into the design doc; release → CHANGELOG + state here.
     adopters on older Xcode pin to `0.3.5`. SemVer covers the rest.
 
 ### ACTIVE WORK — iOS 27, resume here (June 2026)
-Decided to implement iOS 27 by **learn-by-building** against the real SDK
-(better than docs/memory for API-shape questions). Next steps, in order:
-1. **On the new PC, install the Xcode 27 beta + iOS 27 SDK** (this machine
-   had only iOS 26.5). Verify with `xcodebuild -showsdks`. **Nothing iOS 27
-   compiles until this exists** — hard gate.
-2. `git switch xcode27`. Scaffold `Examples/iOS27Demo` (a standalone demo
-   target allowed to require the beta; keep the core package clean for now).
-3. Build outward in `docs/iOS27-Design.md` §6 order: the public
-   `LanguageModel` protocol conformance first (writing it empirically
-   answers open questions Q9/Q5/Q10), then a **structural**
-   `PrivateCloudComputeProvider` (wire the shape; leave quota/error mapping
-   as a TODO — Q1–Q4 need a real Apple-Intelligence device + the PCC
-   entitlement to observe, NOT discoverable by compiling), then user-account
-   Gemini/Claude.
-4. As each `docs/iOS27-OpenQuestions.md` item gets a verified answer, fold it
-   into `docs/iOS27-Design.md` and delete it from the questions file (mark
-   answers "observed in iOS 27 beta N — verify at GA"; betas churn).
+Implementing iOS 27 by **learn-by-building** against the real SDK. Done so far
+on `xcode27`: hard gate cleared; SDK read directly (the `.swiftinterface` is
+the source of truth — see `docs/iOS27-Design.md` §8); high-priority open
+questions answered; **`PrivateCloudComputeProvider`** built, wired, unit-tested,
+and **validated live on the M2 host (macOS 27) with the entitlement assigned**;
+demos restructured to one signed Xcode app per platform (`iOSDemo` + new
+`macOSDemo`), PCC opt-in; public README documents the PCC entitlement.
+
+Note on the earlier plan: it expected to scaffold `Examples/iOS27Demo` and
+leave the core "clean," and to treat the PCC provider as a stub because Q1–Q4
+"need a device." Reading the `.swiftinterface` made the API shape (incl. the
+full quota/error surface) discoverable *by compiling*, so the PCC provider went
+straight into the core target behind a type-level `@available` gate (the D14
+end state). Only the runtime *values/behaviour* still need a device.
+
+Next steps, in order:
+1. **User-account Gemini/Claude** via the `LanguageModel` + `Executor` pattern
+   (§8): each is a `LanguageModel` whose `Executor.respond(…streamingInto:)`
+   drives the existing `AnthropicProvider`/`GeminiProvider` REST clients
+   (translate transcript in / fragments out). First check whether the
+   Utilities Chat-Completions `LanguageModel` (Q8, separate open-source
+   package) covers this before hand-writing an executor. Wire into
+   `buildProviders` at the same single gate; OAuth attaches via
+   `ModelSelector`'s existing `activation` hook.
+2. **`preferred(_ need:) -> any LanguageModel`** bridge (D1/D9): evolve
+   `resolveProvider()` to return Apple's `LanguageModel` (confirmed feedable to
+   `.model(_:)` and `LanguageModelSession(model:)`, §8) for native Dynamic
+   Profiles. Needs each VoltaSDK provider to expose/wrap an `any LanguageModel`.
+3. **Per-need fallback chain** (`.lightweight/.reasoning/.largeContext`),
+   keeping `ModelPreference` at 4 cases (a third tier makes the closed enum
+   combinatorial).
+4. **Follow-up surfaced by §8:** generalize the D13 `contextSize` capability
+   from sync `Int?` to an async read, so PCC/cloud models can join the
+   proactive token pre-flight (today PCC opts out → reactive only).
+5. **Deeper PCC runtime validation:** live answering is confirmed (via
+   `Examples/macOSDemo`, signed with the granted entitlement). Still to observe
+   on a device: real quota-exhaustion (`.quotaLimitReached` → `.rateLimited`
+   mapping) and `serviceUnavailable`, then fold Q15 (dev vs prod quotas) and
+   any Q12/Q13 findings into the design doc. Confirmed so far: `availability`/
+   `quotaUsage` read fine *without* the entitlement, but the first `respond`
+   traps if it's absent — hence the provider's `SecTask` self-gate.
 
 Design decision already recorded under D7 in `docs/iOS27-Design.md`:
 **`.largeContext` is REACTIVE, not preemptive** — it reorders the chain to
@@ -135,18 +187,22 @@ overflow, never inferred from the need.
 5. ~~Multi-turn~~ ✅ (D12) — still open, lower priority: KV-cache/`Transcript`
    reuse when the provider didn't change between turns; trimming hook pairs
    with `contextUsage`.
-6. **iOS 27 providers** (PCC, then Gemini/Claude) — blocked, see
-   `docs/iOS27-Design.md` §7.
+6. **iOS 27 providers** — PCC ✅ (xcode27, structural; runtime unverified);
+   user-account Gemini/Claude next via the `LanguageModel`+`Executor` pattern
+   (`docs/iOS27-Design.md` §6/§8). Was blocked; SDK now in hand.
 7. **Per-need fallback chain** (`.lightweight/.reasoning/.largeContext`) —
-   blocked with 6.
-8. **`preferred(_ need:)` bridge** for Dynamic Profiles — blocked with 6.
+   unblocked with 6; not started.
+8. **`preferred(_ need:)` bridge** for Dynamic Profiles — unblocked with 6
+   (returns `any LanguageModel`, feedable to `.model(_:)`, §8); not started.
 9. ~~Model picker component~~ ✅ (June 2026): `ModelSelector` in VoltaSDKUI —
    collapsed user-side picker; selection answered by the app with
    `.activate`/`.deny`/`.deferred` (deferred = app-owned flow commits later
    via the binding — the iOS 27 OAuth-page pattern). Gate invariant: nothing
-   commits without `onSelection` — auto-selects on-device only (the sole
-   gate-free provider); cloud is never preselected. iOS 27 providers will
-   appear in it automatically once wired into `buildProviders`.
+   commits without `onSelection` — auto-selects the best available **gate-free**
+   provider (on-device, or PCC when on-device is off/unavailable; `isGateFree`
+   = `{.onDevice, .privateCloudCompute}`), in chain order; gated providers
+   (developer-key, user-account) are never preselected. iOS 27 providers appear
+   automatically once wired into `buildProviders`; PCC has a default label.
 10. **Fetch model lists from vendor APIs** (OpenAI/Anthropic `GET /v1/models`,
     Gemini `ListModels`): once a key is entered, populate a model picker for
     the developer instead of a free-text field. Complements D15.

@@ -44,14 +44,16 @@ File map:
 │   │   ├── ProviderStatusList.swift       // fallback-chain status list (+ public Row)
 │   │   ├── ModelSelector.swift            // USER-side collapsed picker + onSelection hook (+ public Row)
 │   │   └── AIPlaygroundView.swift         // conversational playground with provenance
-│   ├── VoltaSDKDemoUI/                    // demo UI shared macOS+iOS (adaptive layout)
-│   │   └── DemoRootView.swift             // HSplitView on macOS, TabView on iOS
-│   └── VoltaSDKDemo/                      // macOS bootstrap: `swift run VoltaSDKDemo`
-│       └── DemoApp.swift
+│   └── VoltaSDKDemoUI/                    // demo UI shared macOS+iOS (adaptive layout)
+│       └── DemoRootView.swift             // HSplitView on macOS, TabView on iOS
 ├── Examples/iOSDemo/                      // iPhone/iPad demo app (Xcode project)
 │   ├── project.yml                        // XcodeGen spec (carries DEVELOPMENT_TEAM)
 │   ├── iOSDemo.xcodeproj
 │   └── Sources/iOSDemoApp.swift           // @main wrapper around DemoRootView
+├── Examples/macOSDemo/                    // macOS demo app (signed Xcode project, same UI)
+│   ├── project.yml
+│   ├── macOSDemo.xcodeproj
+│   └── Sources/macOSDemoApp.swift         // @main wrapper around DemoRootView
 └── Tests/VoltaSDKTests/
     └── VoltaSDKTests.swift                // fallback, privacy, history, tokens, parsing
 ```
@@ -338,7 +340,7 @@ is why we never built a role abstraction that would now be in the way.
   token pre-flight incl. response reserve and the no-capability case (D13),
   context-usage reporting, OpenAI window table + estimate,
   global configure, Retry-After parsing.
-- `swift run VoltaSDKDemo` — macOS test UI.
+- **macOS demo:** open `Examples/macOSDemo/macOSDemo.xcodeproj` and run.
 - **iOS demo:** open `Examples/iOSDemo/iOSDemo.xcodeproj` and run on an
   iPhone/iPad (or simulator with an iOS 26 runtime — Xcode 26.6 ships iPhone 17
   family simulators). The project was generated with XcodeGen from

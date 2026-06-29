@@ -5,6 +5,65 @@ All notable changes to this package. Versioning: [SemVer](https://semver.org).
 evolve the API. **1.0.0 will mark the complete feature set**, including the
 iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
 
+## [Unreleased] — iOS 27 extension (`xcode27` branch)
+
+> Work toward the `1.0` line. Requires **Xcode 27** (iOS 27 SDK) to build;
+> `@available(iOS 27, *)` keeps the deployment target at iOS 26, so adopters on
+> Xcode 26.4 keep using `0.3.5`. Not yet released.
+
+- **Private Cloud Compute provider (D6).** New `PrivateCloudComputeProvider`
+  wraps `PrivateCloudComputeLanguageModel` behind the existing `ModelProvider`
+  surface: Apple's free "powered" tier — no key, no account, a per-user daily
+  quota — at privacy level `.appleCloud` (between on-device and the developer
+  key). `availability()` reads the quota **proactively** (`quotaUsage`) and
+  pre-skips an exhausted PCC; a quota that runs out mid-call surfaces as the
+  recoverable `.rateLimited(retryAfter:)` (from the quota's `resetDate`), so the
+  chain steps down automatically. Enabled by default via
+  `AIConfiguration.enablePrivateCloudCompute`; joins the `.preferOnDevice` /
+  `.preferDeveloperKey` chains, never the strict `…Only` modes. Wired into
+  `buildProviders` at a single type-level `@available` gate (D14). New
+  `ProviderIdentifier.privateCloudCompute`. **Validated end-to-end on an M2
+  Mac (macOS 27): with the entitlement assigned, PCC answers live at privacy
+  level `appleCloud`.**
+- **Entitlement safety.** Calling PCC without the
+  `com.apple.developer.private-cloud-compute` entitlement is a *fatal trap* in
+  the framework (not a catchable error), and `availability` does not reflect a
+  missing entitlement. Since PCC is default-on, `availability()` now verifies
+  the running binary carries the entitlement (`SecTask` self-check) and reports
+  `.unavailable` when it does not — a missing entitlement degrades to a graceful
+  fallback instead of crashing the app. Confirmed against macOS 27 beta.
+- **Internal:** transcript construction shared between the on-device and PCC
+  providers in a new `FoundationModelsTranscript` helper (no behaviour change
+  for on-device).
+- The high-priority iOS 27 open questions are now answered directly from the
+  iOS 27 SDK and documented in `docs/iOS27-Design.md` §8.
+- **`ModelSelector` now auto-selects PCC (VoltaSDKUI).** The gate-free
+  auto-select candidate was hardcoded to on-device, so with on-device disabled
+  the selector picked nothing even when Private Cloud Compute was available.
+  Generalized to the best available **gate-free** provider in chain order
+  (`isGateFree` = on-device or PCC); gated providers stay non-preselected, and
+  with none available the row shows "Choose a model". Added a default label for
+  PCC. The demo's `onSelection` treats PCC as free (no paywall).
+- **PCC access documented (Q14).** The entitlement is developer-side
+  (`com.apple.developer.private-cloud-compute`), requested from Apple
+  (App Store Small Business Program, < 2M downloads); adopting VoltaSDK without
+  PCC requires nothing. See the README's Private Cloud Compute section.
+- **Demo apps restructured — one signed Xcode app per platform.** Removed the
+  unsigned `swift run VoltaSDKDemo` executable (a `swift run` binary can't carry
+  the PCC entitlement) and added **`Examples/macOSDemo`**, the signed macOS
+  counterpart to `Examples/iOSDemo`, running the same shared `VoltaSDKDemoUI`
+  chat UI. Both demos treat PCC as **opt-in**: they build for everyone with PCC
+  unavailable, and you enable live PCC by adding the capability with your own
+  entitled team. (The transitional `Examples/macOSPCCTest` was folded into
+  `macOSDemo`.) The shared developer pane gained a **Private Cloud Compute
+  toggle** (`AIConfiguration.enablePrivateCloudCompute`) alongside the on-device
+  toggle. `VoltaSDKDemoUI` library is otherwise unchanged.
+
+## [0.3.5] — 2026-06-13
+
+- Documentation only, no code changes: the SPM installation snippet now uses
+  the real public repository URL.
+
 ## [0.3.4] — 2026-06-13
 
 - Documentation only, no code changes: the public README no longer
