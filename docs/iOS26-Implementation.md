@@ -29,29 +29,42 @@ File map:
 ├── docs/                                  // internal sources (this file & co.)
 ├── Sources/
 │   ├── VoltaSDK/                          // CORE — no UI dependency, ever
-│   │   ├── ModelProvider.swift            // protocol + identifiers + statuses + typed errors
+│   │   ├── ModelProvider.swift            // protocol + identifiers + statuses + typed errors (D13/D16 capabilities)
 │   │   ├── ChatTurn.swift                 // app-supplied conversation turn (D12)
 │   │   ├── PrivacyDisclosure.swift        // downgrade event + disclosure policy
 │   │   ├── CloudVendor.swift              // vendor detection + defaults + doc links (D15)
 │   │   ├── OnDeviceProvider.swift         // wraps SystemLanguageModel, maps GenerationError
-│   │   ├── OpenAIProvider.swift           // Chat Completions (Codable, typed errors)
-│   │   ├── AnthropicProvider.swift        // Claude Messages API (x-api-key, no temperature)
-│   │   ├── GeminiProvider.swift           // Gemini generateContent (x-goog-api-key)
-│   │   ├── AIOrchestrator.swift           // orchestrator + config + fallback + resolution
+│   │   ├── OpenAIProvider.swift           // Chat Completions (Codable, typed errors, SSE streaming)
+│   │   ├── AnthropicProvider.swift        // Claude Messages API (x-api-key, no temperature, SSE streaming)
+│   │   ├── GeminiProvider.swift           // Gemini generateContent (dual transport, SSE streaming)
+│   │   ├── AIOrchestrator.swift           // orchestrator + config + fallback + resolution + streaming
+│   │   ├── ServerSentEvents.swift         // shared SSE parser (D16)
+│   │   ├── SessionStreaming.swift         // session snapshots → deltas for session-backed providers (D16)
+│   │   ├── SessionCache.swift             // warm-session reuse for session-backed providers (D17)
+│   │   ├── FoundationModelsTranscript.swift // ChatTurn ↔ native Transcript (public: the D12↔profile glue)
+│   │   ├── PrivateCloudComputeProvider.swift // PCC (iOS 27, D6/D14; SecTask entitlement gate)
+│   │   ├── CloudAccountLanguageModel.swift  // iOS 27 front door: vendor REST as LanguageModel+Executor
+│   │   ├── LanguageModelProvider.swift    // wraps any LanguageModel into the chain (iOS 27)
+│   │   ├── LanguageModelBridge.swift      // LanguageModelConvertible + preferred() conformances (D1, iOS 27)
+│   │   ├── ProviderError+LanguageModel.swift // shared LanguageModelError → ProviderError mapping
 │   │   └── Mocks.swift                    // MockProvider (public, for adopters' tests too)
+│   ├── VoltaSDKAuth/                      // OPT-IN OAuth machinery (PKCE, Keychain, refresh) — not in core
 │   ├── VoltaSDKUI/                        // OPTIONAL SwiftUI components (separate product)
 │   │   ├── PrivacyLevelBadge.swift        // badge for a PrivacyLevel
 │   │   ├── ProviderStatusList.swift       // fallback-chain status list (+ public Row)
 │   │   ├── ModelSelector.swift            // USER-side collapsed picker + onSelection hook (+ public Row)
-│   │   └── AIPlaygroundView.swift         // conversational playground with provenance
-│   ├── VoltaSDKDemoUI/                    // demo UI shared macOS+iOS (adaptive layout)
-│   │   └── DemoRootView.swift             // HSplitView on macOS, TabView on iOS
-│   └── VoltaSDKDemo/                      // macOS bootstrap: `swift run VoltaSDKDemo`
-│       └── DemoApp.swift
+│   │   └── AIPlaygroundView.swift         // playground with provenance + optional PlaygroundEngine driver
+│   └── VoltaSDKDemoUI/                    // demo UI shared macOS+iOS (adaptive layout)
+│       ├── DemoRootView.swift             // HSplitView on macOS, TabView on iOS
+│       └── ProfileEngine.swift            // iOS 27: native Dynamic Profile as the playground's 2nd driver
 ├── Examples/iOSDemo/                      // iPhone/iPad demo app (Xcode project)
 │   ├── project.yml                        // XcodeGen spec (carries DEVELOPMENT_TEAM)
 │   ├── iOSDemo.xcodeproj
 │   └── Sources/iOSDemoApp.swift           // @main wrapper around DemoRootView
+├── Examples/macOSDemo/                    // macOS demo app (signed Xcode project, same UI)
+│   ├── project.yml
+│   ├── macOSDemo.xcodeproj
+│   └── Sources/macOSDemoApp.swift         // @main wrapper around DemoRootView
 └── Tests/VoltaSDKTests/
     └── VoltaSDKTests.swift                // fallback, privacy, history, tokens, parsing
 ```
@@ -98,6 +111,22 @@ File map:
 - **`GeminiProvider`** — Gemini `generateContent` (`x-goog-api-key`, history
   roles are user/"model", `systemInstruction` top-level). Invalid key
   surfaces as 400 "API key not valid" → mapped to `.unauthorized`.
+  **Thinking models (2.5 and later, August 2026):** thinking tokens are spent
+  against `maxOutputTokens`, so the SDK's 1000-token default was consumed
+  entirely by thinking — a 200 OK candidate with no `content` and
+  `finishReason: MAX_TOKENS`, i.e. an "empty response" (observed live with
+  `gemini-3.6-flash`). Fixed on three levels: the request asks for
+  `maxTokens + thinkingHeadroom(forModel:)` (4096 from 2.5 on, 0 for 1.x/2.0)
+  because `maxTokens` means *tokens of answer*, and raising the ceiling costs
+  nothing — the model thinks and bills either way, the cap only decides
+  whether the answer survives; extraction joins ALL parts and skips
+  `thought: true` summaries instead of reading `parts.first`; and a textless
+  answer is diagnosed by `emptyAnswerError(finishReason:blockReason:thoughtTokens:)`
+  (MAX_TOKENS → actionable `.api`, SAFETY/blocked prompt →
+  `.guardrailViolation`, clean STOP → `.emptyResponse`), on the buffered and
+  streamed paths alike. Response DTOs are fully optional for the same reason:
+  a candidate that produced nothing carries no `content` at all, and decoding
+  must survive it to report why.
 - **`CloudVendor`** (D15) — which vendor a developer key belongs to:
   auto-detected from the key prefix (`sk-ant-` → Anthropic, `AIza` → Gemini,
   `sk-` → OpenAI; order matters), overridable via
@@ -247,9 +276,70 @@ makes sense for the vendor that issued the key. Rationale: D4 frames the dev
 key as "AI included in the app's subscription" — which vendor backs it is the
 developer's business decision, and the framework shouldn't privilege one.
 Implementation notes: Anthropic sends no `temperature` (Opus 4.7+ 400s on
-sampling params); every vendor has list-models endpoints (OpenAI/Anthropic
+sampling params); **vendor defaults are perishable** — Google retired
+`gemini-2.5-flash` for new accounts in August 2026 ("no longer available to
+new users"), so `CloudVendor.defaultModel` moved to `gemini-3.6-flash`; every
+vendor has list-models endpoints (OpenAI/Anthropic
 `GET /v1/models`, Gemini `ListModels`) — fetching them to populate a model
 picker is a roadmap item, not yet built.
+
+### D16 — Streaming as an optional capability, fallback until the first fragment
+`streamResponse` on `ModelProvider` is an optional capability in the D13
+idiom: the protocol default buffers `respond` and delivers the whole answer
+as ONE fragment, so every provider — including adopters' custom ones — can
+take part in a streamed chain without code changes; providers with a native
+path override it with real token deltas. All five built-ins override it:
+OpenAI/Anthropic/Gemini via SSE (`"stream": true`; Gemini's
+`streamGenerateContent?alt=sse` on the Developer API transport only — the
+Code Assist OAuth envelope stays buffered), on-device/PCC/`LanguageModelProvider`
+via the session's native `streamResponse` with cumulative snapshots converted
+to deltas (`SessionStreaming`). The orchestrator's `streamResponse` /
+`streamDetailed` run the same chain walk as `respond` (availability,
+pre-flight, privacy gate), with one rule: **automatic fallback applies only
+until the first fragment reaches the caller** — after any text is visible, a
+failure surfaces as an error. Rationale: silently re-answering with a
+different model would retract text the user already read; a pre-first-token
+failure is indistinguishable from the buffered case, so the chain still steps
+down silently there. Privacy disclosure keeps firing BEFORE any data is sent,
+never mid-stream. Fragments are deltas (concatenation = full answer);
+`.began(provider:privacyLevel:)` precedes the first fragment as the streamed
+counterpart of `AIResponse` provenance. Mid-stream vendor errors map like
+HTTP ones (Anthropic `overloaded_error` → transient network, `rate_limit_error`
+→ `.rateLimited`); on iOS 27 the `CloudAccountLanguageModel` executor forwards
+the same fragments into Apple's generation channel, closing the
+"single-fragment executor" gap from session 339.
+
+### D18 — Privacy downgrades are logged by default, not silent
+`PrivacyDisclosure` gains a `.log` case — the downgrade is recorded to the
+unified log (subsystem "VoltaSDK", category "privacy") — and it replaces
+`.silent` as the default everywhere. Rationale (self-criticism, Sep 2026): a
+privacy-first SDK whose default lets a journal entry silently fall through to
+an external vendor was the wrong default; logging reaches no end user,
+requires no handler, costs nothing, and makes the fallback visible in
+Console/Instruments during development. `.silent` remains available as an
+explicit opt-in. Behavior change within 0.x (allowed pre-1.0).
+
+### D17 — Warm-session reuse: verify the continuation, never assume it
+Rebuilding a session per call (the D12 discipline) re-processes the whole
+conversation prefix on every turn — a growing time-to-first-token tax on the
+session-backed providers (on-device, PCC, wrapped `LanguageModel`s; REST
+providers are untouched — HTTP chat APIs re-send history for everyone, so
+there is nothing to reuse). D17 removes the tax without touching D12's
+semantics: each session-backed provider holds a `SessionCache` with ONE warm
+session plus the exact conversation it has absorbed (instructions + history
++ every exchange completed since). A call reuses the warm session **iff its
+(instructions, history) equals that conversation exactly** — then only the
+new prompt is processed, matching a natively held Apple session. Any
+divergence (the app trimmed/edited history, new conversation, different
+instructions) is a miss: discard, rebuild from the app's history — the
+pre-D17 behaviour. The app still owns the history; the cache *verifies*
+continuation rather than assuming it, which is what keeps D12 honest.
+Bookkeeping: check-in only after a SUCCESSFUL, non-empty turn (an errored or
+mid-stream-failed session may hold an inconsistent transcript and is
+dropped); `checkOut` removes the entry, so concurrent calls can never share
+a session (the race loser builds fresh); a config change rebuilds providers
+→ cold caches. Scope: one session per provider — alternating between two
+conversations misses every time (no regression, just no benefit).
 
 ## 5. Public API that must stay stable
 
@@ -262,20 +352,32 @@ AIOrchestrator(providers: [any ModelProvider],      // tests / custom providers
                responseTokenReserve: Int)
 AIOrchestrator.active                               // configured shared instance
 
-// usage — history is app-owned conversation context (D12), defaults to []
-try await kit.respond(to: prompt, instructions: nil, history: []) -> String
-try await kit.respondDetailed(to:instructions:history:) -> AIResponse  // + provenance
-try await kit.resolveProvider() -> any ModelProvider            // the primitive (D9)
+// usage — history is app-owned conversation context (D12), defaults to [];
+// every entry point also takes `need: ModelNeed? = nil` (D7): a per-call
+// hint (.lightweight / .reasoning / .largeContext) that REORDERS the chain
+// for that call (tiers by privacy level; .largeContext sorts within-tier by
+// known window size and stays reactive — the D13 pre-flight does the routing)
+try await kit.respond(to: prompt, instructions: nil, history: [], need: nil) -> String
+try await kit.respondDetailed(to:instructions:history:need:) -> AIResponse  // + provenance
+await kit.streamResponse(to:instructions:history:need:) -> AsyncThrowingStream<String, Error>       // (D16)
+await kit.streamDetailed(to:instructions:history:need:) -> AsyncThrowingStream<AIStreamEvent, Error> // + provenance
+try await kit.resolveProvider(for: need) -> any ModelProvider   // the primitive (D9)
+try await kit.preferred(_ need: ModelNeed? = nil) -> any LanguageModel  // iOS 27: Dynamic Profiles bridge (D1/D7)
+enum ModelNeed { lightweight, reasoning, largeContext }         // (D7)
+FoundationModelsTranscript.entries(instructions:history:) -> [Transcript.Entry]  // ChatTurn → native transcript (D12↔profile glue)
+struct PlaygroundEngine { label, footnote, stream }  // VoltaSDKUI: app-supplied playground driver (D1)
 await kit.contextUsage(instructions:history:) -> ContextUsage?  // window pressure (D13)
 await kit.availableProviders() -> [ProviderIdentifier]
-await kit.providerStatuses() -> [ProviderStatus]                // for UI
+await kit.providerStatuses(for: need) -> [ProviderStatus]       // for UI; need previews D7 order
 
 // extension points
 protocol ModelProvider { identifier; privacyLevel; availability(); respond(to:instructions:history:);
+                         streamResponse(to:instructions:history:);               // defaulted: one fragment (D16)
                          contextSize; tokenCount(prompt:instructions:history:) }  // last two defaulted (D13)
+enum AIStreamEvent { began(provider:privacyLevel:), text(String) }               // (D16)
 enum ProviderError { ...; var isRecoverableByFallback: Bool }
 enum PrivacyLevel { external < appleCloud < onDevice }
-enum PrivacyDisclosure { silent, notify(…), askOnPrivacyChange(…), denyDowngrade }
+enum PrivacyDisclosure { silent, log /* default, D18 */, notify(…), askOnPrivacyChange(…), denyDowngrade }
 struct PrivacyDowngrade { from, to, provider }
 enum ModelPreference { preferOnDevice, preferDeveloperKey, onDeviceOnly, developerKeyOnly }
 enum CloudVendor { openAI, anthropic, gemini; detect(fromKey:); defaultModel; modelDocumentationURL } // (D15)
@@ -338,7 +440,7 @@ is why we never built a role abstraction that would now be in the way.
   token pre-flight incl. response reserve and the no-capability case (D13),
   context-usage reporting, OpenAI window table + estimate,
   global configure, Retry-After parsing.
-- `swift run VoltaSDKDemo` — macOS test UI.
+- **macOS demo:** open `Examples/macOSDemo/macOSDemo.xcodeproj` and run.
 - **iOS demo:** open `Examples/iOSDemo/iOSDemo.xcodeproj` and run on an
   iPhone/iPad (or simulator with an iOS 26 runtime — Xcode 26.6 ships iPhone 17
   family simulators). The project was generated with XcodeGen from

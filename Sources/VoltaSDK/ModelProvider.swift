@@ -24,7 +24,17 @@ public struct ProviderIdentifier: Hashable, Sendable, CustomStringConvertible {
     public static let openAI    = ProviderIdentifier("openai")
     public static let anthropic = ProviderIdentifier("anthropic")
     public static let gemini    = ProviderIdentifier("gemini")
-    // iOS 27: .privateCloudCompute, plus user-account variants of the above
+    /// Private Cloud Compute (iOS 27): Apple-hosted, free with a per-user
+    /// daily quota, no key. Sits between on-device and the developer key.
+    public static let privateCloudCompute = ProviderIdentifier("private-cloud-compute")
+
+    /// A user-account provider (iOS 27): the user's *own* OpenAI / Claude /
+    /// Gemini account, billed to them, reached through the public
+    /// `LanguageModel` protocol. Distinct from the developer-key providers
+    /// above so the chain and pickers can tell them apart.
+    public static func userAccount(_ vendor: CloudVendor) -> ProviderIdentifier {
+        ProviderIdentifier("user-\(vendor.rawValue)")
+    }
 }
 
 // MARK: - Privacy level
@@ -150,6 +160,19 @@ public protocol ModelProvider: Sendable {
         history: [ChatTurn]
     ) async throws -> String
 
+    // MARK: Optional capability: streaming (D16)
+
+    /// Streaming response: the reply as ordered text fragments (deltas, not
+    /// cumulative snapshots). The default implementation buffers `respond`
+    /// and delivers the whole answer as ONE fragment, so every provider can
+    /// take part in a streamed chain; providers with a native streaming path
+    /// override it with real token deltas.
+    func streamResponse(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn]
+    ) -> AsyncThrowingStream<String, Error>
+
     // MARK: Optional capability: token awareness (D13)
 
     /// Context window size in tokens, if known.
@@ -171,6 +194,30 @@ public extension ModelProvider {
     /// Convenience for one-shot calls (no conversation).
     func respond(to prompt: String, instructions: String?) async throws -> String {
         try await respond(to: prompt, instructions: instructions, history: [])
+    }
+
+    /// Default streaming (D16): the buffered answer as a single fragment.
+    /// Failure semantics match `respond` — an error before the fragment is
+    /// a pre-first-token failure, so the orchestrator's fallback still works.
+    func streamResponse(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn]
+    ) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    let text = try await respond(
+                        to: prompt, instructions: instructions, history: history
+                    )
+                    continuation.yield(text)
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
     }
 
     /// Default: capability unsupported. Existing custom providers keep

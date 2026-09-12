@@ -16,27 +16,39 @@
 import Foundation
 
 /// The cloud vendor a developer key belongs to.
-public enum CloudVendor: String, Sendable, CaseIterable {
+public enum CloudVendor: String, Sendable, CaseIterable, Identifiable {
     case openAI = "OpenAI"
     case anthropic = "Anthropic"
     case gemini = "Google Gemini"
 
+    public var id: String { rawValue }
+
     /// Best-effort detection from the key format:
-    /// `sk-ant-…` → Anthropic, `AIza…` → Google, `sk-…` → OpenAI.
+    /// `sk-ant-…` → Anthropic, `AIza…`/`AQ.…` → Google, `sk-…` → OpenAI.
     /// Order matters: the Anthropic prefix is a superset of OpenAI's.
+    /// `AQ.` is Google's new "Auth key" format (mid-2026 migration: AI Studio
+    /// now issues only these; `AIza` "Standard" keys are being phased out).
+    /// Whitespace/newlines are trimmed first — pasted keys routinely carry
+    /// them, and a stray space must not flip the vendor (observed live: a
+    /// valid Gemini key read as "unknown format").
     public static func detect(fromKey key: String) -> CloudVendor? {
+        let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
         if key.hasPrefix("sk-ant-") { return .anthropic }
-        if key.hasPrefix("AIza") { return .gemini }
+        if key.hasPrefix("AIza") || key.hasPrefix("AQ.") { return .gemini }
         if key.hasPrefix("sk-") { return .openAI }
         return nil
     }
 
     /// Model used when the developer doesn't specify one.
+    /// Vendors retire these: Gemini moved off `gemini-2.5-flash` in August
+    /// 2026 (the Developer API rejects it for accounts that never used it —
+    /// "no longer available to new users"), so the default is `3.6-flash`.
+    /// Adopters who need a specific model set `developerKeyModel`.
     public var defaultModel: String {
         switch self {
         case .openAI:    return "gpt-4o-mini"
         case .anthropic: return "claude-opus-4-8"
-        case .gemini:    return "gemini-2.5-flash"
+        case .gemini:    return "gemini-3.6-flash"
         }
     }
 

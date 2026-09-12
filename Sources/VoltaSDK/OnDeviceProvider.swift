@@ -14,6 +14,11 @@ public struct OnDeviceProvider: ModelProvider {
     public let identifier = ProviderIdentifier.onDevice
     public let privacyLevel = PrivacyLevel.onDevice
 
+    /// Warm-session reuse (D17): copies of this provider value share the one
+    /// cache, so consecutive turns of the same conversation skip re-processing
+    /// the whole prefix.
+    private let sessionCache = SessionCache()
+
     public init() {}
 
     public func availability() async -> ProviderAvailability {
@@ -32,13 +37,21 @@ public struct OnDeviceProvider: ModelProvider {
         instructions: String?,
         history: [ChatTurn]
     ) async throws -> String {
-        // A session is created per call (stateless, D12): the conversation
-        // history comes from the app and is rebuilt as a native Foundation
-        // Models Transcript.
-        let session = Self.makeSession(instructions: instructions, history: history)
+        // Warm-session reuse (D17): when the call continues exactly the
+        // conversation the cached session absorbed, only the new prompt is
+        // processed. Otherwise the session is rebuilt from the app-supplied
+        // history (stateless semantics, D12 — the cache verifies, never
+        // assumes).
+        let session = sessionCache.checkOut(instructions: instructions, history: history)
+            ?? Self.makeSession(instructions: instructions, history: history)
 
         do {
             let response = try await session.respond(to: prompt)
+            sessionCache.checkIn(
+                session,
+                instructions: instructions,
+                history: history + [.user(prompt), .assistant(response.content)]
+            )
             return response.content
         } catch let error as LanguageModelSession.GenerationError {
             throw Self.map(error)
@@ -47,6 +60,31 @@ public struct OnDeviceProvider: ModelProvider {
         } catch {
             throw ProviderError.generation(String(describing: error))
         }
+    }
+
+    // MARK: Streaming (D16)
+
+    /// Native token streaming via the session's `streamResponse`, with the
+    /// framework's cumulative snapshots converted to deltas (shared helper).
+    public func streamResponse(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn]
+    ) -> AsyncThrowingStream<String, Error> {
+        SessionStreaming.stream(
+            prompt: prompt,
+            instructions: instructions,
+            history: history,
+            cache: sessionCache,
+            makeSession: { Self.makeSession(instructions: instructions, history: history) },
+            mapError: { error in
+                if let generation = error as? LanguageModelSession.GenerationError {
+                    return Self.map(generation)
+                }
+                if error is CancellationError { return ProviderError.cancelled }
+                return ProviderError.generation(String(describing: error))
+            }
+        )
     }
 
     // MARK: Token awareness (D13)
@@ -65,7 +103,7 @@ public struct OnDeviceProvider: ModelProvider {
         history: [ChatTurn]
     ) async -> Int? {
         guard #available(iOS 26.4, macOS 26.4, *) else { return nil }
-        var entries = Self.transcriptEntries(instructions: instructions, history: history)
+        var entries = FoundationModelsTranscript.entries(instructions: instructions, history: history)
         if !prompt.isEmpty {
             entries.append(.prompt(Transcript.Prompt(
                 segments: [.text(Transcript.TextSegment(content: prompt))]
@@ -89,37 +127,8 @@ public struct OnDeviceProvider: ModelProvider {
             }
             return LanguageModelSession()
         }
-        let entries = transcriptEntries(instructions: instructions, history: history)
+        let entries = FoundationModelsTranscript.entries(instructions: instructions, history: history)
         return LanguageModelSession(transcript: Transcript(entries: entries))
-    }
-
-    /// Maps instructions + history (D12) into native `Transcript` entries.
-    /// Shared between session creation and token counting.
-    private static func transcriptEntries(
-        instructions: String?,
-        history: [ChatTurn]
-    ) -> [Transcript.Entry] {
-        var entries: [Transcript.Entry] = []
-        if let instructions, !instructions.isEmpty {
-            entries.append(.instructions(Transcript.Instructions(
-                segments: [.text(Transcript.TextSegment(content: instructions))],
-                toolDefinitions: []
-            )))
-        }
-        for turn in history {
-            switch turn.role {
-            case .user:
-                entries.append(.prompt(Transcript.Prompt(
-                    segments: [.text(Transcript.TextSegment(content: turn.text))]
-                )))
-            case .assistant:
-                entries.append(.response(Transcript.Response(
-                    assetIDs: [],
-                    segments: [.text(Transcript.TextSegment(content: turn.text))]
-                )))
-            }
-        }
-        return entries
     }
 
     /// Maps generation errors onto ProviderError, separating the cases the

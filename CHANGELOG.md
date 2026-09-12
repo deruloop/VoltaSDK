@@ -5,6 +5,265 @@ All notable changes to this package. Versioning: [SemVer](https://semver.org).
 evolve the API. **1.0.0 will mark the complete feature set**, including the
 iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
 
+## [1.0.0] — 2026-09-12 — the iOS 27 extension
+
+> The complete feature set. Requires **Xcode 27** (iOS 27 SDK) to build;
+> `@available(iOS 27, *)` keeps the deployment target at iOS 26, so adopters on
+> Xcode 26.4 keep using `0.3.5`. Validated against the iOS/macOS 27 beta
+> toolchain (27A5237l); a GA re-verify pass follows as a patch if anything
+> shifted.
+
+- **README brought current with the iOS 27 line.** Streaming, per-need
+  resolution, the Dynamic Profiles bridge, the `.log` disclosure default,
+  warm-session reuse, and the cross-vendor OAuth verdict (a user account
+  means the user's API key) now appear in the public README; test counts and
+  contributor notes refreshed.
+- **Per-need chains (D7): `ModelNeed`.** Every entry point
+  (`respond`/`respondDetailed`/`streamResponse`/`streamDetailed`/
+  `resolveProvider`/`preferred`) gains a per-call `need:` hint —
+  `.lightweight` (on-device → PCC → external), `.reasoning` (PCC → external
+  → on-device), `.largeContext` (PCC → external with larger known windows
+  first, on-device LAST — long-context work shouldn't lean on the small
+  on-device model; the D13 pre-flight still skips any window the measured
+  call exceeds). A need reorders the chain for one call, never replaces
+  it; ties keep the configured order; `ModelPreference` stays at 4 cases.
+  The D1 flagship is now real syntax:
+  `.model(orchestrator.preferred(.reasoning))`. `providerStatuses` gains a
+  `for need:` parameter — the chain in the order that need would walk it —
+  and the playground shows that preview live under its need picker
+  (unavailable providers in parentheses).
+- **Privacy downgrades are logged by default (D18).** New
+  `PrivacyDisclosure.log` case — downgrades are recorded to the unified log
+  (subsystem "VoltaSDK", category "privacy") — and it replaces `.silent` as
+  the default: a privacy-first SDK should never make cloud fallbacks
+  invisible by default. `.silent` remains as an explicit opt-in. Behavior
+  change within 0.x.
+- **Warm-session reuse (D17).** The session-backed providers (on-device,
+  PCC, wrapped `LanguageModel`s) now keep their last session warm: when the
+  next call continues exactly the same conversation (same instructions, same
+  app-supplied history including the last exchange), the session is reused
+  and only the new prompt is processed — matching the time-to-first-token of
+  a natively held Apple session, where before every turn re-processed the
+  whole prefix. Any divergence (trimmed/edited history, new conversation)
+  rebuilds as before — D12's app-owned-history semantics are unchanged, the
+  cache verifies continuation rather than assuming it. Errored or empty
+  turns never re-enter the cache; concurrent calls never share a session.
+  REST providers are unaffected (HTTP chat APIs re-send history for every
+  client, Apple's included).
+- **One chat, two drivers: the playground demos both consumption modes.**
+  `AIPlaygroundView` gains an optional app-supplied **`PlaygroundEngine`**
+  (label + footnote + a `streamDetailed`-shaped stream closure): when
+  present, a driver picker appears and the SAME conversation continues
+  across drivers — the history is app-owned (D12), so it replays into
+  either engine. The demo supplies `ProfileEngine` (iOS 27): a native
+  `LanguageModelSession.Profile` declared entirely in Apple's API whose
+  `.model(...)` is `orchestrator.preferred()`, re-resolved per turn (D7),
+  with the history replayed through `LanguageModelSession(profile:history:)`.
+  To make that replay possible for any adopter,
+  **`FoundationModelsTranscript.entries(instructions:history:)` is now
+  public** — the `[ChatTurn]` → `[Transcript.Entry]` glue between the two
+  modes. Documents two Swift 6 findings: `preferred()` is async vs.
+  synchronous profile modifiers (resolve-then-declare), and the session's
+  `sending profile:` parameter rejects profiles declared in `@MainActor`
+  context (isolation inheritance — built in a `nonisolated` helper).
+- **Dynamic Profiles bridge (D1): `preferred()`.** New
+  `AIOrchestrator.preferred() -> any LanguageModel` (iOS 27): resolves the
+  chain exactly like `resolveProvider()` (availability + `.denyDowngrade`)
+  and returns the winning provider's **native Apple `LanguageModel`** — ready
+  for `.model(orchestrator.preferred())` in a `DynamicProfile` or
+  `LanguageModelSession(model:)`. Backed by the new public
+  `LanguageModelConvertible` capability, adopted by all five built-ins:
+  on-device → `SystemLanguageModel.default`, PCC → its entitled model
+  (nil-gated so an unentitled process is skipped, never trapped), wrapped
+  user-account/custom models → themselves, developer-key OpenAI/Claude/Gemini
+  → a `CloudAccountLanguageModel` over the same REST client. Custom providers
+  can adopt the protocol to join; non-convertible ones are skipped. A
+  per-need overload (`preferred(_ need:)`) lands with the per-need chains.
+- **Streaming (D16).** New `streamResponse` / `streamDetailed` on
+  `AIOrchestrator`: the answer as ordered text deltas through the same
+  resolution-and-fallback chain as `respond`, with a `.began` provenance event
+  before the first fragment. Fallback rule: automatic fallback applies only
+  until the first fragment reaches the caller — visible text is never
+  retracted; after it, failures surface. `ModelProvider` gains an optional
+  `streamResponse` capability (default: the buffered answer as one fragment,
+  so existing custom providers keep working); all five built-ins stream
+  natively — OpenAI/Anthropic/Gemini over SSE (Gemini on the Developer API
+  transport; the Code Assist OAuth envelope stays buffered), on-device/PCC/
+  wrapped `LanguageModel`s via the session's native stream (cumulative
+  snapshots → deltas). On iOS 27 the `CloudAccountLanguageModel` executor now
+  forwards real deltas into the generation channel (closing the
+  single-fragment gap from session 339), and `AIPlaygroundView` renders
+  fragments as they arrive. New public type `AIStreamEvent`; `MockProvider`
+  gains `streamFragments`/`streamFailure` for testing streamed chains.
+  **Validated live** (`macOSDemo`, macOS 27 on an M2 host): PCC streams
+  (native session path), and a user-connected Gemini account streams through
+  the full iOS 27 front door — SSE deltas surviving the executor → generation
+  channel → session round-trip.
+- **Google's new `AQ.` Auth keys supported (D15).** Mid-2026, Google began
+  issuing Gemini API keys in a new `AQ.…` "Auth key" format (AI Studio now
+  issues only these; `AIza` "Standard" keys are being phased out). Detection
+  maps `AQ.` to Gemini, and `GeminiProvider` treats both formats as API keys
+  on the Developer API transport (the documented `x-goog-api-key` path, which
+  is also the SSE streaming path). Migration safety net: an `AQ.` key the
+  Developer API rejects with an auth error falls back to the Code Assist
+  transport as a Bearer credential (observed accepted live) — before the
+  first fragment only, per D16.
+- **Fix: the developer key is trimmed before detection and use.** A pasted
+  key with a stray space/newline made `CloudVendor.detect` read a valid
+  Gemini key as "unknown format" (falling back to OpenAI) and would have
+  broken the auth header. `detect(fromKey:)` and `buildCloudProvider` now
+  trim whitespace/newlines (observed live; regression-tested).
+- **Private Cloud Compute provider (D6).** New `PrivateCloudComputeProvider`
+  wraps `PrivateCloudComputeLanguageModel` behind the existing `ModelProvider`
+  surface: Apple's free "powered" tier — no key, no account, a per-user daily
+  quota — at privacy level `.appleCloud` (between on-device and the developer
+  key). `availability()` reads the quota **proactively** (`quotaUsage`) and
+  pre-skips an exhausted PCC; a quota that runs out mid-call surfaces as the
+  recoverable `.rateLimited(retryAfter:)` (from the quota's `resetDate`), so the
+  chain steps down automatically. Enabled by default via
+  `AIConfiguration.enablePrivateCloudCompute`; joins the `.preferOnDevice` /
+  `.preferDeveloperKey` chains, never the strict `…Only` modes. Wired into
+  `buildProviders` at a single type-level `@available` gate (D14). New
+  `ProviderIdentifier.privateCloudCompute`. **Validated end-to-end on an M2
+  Mac (macOS 27): with the entitlement assigned, PCC answers live at privacy
+  level `appleCloud`.**
+- **Entitlement safety.** Calling PCC without the
+  `com.apple.developer.private-cloud-compute` entitlement is a *fatal trap* in
+  the framework (not a catchable error), and `availability` does not reflect a
+  missing entitlement. Since PCC is default-on, `availability()` now verifies
+  the running binary carries the entitlement (`SecTask` self-check) and reports
+  `.unavailable` when it does not — a missing entitlement degrades to a graceful
+  fallback instead of crashing the app. Confirmed against macOS 27 beta.
+- **Entitlement safety, part 2 — gate at construction.** Observed live: in a
+  long-running unentitled app, merely *instantiating*
+  `PrivateCloudComputeLanguageModel` starts background status machinery that
+  eventually traps on a background thread (`EXC_BREAKPOINT`) — beyond the reach
+  of any call-site guard. The provider now runs the `SecTask` check at `init`
+  and never creates the model in an unentitled process (the entitlement is
+  signature-baked, so an init-time decision is sound). Fixes a crash where a
+  default-on PCC took down an unentitled app minutes into a session.
+- **Internal:** transcript construction shared between the on-device and PCC
+  providers in a new `FoundationModelsTranscript` helper (no behaviour change
+  for on-device).
+- The high-priority iOS 27 open questions are now answered directly from the
+  iOS 27 SDK and documented in `docs/iOS27-Design.md` §8.
+- **User-account cloud providers via the `LanguageModel` front door (iOS 27).**
+  The user's own OpenAI/Claude/Gemini account can join the fallback chain through
+  Apple's public `LanguageModel` protocol (WWDC session 339).
+  `CloudAccountLanguageModel` conforms via a `LanguageModelExecutor` that
+  decomposes the framework `Transcript` into VoltaSDK's `(instructions, history,
+  prompt)` shape and reuses the existing REST client (honouring per-call
+  `generationOptions`; mapping to built-in `LanguageModelError` where faithful).
+  `LanguageModelProvider` wraps any `LanguageModel` into the chain (via a
+  `LanguageModelSession`). New `AIConfiguration.userAccounts`/`UserAccount`,
+  `ProviderIdentifier.userAccount(_:)`, a "Your accounts" section in the demo,
+  and a friendly picker label. The credential is a **per-call token provider**
+  (static key, Keychain, or OAuth token) living on the model, off the hashable
+  executor config (session 339). *Foundation: the OAuth flow itself isn't wired;
+  no streaming/reasoning-level.* **Validated live (August 2026, beta
+  27A5237l): a user-connected Gemini account (API key) answered in the demo
+  through the full path — chain → `LanguageModelProvider` →
+  `LanguageModelSession` → the `CloudAccountLanguageModel` executor →
+  transcript decomposition → REST → response reassembled in the chat.*
+- **Managed OAuth for user accounts — new `VoltaSDKAuth` module.** Automates the
+  whole runtime sign-in so the developer's side is "register your app once →
+  paste a client ID → enable": `OAuthAccount` runs `ASWebAuthenticationSession`
+  + PKCE (RFC 7636), exchanges the code, stores the token in the Keychain, and
+  refreshes it silently; `OAuthConfiguration` carries the endpoints/client ID
+  the developer registered with the provider; `UserAccount(oauth:)` bridges it
+  into the chain (the executor's token-provider seam). Kept out of the headless
+  core because it uses AuthenticationServices/Keychain. *The one irreducible
+  step is the developer's: each app must be its own registered OAuth client
+  (client ID + redirect) — a shared/SDK-wide client is against provider terms.*
+  **Validated live against Google** (real client, real sign-in, token issued,
+  stored, refreshed) and hardened from what live testing surfaced: the session
+  completion is built `nonisolated` — `ASWebAuthenticationSession` invokes it
+  on a background XPC queue, and a main-actor-inherited closure traps at entry
+  under Swift 6's dynamic isolation checking (`EXC_BREAKPOINT` before any of
+  our code runs); continuation resumption is one-shot;
+  `OAuthConfiguration.additionalAuthorizationParameters` carries provider
+  quirks (Google: `access_type=offline` or no refresh token is ever issued,
+  `prompt=consent` to re-show granular consent); and granted scopes from the
+  token response are validated at sign-in — under-granting (granular consent,
+  stripped scopes) throws `scopesNotGranted(missing:granted:)` at the door
+  instead of failing later at the first API call.
+- **Demo connect flow is key-only; sign-in removed.** Verified across all three
+  vendors (2026 policy): none permits subscription-backed generation on a
+  personal sign-in for third-party apps — Google deprecated the per-user-quota
+  scope and bans proxying its CLI client; Anthropic's terms restrict Claude
+  Free/Pro/Max OAuth tokens to its own products (its sanctioned alternative is
+  Agent SDK credits — i.e. *their* SDK); OpenAI's "Sign in with ChatGPT" shares
+  identity, not plan-backed inference. The demo's connect sheet therefore
+  offers only the user's own API key; the vendor's official package is the
+  sanctioned sign-in route and joins the chain via `customModels`.
+  `VoltaSDKAuth` remains in the package as validated, general-purpose OAuth
+  machinery (for providers/deployments where per-app clients are permitted);
+  the demo no longer depends on it.
+- **Demo hook for vendor packages — and a beta-skew lesson.** `DemoRootView`
+  gained a gated `init(vendorPackageName:makeVendorModels:)` plus an "Official
+  vendor package" section (enable + developer API key → `customModels`), so a
+  host app supplies the vendor model and the shared UI does the rest.
+  `macOSDemo` (deployment now macOS 27; iOSDemo unchanged at 26) wires
+  Anthropic's `ClaudeForFoundationModels` behind `#if canImport` — **with the
+  SPM dependency currently parked**: the package tracks the latest Xcode 27
+  beta SDK and version skew broke the build in *both* directions (0.1.4
+  targets beta 3; it failed against the June beta on `SamplingMode` shapes and
+  against beta 27A5237l on `Transcript.CustomSegment`). Re-attach when
+  Anthropic ships a matching release — the demo section lights up by itself.
+- **Vendor packages plug in: `AIConfiguration.customModels` (iOS 27).** The
+  official vendor route Apple announced — Google ships Gemini for the
+  Foundation Models framework via its Firebase SDK, Anthropic publishes a
+  Claude package — lands in the chain through a new public plug-in point: any
+  conformance to Apple's `LanguageModel` protocol, wrapped as
+  `CustomLanguageModel(model, identifier:, privacyLevel:)`, becomes one more
+  provider (statuses, picker, provenance, privacy disclosure included), no
+  VoltaSDK release needed per vendor. Custom models trail the built-in
+  providers in the prefer chains and are never auto-selected. (Implementation:
+  the internal `LanguageModelProvider` wrapper is now existential-based, and
+  the config stores entries type-erased so the iOS-27-only type stays behind an
+  availability-gated accessor.)
+- **Gemini: credential-aware dual transport.** A Google API key (`AIza…`)
+  speaks the Developer API (`generativelanguage`, `x-goog-api-key` header) as
+  before. An OAuth user token turned out to need a *different transport*, not
+  just a different header: `generativelanguage` rejects user tokens for
+  generation regardless of granted scopes (observed live), so `GeminiProvider`
+  routes OAuth credentials to the Code Assist endpoint
+  (`cloudcode-pa.googleapis.com` — the one behind Google's own Gemini CLI
+  sign-in), including its `loadCodeAssist`/`onboardUser` handshake and
+  `{model, project, request}` envelope. 401/403 responses surface Google's own
+  message verbatim. **Provider-policy finding:** that endpoint is a private
+  API, visible/enable-able only to Google's own client projects — with a
+  third-party OAuth client, personal-account Gemini *generation* stays gated
+  (a valid, correctly-scoped token is not enough). User-account Gemini
+  generation is served by the user's API key instead; the OAuth transport is
+  in place for contexts where the API is available to the client's project.
+- **`ModelSelector` now auto-selects PCC (VoltaSDKUI).** The gate-free
+  auto-select candidate was hardcoded to on-device, so with on-device disabled
+  the selector picked nothing even when Private Cloud Compute was available.
+  Generalized to the best available **gate-free** provider in chain order
+  (`isGateFree` = on-device or PCC); gated providers stay non-preselected, and
+  with none available the row shows "Choose a model". Added a default label for
+  PCC. The demo's `onSelection` treats PCC as free (no paywall).
+- **PCC access documented (Q14).** The entitlement is developer-side
+  (`com.apple.developer.private-cloud-compute`), requested from Apple
+  (App Store Small Business Program, < 2M downloads); adopting VoltaSDK without
+  PCC requires nothing. See the README's Private Cloud Compute section.
+- **Demo apps restructured — one signed Xcode app per platform.** Removed the
+  unsigned `swift run VoltaSDKDemo` executable (a `swift run` binary can't carry
+  the PCC entitlement) and added **`Examples/macOSDemo`**, the signed macOS
+  counterpart to `Examples/iOSDemo`, running the same shared `VoltaSDKDemoUI`
+  chat UI. Both demos treat PCC as **opt-in**: they build for everyone with PCC
+  unavailable, and you enable live PCC by adding the capability with your own
+  entitled team. (The transitional `Examples/macOSPCCTest` was folded into
+  `macOSDemo`.) The shared developer pane gained a **Private Cloud Compute
+  toggle** (`AIConfiguration.enablePrivateCloudCompute`) alongside the on-device
+  toggle. `VoltaSDKDemoUI` library is otherwise unchanged.
+
+## [0.3.5] — 2026-06-13
+
+- Documentation only, no code changes: the SPM installation snippet now uses
+  the real public repository URL.
+
 ## [0.3.4] — 2026-06-13
 
 - Documentation only, no code changes: the public README no longer

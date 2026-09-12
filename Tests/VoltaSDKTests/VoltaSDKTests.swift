@@ -6,7 +6,9 @@
 import Foundation
 import Testing
 import Synchronization
+import FoundationModels
 @testable import VoltaSDK
+@testable import VoltaSDKAuth
 
 // MARK: - Selection and fallback
 
@@ -445,6 +447,22 @@ struct CloudVendorTests {
         #expect(CloudVendor.detect(fromKey: "mystery") == nil)
     }
 
+    @Test("Detection tolerates pasted whitespace around the key")
+    func detectionTrimsWhitespace() {
+        // Observed live: a valid Gemini key pasted with a stray newline read
+        // as "unknown format" and was routed to the wrong vendor.
+        #expect(CloudVendor.detect(fromKey: " AIzaSyD-abc\n") == .gemini)
+        #expect(CloudVendor.detect(fromKey: "\nsk-ant-api03-abc ") == .anthropic)
+        #expect(CloudVendor.detect(fromKey: " sk-proj-abc") == .openAI)
+    }
+
+    @Test("Google's new AQ. Auth keys are detected as Gemini")
+    func detectsNewGoogleAuthKeyFormat() {
+        // Mid-2026 migration: AI Studio now issues only AQ.-prefix keys
+        // (observed live — an adopter's fresh key read as "unknown format").
+        #expect(CloudVendor.detect(fromKey: "AQ.Ab8RN6-abc") == .gemini)
+    }
+
     @Test("Anthropic prefix wins over the OpenAI prefix it contains")
     func anthropicPrefixPrecedence() {
         // "sk-ant-…" also matches "sk-…": order must favor Anthropic.
@@ -490,9 +508,43 @@ struct CloudVendorTests {
 
     @Test("Gemini: known windows per model, nil for unknown models")
     func geminiKnownWindows() {
-        #expect(GeminiProvider.knownContextSize(forModel: "gemini-2.5-flash") == 1_048_576)
+        #expect(GeminiProvider.knownContextSize(forModel: "gemini-3.6-flash") == 1_048_576)
         #expect(GeminiProvider.knownContextSize(forModel: "gemini-1.5-pro") == 2_097_152)
         #expect(GeminiProvider.knownContextSize(forModel: "mystery-model") == nil)
+    }
+
+    @Test("Gemini: thinking models get output headroom, older ones don't")
+    func geminiThinkingHeadroom() {
+        #expect(GeminiProvider.thinkingHeadroom(forModel: "gemini-3.6-flash") > 0)
+        #expect(GeminiProvider.thinkingHeadroom(forModel: "gemini-2.5-flash") > 0)
+        #expect(GeminiProvider.thinkingHeadroom(forModel: "gemini-1.5-pro") == 0)
+        #expect(GeminiProvider.thinkingHeadroom(forModel: "gemini-2.0-flash") == 0)
+    }
+
+    @Test("Gemini: a textless answer names its cause")
+    func geminiEmptyAnswerDiagnosis() {
+        // Budget consumed by thinking — the failure this replaced.
+        let budget = GeminiProvider.emptyAnswerError(
+            finishReason: "MAX_TOKENS", blockReason: nil, thoughtTokens: 1000
+        )
+        guard case .api(let message, let code) = budget else {
+            Issue.record("expected an API error, got \(budget)"); return
+        }
+        #expect(code == "MAX_TOKENS")
+        #expect(message.contains("1000 tokens thinking"))
+
+        // Policy stops are guardrail violations, not empty responses.
+        if case .guardrailViolation = GeminiProvider.emptyAnswerError(
+            finishReason: "SAFETY", blockReason: nil, thoughtTokens: nil
+        ) {} else { Issue.record("SAFETY should map to a guardrail violation") }
+        if case .guardrailViolation = GeminiProvider.emptyAnswerError(
+            finishReason: nil, blockReason: "OTHER", thoughtTokens: nil
+        ) {} else { Issue.record("a blocked prompt should map to a guardrail violation") }
+
+        // A clean stop with no text really is an empty response.
+        #expect(GeminiProvider.emptyAnswerError(
+            finishReason: "STOP", blockReason: nil, thoughtTokens: nil
+        ) == .emptyResponse)
     }
 
     @Test("Cloud providers are unavailable without a key")
@@ -501,6 +553,276 @@ struct CloudVendorTests {
             == .unavailable(reason: "API key not configured"))
         #expect(await GeminiProvider(apiKey: "").availability()
             == .unavailable(reason: "API key not configured"))
+    }
+}
+
+// MARK: - Private Cloud Compute wiring (iOS 27)
+
+@Suite("Private Cloud Compute (iOS 27)")
+struct PrivateCloudComputeTests {
+
+    @Test("Disabling PCC keeps it out of the chain, regardless of OS")
+    func disabledMeansNoProvider() {
+        var config = AIConfiguration()
+        config.enablePrivateCloudCompute = false
+        #expect(AIOrchestrator.buildPrivateCloudComputeProvider(from: config) == nil)
+    }
+
+    @available(iOS 27.0, macOS 27.0, *)
+    @Test("Default config builds PCC with the .appleCloud privacy level")
+    func defaultBuildsPCC() {
+        let provider = AIOrchestrator.buildPrivateCloudComputeProvider(from: AIConfiguration())
+        #expect(provider?.identifier == .privateCloudCompute)
+        #expect(provider?.privacyLevel == .appleCloud)
+    }
+
+    @available(iOS 27.0, macOS 27.0, *)
+    @Test("PCC joins the prefer chains but never the strict only modes")
+    func chainMembership() async {
+        func identifiers(_ preference: ModelPreference) async -> [ProviderIdentifier] {
+            var config = AIConfiguration()
+            config.preference = preference
+            config.developerKey = "sk-test"   // ensure a cloud provider exists
+            let statuses = await AIOrchestrator(configuration: config).providerStatuses()
+            return statuses.map(\.identifier)
+        }
+
+        // Privacy order in the prefer-on-device chain: on-device → PCC → key.
+        #expect(await identifiers(.preferOnDevice)
+            == [.onDevice, .privateCloudCompute, .openAI])
+        // Strict modes stay single-provider — PCC is a fallback tier, not a peer.
+        #expect(await identifiers(.onDeviceOnly) == [.onDevice])
+        #expect(await identifiers(.developerKeyOnly) == [.openAI])
+    }
+}
+
+// MARK: - Transcript translation (iOS 27 front door)
+
+@Suite("Transcript translation")
+struct TranscriptTranslationTests {
+
+    @Test("decompose inverts entries — the trailing user turn is the prompt")
+    func roundTrip() {
+        let history: [ChatTurn] = [.user("hi"), .assistant("hello"), .user("plan a trip")]
+        let entries = FoundationModelsTranscript.entries(
+            instructions: "Be concise.", history: history
+        )
+        let parts = FoundationModelsTranscript.decompose(Transcript(entries: entries))
+
+        #expect(parts.instructions == "Be concise.")
+        #expect(parts.prompt == "plan a trip")
+        #expect(parts.history == [.user("hi"), .assistant("hello")])
+    }
+
+    @Test("No instructions → nil, not an empty string")
+    func noInstructions() {
+        let entries = FoundationModelsTranscript.entries(
+            instructions: nil, history: [.user("just this")]
+        )
+        let parts = FoundationModelsTranscript.decompose(Transcript(entries: entries))
+        #expect(parts.instructions == nil)
+        #expect(parts.prompt == "just this")
+        #expect(parts.history.isEmpty)
+    }
+}
+
+// MARK: - User-account providers (iOS 27 front door)
+
+@Suite("User-account providers (iOS 27)")
+struct UserAccountProviderTests {
+
+    @Test("No accounts configured → no user-account providers, regardless of OS")
+    func noneConfigured() {
+        #expect(AIOrchestrator.buildUserAccountProviders(from: AIConfiguration()).isEmpty)
+    }
+
+    @available(iOS 27.0, macOS 27.0, *)
+    @Test("Configured accounts become external user-account providers")
+    func builtFromConfig() {
+        var config = AIConfiguration()
+        config.userAccounts = [
+            UserAccount(vendor: .openAI, apiKey: "sk-user"),
+            UserAccount(vendor: .anthropic, apiKey: "sk-ant-user"),
+        ]
+        let providers = AIOrchestrator.buildUserAccountProviders(from: config)
+        #expect(providers.map(\.identifier) == [.userAccount(.openAI), .userAccount(.anthropic)])
+        #expect(providers.allSatisfy { $0.privacyLevel == .external })
+    }
+
+    @available(iOS 27.0, macOS 27.0, *)
+    @Test("User accounts trail the developer key in the prefer chains, absent in only modes")
+    func chainMembership() async {
+        func identifiers(_ preference: ModelPreference) async -> [ProviderIdentifier] {
+            var config = AIConfiguration()
+            config.preference = preference
+            config.developerKey = "sk-test"
+            config.userAccounts = [UserAccount(vendor: .gemini, apiKey: "AIzaUser")]
+            return await AIOrchestrator(configuration: config).providerStatuses().map(\.identifier)
+        }
+        #expect(await identifiers(.preferOnDevice)
+            == [.onDevice, .privateCloudCompute, .openAI, .userAccount(.gemini)])
+        #expect(await identifiers(.developerKeyOnly) == [.openAI])
+    }
+
+    @available(iOS 27.0, macOS 27.0, *)
+    @Test("An account with no credential reports unavailable, never crashes")
+    func unconnectedIsUnavailable() async {
+        var config = AIConfiguration()
+        config.enableOnDevice = false
+        config.enablePrivateCloudCompute = false
+        config.userAccounts = [UserAccount(vendor: .openAI, apiKey: "")]
+        let statuses = await AIOrchestrator(configuration: config).providerStatuses()
+        #expect(statuses.count == 1)
+        #expect(statuses.first?.identifier == .userAccount(.openAI))
+        #expect(statuses.first?.availability == .unavailable(reason: "Account not connected"))
+    }
+}
+
+// MARK: - Custom vendor models (iOS 27)
+
+@Suite("Custom vendor models (iOS 27)")
+struct CustomLanguageModelTests {
+
+    @Test("No custom models configured → none built, regardless of OS")
+    func noneConfigured() {
+        #expect(AIOrchestrator.buildCustomModelProviders(from: AIConfiguration()).isEmpty)
+    }
+
+    @available(iOS 27.0, macOS 27.0, *)
+    @Test("A vendor LanguageModel joins the chain with its declared identity")
+    func vendorModelJoinsChain() async {
+        var config = AIConfiguration()
+        config.enableOnDevice = false
+        config.enablePrivateCloudCompute = false
+        // Any LanguageModel works — our own front-door model stands in for a
+        // vendor package (e.g. Firebase's Gemini).
+        config.customModels = [CustomLanguageModel(
+            CloudAccountLanguageModel(vendor: .gemini, apiKey: "stand-in"),
+            identifier: ProviderIdentifier("firebase-gemini"),
+            privacyLevel: .external
+        )]
+        let statuses = await AIOrchestrator(configuration: config).providerStatuses()
+        #expect(statuses.map(\.identifier) == [ProviderIdentifier("firebase-gemini")])
+        #expect(statuses.first?.privacyLevel == .external)
+        #expect(statuses.first?.availability == .available)
+    }
+
+    @available(iOS 27.0, macOS 27.0, *)
+    @Test("Custom models trail the chain in prefer modes, absent in only modes")
+    func chainPlacement() async {
+        var config = AIConfiguration()
+        config.developerKey = "sk-test"
+        config.customModels = [CustomLanguageModel(
+            CloudAccountLanguageModel(vendor: .anthropic, apiKey: "stand-in"),
+            identifier: ProviderIdentifier("vendor-claude"),
+            privacyLevel: .external
+        )]
+        let prefer = await AIOrchestrator(configuration: config).providerStatuses().map(\.identifier)
+        #expect(prefer == [.onDevice, .privateCloudCompute, .openAI, ProviderIdentifier("vendor-claude")])
+
+        config.preference = .developerKeyOnly
+        let only = await AIOrchestrator(configuration: config).providerStatuses().map(\.identifier)
+        #expect(only == [.openAI])
+    }
+}
+
+// MARK: - OAuth (VoltaSDKAuth)
+
+@Suite("OAuth PKCE")
+struct PKCETests {
+
+    @Test("S256 challenge matches the RFC 7636 test vector")
+    func rfcVector() {
+        // RFC 7636 Appendix B.
+        let verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+        #expect(PKCE.challenge(for: verifier) == "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
+    }
+
+    @Test("A generated verifier is 43 URL-safe base64 characters")
+    func verifierShape() {
+        let verifier = PKCE.makeVerifier()
+        #expect(verifier.count == 43)
+        let allowed = Set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
+        #expect(verifier.allSatisfy { allowed.contains($0) })
+    }
+}
+
+/// Returns a canned HTTP response for any request — mocks the token endpoint.
+final class MockURLProtocol: URLProtocol {
+    nonisolated(unsafe) static var body = Data()
+    nonisolated(unsafe) static var status = 200
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let response = HTTPURLResponse(
+            url: request.url!, statusCode: Self.status, httpVersion: nil, headerFields: nil
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Self.body)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
+@Suite("OAuth token flow", .serialized)
+struct OAuthTokenFlowTests {
+
+    let config = OAuthConfiguration(
+        authorizationEndpoint: URL(string: "https://idp.example/authorize")!,
+        tokenEndpoint: URL(string: "https://idp.example/token")!,
+        clientID: "abc123",
+        redirectURI: URL(string: "voltademo://oauth")!,
+        scopes: ["openid", "email"]
+    )
+
+    private func mockSession(json: String, status: Int = 200) -> URLSession {
+        MockURLProtocol.body = Data(json.utf8)
+        MockURLProtocol.status = status
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        return URLSession(configuration: configuration)
+    }
+
+    @Test("Authorization URL carries client_id, PKCE S256 challenge, redirect, state, scope")
+    func authorizationURL() {
+        let account = OAuthAccount(vendor: .gemini, configuration: config)
+        // Reuse the RFC 7636 verifier so the expected challenge is known.
+        let url = account.authorizationURL(
+            verifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk", state: "xyz"
+        )
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)!.queryItems!
+        func value(_ name: String) -> String? { items.first { $0.name == name }?.value }
+
+        #expect(value("client_id") == "abc123")
+        #expect(value("response_type") == "code")
+        #expect(value("redirect_uri") == "voltademo://oauth")
+        #expect(value("code_challenge_method") == "S256")
+        #expect(value("code_challenge") == "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
+        #expect(value("state") == "xyz")
+        #expect(value("scope") == "openid email")
+    }
+
+    @Test("Token exchange parses access + refresh token and expiry")
+    func tokenExchange() async throws {
+        let session = mockSession(
+            json: #"{"access_token":"tok-abc","refresh_token":"ref-xyz","expires_in":3600}"#
+        )
+        let account = OAuthAccount(vendor: .gemini, configuration: config, urlSession: session)
+        let token = try await account.exchange(grant: ["grant_type": "authorization_code", "code": "c"])
+
+        #expect(token.accessToken == "tok-abc")
+        #expect(token.refreshToken == "ref-xyz")
+        #expect(token.expiresAt != nil)
+    }
+
+    @Test("A token-endpoint error surfaces as tokenExchangeFailed")
+    func tokenError() async {
+        let session = mockSession(json: #"{"error":"invalid_grant"}"#, status: 400)
+        let account = OAuthAccount(vendor: .gemini, configuration: config, urlSession: session)
+        await #expect(throws: OAuthError.self) {
+            _ = try await account.exchange(grant: ["grant_type": "authorization_code", "code": "bad"])
+        }
     }
 }
 
@@ -514,6 +836,7 @@ struct ConfigurationTests {
         AIOrchestrator.configure {
             $0.enableOnDevice = false
             $0.developerKey = nil
+            $0.enablePrivateCloudCompute = false   // PCC is default-on (iOS 27)
         }
         // No providers built → none available.
         let available = await AIOrchestrator.active.availableProviders()
@@ -547,5 +870,449 @@ struct OpenAIParsingTests {
     func retryAfterInvalid() {
         #expect(OpenAIProvider.parseRetryAfter(nil) == nil)
         #expect(OpenAIProvider.parseRetryAfter("nope") == nil)
+    }
+}
+
+// MARK: - Streaming (D16)
+
+/// A provider that implements only the required surface — exercises the
+/// protocol's DEFAULT streaming (the whole answer as one fragment).
+private struct BareProvider: ModelProvider {
+    let identifier = ProviderIdentifier("bare")
+    let privacyLevel = PrivacyLevel.onDevice
+    func availability() async -> ProviderAvailability { .available }
+    func respond(
+        to prompt: String, instructions: String?, history: [ChatTurn]
+    ) async throws -> String { "whole answer" }
+}
+
+@Suite("Streaming (D16)")
+struct StreamingTests {
+
+    private func collect(
+        _ stream: AsyncThrowingStream<AIStreamEvent, Error>
+    ) async throws -> [AIStreamEvent] {
+        var events: [AIStreamEvent] = []
+        for try await event in stream { events.append(event) }
+        return events
+    }
+
+    @Test("Default capability: the whole answer arrives as one fragment")
+    func defaultSingleFragment() async throws {
+        let kit = AIOrchestrator(providers: [BareProvider()])
+        let events = try await collect(await kit.streamDetailed(to: "hi"))
+        #expect(events == [
+            .began(provider: ProviderIdentifier("bare"), privacyLevel: .onDevice),
+            .text("whole answer")
+        ])
+    }
+
+    @Test("Fragments arrive in order, after one began event")
+    func fragmentsInOrder() async throws {
+        let kit = AIOrchestrator(providers: [
+            MockProvider(identifier: .onDevice, streamFragments: ["a", "b", "c"])
+        ])
+        let events = try await collect(await kit.streamDetailed(to: "hi"))
+        #expect(events == [
+            .began(provider: .onDevice, privacyLevel: .onDevice),
+            .text("a"), .text("b"), .text("c")
+        ])
+    }
+
+    @Test("streamResponse convenience yields text fragments only")
+    func textOnlyConvenience() async throws {
+        let kit = AIOrchestrator(providers: [
+            MockProvider(identifier: .onDevice, streamFragments: ["hel", "lo"])
+        ])
+        var fragments: [String] = []
+        for try await fragment in await kit.streamResponse(to: "hi") {
+            fragments.append(fragment)
+        }
+        #expect(fragments == ["hel", "lo"])
+    }
+
+    @Test("Falls back when a provider fails before its first fragment")
+    func fallsBackBeforeFirstFragment() async throws {
+        let kit = AIOrchestrator(providers: [
+            MockProvider(identifier: .onDevice,
+                         streamFragments: [],
+                         streamFailure: .rateLimited(retryAfter: nil)),
+            MockProvider(identifier: .openAI,
+                         privacyLevel: .external,
+                         streamFragments: ["cloud"])
+        ])
+        let events = try await collect(await kit.streamDetailed(to: "hi"))
+        #expect(events == [
+            .began(provider: .openAI, privacyLevel: .external),
+            .text("cloud")
+        ])
+    }
+
+    @Test("A mid-stream failure surfaces instead of falling back (D16 rule)")
+    func midStreamFailureSurfaces() async throws {
+        let secondReached = Mutex(false)
+        let kit = AIOrchestrator(providers: [
+            MockProvider(identifier: .onDevice,
+                         streamFragments: ["partial "],
+                         streamFailure: .network(code: -1)),
+            MockProvider(identifier: .openAI,
+                         streamFragments: ["never"],
+                         onRespond: { _, _, _ in secondReached.withLock { $0 = true } })
+        ])
+
+        var received: [AIStreamEvent] = []
+        var thrown: ProviderError?
+        do {
+            for try await event in await kit.streamDetailed(to: "hi") {
+                received.append(event)
+            }
+        } catch let error as ProviderError {
+            thrown = error
+        }
+
+        // The fragment already shown is kept, the failure surfaces, and the
+        // chain does NOT silently re-answer with the next provider.
+        #expect(received == [
+            .began(provider: .onDevice, privacyLevel: .onDevice),
+            .text("partial ")
+        ])
+        #expect(thrown == .network(code: -1))
+        #expect(secondReached.withLock { $0 } == false)
+    }
+
+    @Test("A terminal pre-fragment error stops the chain")
+    func terminalErrorStopsChain() async throws {
+        let secondReached = Mutex(false)
+        let kit = AIOrchestrator(providers: [
+            MockProvider(identifier: .onDevice,
+                         streamFragments: [],
+                         streamFailure: .unauthorized),
+            MockProvider(identifier: .openAI,
+                         streamFragments: ["never"],
+                         onRespond: { _, _, _ in secondReached.withLock { $0 = true } })
+        ])
+
+        var thrown: ProviderError?
+        do {
+            for try await _ in await kit.streamDetailed(to: "hi") {}
+        } catch let error as ProviderError {
+            thrown = error
+        }
+        #expect(thrown == .unauthorized)
+        #expect(secondReached.withLock { $0 } == false)
+    }
+
+    @Test("A stream that ends without fragments maps to emptyResponse")
+    func emptyStreamIsEmptyResponse() async throws {
+        let kit = AIOrchestrator(providers: [
+            MockProvider(identifier: .onDevice, streamFragments: [])
+        ])
+        var thrown: ProviderError?
+        do {
+            for try await _ in await kit.streamDetailed(to: "hi") {}
+        } catch let error as ProviderError {
+            thrown = error
+        }
+        #expect(thrown == .emptyResponse)
+    }
+
+    @Test("denyDowngrade excludes lower-privacy providers when streaming")
+    func denyDowngradeApplies() async throws {
+        let kit = AIOrchestrator(
+            providers: [
+                MockProvider(identifier: .onDevice,
+                             availability: .unavailable(reason: "off"),
+                             streamFragments: ["never"]),
+                MockProvider(identifier: .openAI,
+                             privacyLevel: .external,
+                             streamFragments: ["cloud"])
+            ],
+            privacyDisclosure: .denyDowngrade
+        )
+        var thrown: ProviderError?
+        do {
+            for try await _ in await kit.streamDetailed(to: "hi") {}
+        } catch let error as ProviderError {
+            thrown = error
+        }
+        #expect(thrown == .privacyRestricted)
+    }
+}
+
+// MARK: - SSE parser (D16)
+
+@Suite("SSE parser")
+struct SSEParserTests {
+
+    @Test("Parses data events and the [DONE] sentinel (OpenAI style)")
+    func openAIStyle() {
+        var parser = SSEParser()
+        #expect(parser.consume("data: {\"x\":1}") == nil)
+        #expect(parser.consume("") == ServerSentEvent(event: nil, data: "{\"x\":1}"))
+        #expect(parser.consume("data: [DONE]") == nil)
+        #expect(parser.consume("") == ServerSentEvent(event: nil, data: "[DONE]"))
+    }
+
+    @Test("Carries event names (Anthropic style)")
+    func eventNames() {
+        var parser = SSEParser()
+        #expect(parser.consume("event: content_block_delta") == nil)
+        #expect(parser.consume("data: {\"t\":1}") == nil)
+        #expect(parser.consume("") == ServerSentEvent(
+            event: "content_block_delta", data: "{\"t\":1}"
+        ))
+    }
+
+    @Test("Joins multi-line data, ignores comments and blank dispatches")
+    func multiLineAndComments() {
+        var parser = SSEParser()
+        #expect(parser.consume(": keep-alive") == nil)
+        #expect(parser.consume("data: a") == nil)
+        #expect(parser.consume("data:b") == nil)
+        #expect(parser.consume("") == ServerSentEvent(event: nil, data: "a\nb"))
+        #expect(parser.consume("") == nil)
+    }
+}
+
+// MARK: - Dynamic Profiles bridge (iOS 27, D1)
+
+@Suite("Dynamic Profiles bridge (iOS 27)")
+struct PreferredBridgeTests {
+
+    @Test("preferred() returns the first available provider's native model")
+    func returnsFirstAvailableModel() async throws {
+        guard #available(iOS 27.0, macOS 27.0, *) else { return }
+        let account = CloudAccountLanguageModel(
+            vendor: .gemini, apiKey: "AIza-test", model: "gemini-test"
+        )
+        let kit = AIOrchestrator(providers: [
+            MockProvider(identifier: .onDevice, availability: .unavailable(reason: "off")),
+            LanguageModelProvider(
+                identifier: .userAccount(.gemini),
+                privacyLevel: .external,
+                model: account,
+                connected: true
+            )
+        ])
+        let model = try await kit.preferred()
+        let cloud = try #require(model as? CloudAccountLanguageModel)
+        #expect(cloud.vendor == .gemini)
+        #expect(cloud.modelName == "gemini-test")
+    }
+
+    @Test("Developer-key providers bridge via CloudAccountLanguageModel")
+    func developerKeyBridges() async throws {
+        guard #available(iOS 27.0, macOS 27.0, *) else { return }
+        let kit = AIOrchestrator(providers: [
+            OpenAIProvider(apiKey: "sk-test", model: "gpt-test")
+        ])
+        let model = try await kit.preferred()
+        let cloud = try #require(model as? CloudAccountLanguageModel)
+        #expect(cloud.vendor == .openAI)
+        #expect(cloud.modelName == "gpt-test")
+    }
+
+    @Test("Providers that cannot bridge are skipped, not fatal")
+    func skipsNonConvertible() async throws {
+        guard #available(iOS 27.0, macOS 27.0, *) else { return }
+        let kit = AIOrchestrator(providers: [
+            // Available, would win respond() — but not LanguageModelConvertible.
+            MockProvider(identifier: ProviderIdentifier("custom"), outcome: .success("mock")),
+            AnthropicProvider(apiKey: "sk-ant-test")
+        ])
+        let model = try await kit.preferred()
+        let cloud = try #require(model as? CloudAccountLanguageModel)
+        #expect(cloud.vendor == .anthropic)
+    }
+
+    @Test("denyDowngrade excludes lower-privacy models from the bridge")
+    func denyDowngradeExcludes() async throws {
+        guard #available(iOS 27.0, macOS 27.0, *) else { return }
+        let kit = AIOrchestrator(
+            providers: [
+                MockProvider(identifier: .onDevice, availability: .unavailable(reason: "off")),
+                GeminiProvider(apiKey: "AIza-test")
+            ],
+            privacyDisclosure: .denyDowngrade
+        )
+        var thrown: ProviderError?
+        do { _ = try await kit.preferred() } catch let error as ProviderError { thrown = error }
+        #expect(thrown == .noProviderAvailable)
+    }
+
+    @Test("No convertible provider at all throws noProviderAvailable")
+    func emptyChainThrows() async throws {
+        guard #available(iOS 27.0, macOS 27.0, *) else { return }
+        let kit = AIOrchestrator(providers: [
+            MockProvider(identifier: ProviderIdentifier("custom"), outcome: .success("mock"))
+        ])
+        var thrown: ProviderError?
+        do { _ = try await kit.preferred() } catch let error as ProviderError { thrown = error }
+        #expect(thrown == .noProviderAvailable)
+    }
+}
+
+// MARK: - Warm-session reuse (D17)
+
+@Suite("Warm-session reuse (D17)")
+struct SessionCacheTests {
+
+    @Test("Hit only when the conversation continues exactly")
+    func hitOnExactContinuation() {
+        let cache = SessionCache()
+        let session = LanguageModelSession()
+        let conversation: [ChatTurn] = [.user("q"), .assistant("a")]
+
+        cache.checkIn(session, instructions: "sys", history: conversation)
+        #expect(cache.checkOut(instructions: "sys", history: conversation) === session)
+    }
+
+    @Test("Check-out is exclusive: a second caller builds fresh")
+    func checkOutIsExclusive() {
+        let cache = SessionCache()
+        let session = LanguageModelSession()
+        cache.checkIn(session, instructions: nil, history: [])
+
+        #expect(cache.checkOut(instructions: nil, history: []) === session)
+        #expect(cache.checkOut(instructions: nil, history: []) == nil)
+    }
+
+    @Test("A diverging history is a miss AND discards the stale entry")
+    func divergenceInvalidates() {
+        let cache = SessionCache()
+        let session = LanguageModelSession()
+        cache.checkIn(session, instructions: nil, history: [.user("q"), .assistant("a")])
+
+        // The app trimmed its history → not a continuation → miss…
+        #expect(cache.checkOut(instructions: nil, history: [.user("q")]) == nil)
+        // …and the stale session must be gone, not resurrected later.
+        #expect(cache.checkOut(instructions: nil, history: [.user("q"), .assistant("a")]) == nil)
+    }
+
+    @Test("Different instructions are a different conversation")
+    func instructionsAreCompared() {
+        let cache = SessionCache()
+        let session = LanguageModelSession()
+        cache.checkIn(session, instructions: "be brief", history: [])
+
+        #expect(cache.checkOut(instructions: "be verbose", history: []) == nil)
+    }
+}
+
+// MARK: - Per-need chains (D7)
+
+@Suite("Per-need chains (D7)")
+struct ModelNeedTests {
+
+    private func chain() -> [MockProvider] {
+        [
+            MockProvider(identifier: .openAI, privacyLevel: .external,
+                         outcome: .success("external"), contextSize: 128_000, tokenCount: 10),
+            MockProvider(identifier: .privateCloudCompute, privacyLevel: .appleCloud,
+                         outcome: .success("apple-cloud")),
+            MockProvider(identifier: .onDevice, privacyLevel: .onDevice,
+                         outcome: .success("on-device"), contextSize: 4_096, tokenCount: 10)
+        ]
+    }
+
+    @Test("No need keeps the configured order")
+    func nilNeedKeepsOrder() async throws {
+        let kit = AIOrchestrator(providers: chain())
+        #expect(try await kit.respond(to: "hi") == "external")
+    }
+
+    @Test(".lightweight leads with on-device even when external is configured first")
+    func lightweightPrefersLocal() async throws {
+        let kit = AIOrchestrator(providers: chain())
+        #expect(try await kit.respond(to: "hi", need: .lightweight) == "on-device")
+    }
+
+    @Test(".reasoning leads with the Apple-cloud tier, on-device last")
+    func reasoningPrefersCapable() async throws {
+        let kit = AIOrchestrator(providers: chain())
+        #expect(try await kit.respond(to: "hi", need: .reasoning) == "apple-cloud")
+
+        // With PCC gone, external outranks on-device for reasoning.
+        let noPCC = AIOrchestrator(providers: chain().filter { $0.identifier != .privateCloudCompute })
+        #expect(try await noPCC.respond(to: "hi", need: .reasoning) == "external")
+    }
+
+    @Test(".largeContext leads with Apple cloud; on-device is the last resort")
+    func largeContextAvoidsOnDevice() async throws {
+        // D7 amendment (Sep 2026): long-context work shouldn't lean on the
+        // small on-device model, even for calls that would fit it.
+        let kit = AIOrchestrator(providers: chain())
+        #expect(try await kit.respond(to: "hi", need: .largeContext) == "apple-cloud")
+
+        // …but on-device remains reachable when nothing else is available.
+        let onlyLocal = AIOrchestrator(providers: [
+            MockProvider(identifier: .onDevice, privacyLevel: .onDevice,
+                         outcome: .success("on-device"))
+        ])
+        #expect(try await onlyLocal.respond(to: "hi", need: .largeContext) == "on-device")
+    }
+
+    @Test(".largeContext ranks larger windows first and pre-flight still guards")
+    func largeContextWindowOrder() async throws {
+        let kit = AIOrchestrator(
+            providers: [
+                MockProvider(identifier: .anthropic, privacyLevel: .external,
+                             outcome: .success("small-cloud"), contextSize: 200_000, tokenCount: 8_000),
+                MockProvider(identifier: .gemini, privacyLevel: .external,
+                             outcome: .success("big-cloud"), contextSize: 1_000_000, tokenCount: 8_000)
+            ],
+            responseTokenReserve: 0
+        )
+        // Within the external tier the larger window ranks first.
+        #expect(try await kit.respond(to: "hi", need: .largeContext) == "big-cloud")
+
+        // And the D13 pre-flight still skips a window the call exceeds,
+        // whatever the ordering says: 300K tokens overflow the 200K window.
+        let overflowing = AIOrchestrator(
+            providers: [
+                MockProvider(identifier: .anthropic, privacyLevel: .external,
+                             outcome: .success("small-cloud"), contextSize: 200_000, tokenCount: 300_000),
+                MockProvider(identifier: .gemini, privacyLevel: .external,
+                             outcome: .success("big-cloud"), contextSize: 1_000_000, tokenCount: 300_000)
+            ],
+            responseTokenReserve: 0
+        )
+        #expect(try await overflowing.respond(to: "hi", need: .largeContext) == "big-cloud")
+    }
+
+    @Test("providerStatuses(for:) previews the need-reordered chain")
+    func statusesPreviewNeedOrder() async throws {
+        let kit = AIOrchestrator(providers: chain())
+        let reasoning = await kit.providerStatuses(for: .reasoning)
+        #expect(reasoning.map(\.identifier) == [.privateCloudCompute, .openAI, .onDevice])
+        let auto = await kit.providerStatuses()
+        #expect(auto.map(\.identifier) == [.openAI, .privateCloudCompute, .onDevice])
+    }
+
+    @Test("Streaming honours the need")
+    func streamingHonoursNeed() async throws {
+        let kit = AIOrchestrator(providers: chain())
+        var fragments: [String] = []
+        for try await fragment in await kit.streamResponse(to: "hi", need: .lightweight) {
+            fragments.append(fragment)
+        }
+        #expect(fragments == ["on-device"])
+    }
+
+    @Test("preferred(_ need:) resolves by need (iOS 27)")
+    func preferredHonoursNeed() async throws {
+        guard #available(iOS 27.0, macOS 27.0, *) else { return }
+        let kit = AIOrchestrator(providers: [
+            AnthropicProvider(apiKey: "sk-ant-test"),                    // external
+            LanguageModelProvider(
+                identifier: .privateCloudCompute,
+                privacyLevel: .appleCloud,
+                model: CloudAccountLanguageModel(vendor: .gemini, apiKey: "AIza-x", model: "m"),
+                connected: true
+            )
+        ])
+        let model = try await kit.preferred(.reasoning)
+        // The Apple-cloud tier outranks external for reasoning.
+        #expect((model as? CloudAccountLanguageModel)?.vendor == .gemini)
     }
 }

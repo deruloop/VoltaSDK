@@ -29,6 +29,14 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: J6HPZ958W6
+        # ── Private Cloud Compute: OPT-IN ─────────────────────────────────
+        # Left unwired so this demo builds for everyone (on iOS 27, PCC shows
+        # "unavailable" and the chain falls back to on-device). To exercise
+        # LIVE PCC: request the entitlement from Apple (see ../../README.md),
+        # set your own DEVELOPMENT_TEAM above, then either add the "Private
+        # Cloud Compute" capability in Xcode (Signing & Capabilities) or
+        # uncomment the next line and re-run `xcodegen generate`:
+        # CODE_SIGN_ENTITLEMENTS: iOSDemo.entitlements
 schemes:
   iOSDemo:
     build:

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Private Cloud Compute (opt-in). NOT wired into the build by default (see
+	  project.yml) so the demo builds for everyone. To exercise live PCC on an
+	  iOS 27 device, add the "Private Cloud Compute" capability in Xcode (or
+	  wire CODE_SIGN_ENTITLEMENTS to this file) — and request the entitlement
+	  from Apple for your account first. See the repo README.
+	-->
+	<key>com.apple.developer.private-cloud-compute</key>
+	<true/>
+</dict>
+</plist>
