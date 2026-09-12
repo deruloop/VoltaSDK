@@ -45,7 +45,7 @@ explains why).
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/deruloop/VoltaSDK.git", from: "0.3.5")
+    .package(url: "https://github.com/deruloop/VoltaSDK.git", from: "1.0.0")
 ]
 ```
 
@@ -58,10 +58,9 @@ UI.
 Add Local… → select the package folder. Note: a local dependency always uses
 the working copy; version tags don't apply.
 
-The latest released version is **0.3.5** (see [CHANGELOG.md](CHANGELOG.md)).
-VoltaSDK is in active development: 0.x minor versions may evolve the API. The
-iOS 27 line on this branch (Private Cloud Compute and beyond) is unreleased and
-will become **1.0.0**, which marks the complete feature set.
+The latest released version is **1.0.0** (see [CHANGELOG.md](CHANGELOG.md)),
+the complete feature set including the iOS 27 tier. Projects pinned to
+Xcode 26.4 should use **0.3.5**, the last release that builds there.
 
 ## Usage
 

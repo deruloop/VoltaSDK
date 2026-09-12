@@ -95,8 +95,14 @@ questions doc into the design doc; release → CHANGELOG + state here.
   ("Missing package product"); both demo `.xcodeproj` are hand-patched to use
   `XCLocalSwiftPackageReference` and are the source of truth — re-apply that fix
   if you regenerate.
+- **1.0.0 RELEASED (Sep 12, 2026): `xcode27` merged into `main`; `main` is
+  now the 1.0 line.** Tagged on the merge commit (pre-release marker `0.9.0`
+  tagged the day before, on the branch tip). Released against the beta
+  toolchain 27A5237l; the GA re-verify of every §8-derived claim is still
+  owed and ships as a patch if anything shifted. Next work happens on the
+  **`evaluation`** branch (roadmap item 11), created from 1.0.0.
 - **Git: remote is `https://github.com/deruloop/VoltaSDK.git` (public).**
-  Branching strategy (user decision, June 2026):
+  Branching strategy (user decision, June 2026 — **executed Sep 12, 2026**):
   - **`main`** = the iOS 26 line. Stays at `0.3.x` (now `0.3.5`), builds on
     Xcode 26.4+, runs on iOS 26+. Public README describes only this.
   - **`xcode27`** (pushed, currently identical to `main`) = the iOS 27 work.

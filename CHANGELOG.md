@@ -5,11 +5,13 @@ All notable changes to this package. Versioning: [SemVer](https://semver.org).
 evolve the API. **1.0.0 will mark the complete feature set**, including the
 iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
 
-## [Unreleased] — iOS 27 extension (`xcode27` branch)
+## [1.0.0] — 2026-09-12 — the iOS 27 extension
 
-> Work toward the `1.0` line. Requires **Xcode 27** (iOS 27 SDK) to build;
+> The complete feature set. Requires **Xcode 27** (iOS 27 SDK) to build;
 > `@available(iOS 27, *)` keeps the deployment target at iOS 26, so adopters on
-> Xcode 26.4 keep using `0.3.5`. Not yet released.
+> Xcode 26.4 keep using `0.3.5`. Validated against the iOS/macOS 27 beta
+> toolchain (27A5237l); a GA re-verify pass follows as a patch if anything
+> shifted.
 
 - **README brought current with the iOS 27 line.** Streaming, per-need
   resolution, the Dynamic Profiles bridge, the `.log` disclosure default,
