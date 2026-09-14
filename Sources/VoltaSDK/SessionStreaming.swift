@@ -15,6 +15,7 @@
 import Foundation
 import FoundationModels
 
+@available(iOS 26.0, macOS 26.0, *)
 enum SessionStreaming {
     /// Streams `prompt` through a session — the provider's warm one when the
     /// conversation continues exactly (D17), otherwise a fresh one from

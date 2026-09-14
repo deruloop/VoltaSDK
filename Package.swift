@@ -3,9 +3,14 @@ import PackageDescription
 
 let package = Package(
     name: "VoltaSDK",
+    // Floor iOS 18 / macOS 15 (D19): the package INSTALLS in apps deploying
+    // to 18+, and each capability tier is @available-gated — the cloud chain,
+    // streaming, needs, and the UI kit work from 18; on-device joins at 26;
+    // PCC, the front door, and the profiles bridge at 27. 18 is the hard
+    // minimum: the core uses Synchronization.Mutex (iOS 18+).
     platforms: [
-        .iOS(.v26),
-        .macOS(.v26)
+        .iOS(.v18),
+        .macOS(.v15)
     ],
     products: [
         // The core: no UI dependency, configurable headless.

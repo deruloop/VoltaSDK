@@ -603,6 +603,7 @@ struct TranscriptTranslationTests {
 
     @Test("decompose inverts entries — the trailing user turn is the prompt")
     func roundTrip() {
+        guard #available(iOS 26.0, macOS 26.0, *) else { return }
         let history: [ChatTurn] = [.user("hi"), .assistant("hello"), .user("plan a trip")]
         let entries = FoundationModelsTranscript.entries(
             instructions: "Be concise.", history: history
@@ -616,6 +617,7 @@ struct TranscriptTranslationTests {
 
     @Test("No instructions → nil, not an empty string")
     func noInstructions() {
+        guard #available(iOS 26.0, macOS 26.0, *) else { return }
         let entries = FoundationModelsTranscript.entries(
             instructions: nil, history: [.user("just this")]
         )
@@ -1159,6 +1161,7 @@ struct SessionCacheTests {
 
     @Test("Hit only when the conversation continues exactly")
     func hitOnExactContinuation() {
+        guard #available(iOS 26.0, macOS 26.0, *) else { return }
         let cache = SessionCache()
         let session = LanguageModelSession()
         let conversation: [ChatTurn] = [.user("q"), .assistant("a")]
@@ -1169,6 +1172,7 @@ struct SessionCacheTests {
 
     @Test("Check-out is exclusive: a second caller builds fresh")
     func checkOutIsExclusive() {
+        guard #available(iOS 26.0, macOS 26.0, *) else { return }
         let cache = SessionCache()
         let session = LanguageModelSession()
         cache.checkIn(session, instructions: nil, history: [])
@@ -1179,6 +1183,7 @@ struct SessionCacheTests {
 
     @Test("A diverging history is a miss AND discards the stale entry")
     func divergenceInvalidates() {
+        guard #available(iOS 26.0, macOS 26.0, *) else { return }
         let cache = SessionCache()
         let session = LanguageModelSession()
         cache.checkIn(session, instructions: nil, history: [.user("q"), .assistant("a")])
@@ -1191,6 +1196,7 @@ struct SessionCacheTests {
 
     @Test("Different instructions are a different conversation")
     func instructionsAreCompared() {
+        guard #available(iOS 26.0, macOS 26.0, *) else { return }
         let cache = SessionCache()
         let session = LanguageModelSession()
         cache.checkIn(session, instructions: "be brief", history: [])
@@ -1314,5 +1320,36 @@ struct ModelNeedTests {
         let model = try await kit.preferred(.reasoning)
         // The Apple-cloud tier outranks external for reasoning.
         #expect((model as? CloudAccountLanguageModel)?.vendor == .gemini)
+    }
+}
+
+// MARK: - User accounts via REST (pre-iOS 27, D19)
+
+@Suite("User accounts via REST (D19)")
+struct UserAccountRESTProviderTests {
+
+    @Test("Identity and availability mirror the account")
+    func identityAndAvailability() async {
+        let provider = UserAccountRESTProvider(
+            account: UserAccount(vendor: .gemini, apiKey: "AIza-x")
+        )
+        #expect(provider.identifier == .userAccount(.gemini))
+        #expect(provider.privacyLevel == .external)
+        #expect(await provider.availability() == .available)
+
+        let empty = UserAccountRESTProvider(
+            account: UserAccount(vendor: .gemini, apiKey: "")
+        )
+        #expect(await empty.availability() == .unavailable(reason: "Account not connected"))
+    }
+
+    @Test("An empty credential fails as unauthorized before any network call")
+    func emptyTokenIsUnauthorized() async {
+        let provider = UserAccountRESTProvider(
+            account: UserAccount(vendor: .anthropic, isConnected: true, token: { "" })
+        )
+        await #expect(throws: ProviderError.unauthorized) {
+            _ = try await provider.respond(to: "hi", instructions: nil, history: [])
+        }
     }
 }

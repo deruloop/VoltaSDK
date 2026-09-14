@@ -30,6 +30,7 @@ import Foundation
 import FoundationModels
 import Synchronization
 
+@available(iOS 26.0, macOS 26.0, *)
 final class SessionCache: @unchecked Sendable {
 
     private struct Entry {

@@ -5,6 +5,32 @@ All notable changes to this package. Versioning: [SemVer](https://semver.org).
 evolve the API. **1.0.0 will mark the complete feature set**, including the
 iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
 
+## [1.1.0] — 2026-09-14 — installs from iOS 18
+
+> The package floor drops from iOS 26 / macOS 26 to **iOS 18 / macOS 15**
+> (D19), so VoltaSDK can be added to apps that still support older systems.
+> Every capability is `@available`-gated to the OS that provides it; nothing
+> changes for apps already deploying to 26+.
+
+- **The cloud tier works in full from iOS 18.** The fallback chain with the
+  developer key, per-call needs, token streaming, privacy disclosure, and
+  the SwiftUI components (`ModelSelector`, `AIPlaygroundView`,
+  `ProviderStatusList`) have no Apple-AI dependency and now carry no
+  availability locks. On-device joins at 26, PCC and the front door at 27,
+  exactly as before.
+- **User accounts work from iOS 18 (D19).** Below iOS 27, a user-supplied
+  key drives the vendor REST client directly (new internal
+  `UserAccountRESTProvider`, same transport, streaming, and error mapping as
+  the developer key); on iOS 27 the account switches to the `LanguageModel`
+  front door as before. The configuration (`AIConfiguration.userAccounts`)
+  is identical on every OS.
+- **`VoltaSDKAuth` is usable standalone from iOS 18.** It never depended on
+  FoundationModels; with the floor lowered it works as a general OAuth2 +
+  PKCE client (sign-in window, Keychain, silent refresh) in apps that use no
+  AI at all.
+- iOS 18 is the hard minimum: the core uses `Synchronization.Mutex`,
+  introduced there.
+
 ## [1.0.0] — 2026-09-12 — the iOS 27 extension
 
 > The complete feature set. Requires **Xcode 27** (iOS 27 SDK) to build;

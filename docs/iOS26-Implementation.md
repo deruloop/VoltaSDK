@@ -41,6 +41,7 @@ File map:
 │   │   ├── ServerSentEvents.swift         // shared SSE parser (D16)
 │   │   ├── SessionStreaming.swift         // session snapshots → deltas for session-backed providers (D16)
 │   │   ├── SessionCache.swift             // warm-session reuse for session-backed providers (D17)
+│   │   ├── UserAccountRESTProvider.swift  // user key → vendor REST below iOS 27 (D19)
 │   │   ├── FoundationModelsTranscript.swift // ChatTurn ↔ native Transcript (public: the D12↔profile glue)
 │   │   ├── PrivateCloudComputeProvider.swift // PCC (iOS 27, D6/D14; SecTask entitlement gate)
 │   │   ├── CloudAccountLanguageModel.swift  // iOS 27 front door: vendor REST as LanguageModel+Executor
@@ -308,6 +309,21 @@ HTTP ones (Anthropic `overloaded_error` → transient network, `rate_limit_error
 → `.rateLimited`); on iOS 27 the `CloudAccountLanguageModel` executor forwards
 the same fragments into Apple's generation channel, closing the
 "single-fragment executor" gap from session 339.
+
+### D19 — Package floor iOS 18; capability tiers by availability
+The package's `platforms:` floor is iOS 18 / macOS 15 so apps deploying
+below 26 can install it; what each OS gets is enforced by `@available`
+gates, never by the floor. The tier map: from 18, the cloud chain
+(developer key AND user keys via the new `UserAccountRESTProvider`),
+streaming, needs, disclosure, and the UI kit; from 26, on-device (+
+warm-session reuse); from 27, PCC, the front door, `customModels`,
+`preferred(_:)`. User accounts route by OS at `buildUserAccountProviders`
+(REST below 27, front door from 27) with identical configuration and
+transport underneath. `VoltaSDKAuth` carries no gates at all. iOS 18 is the
+hard minimum because the core uses `Synchronization.Mutex` (introduced in
+18); going lower would mean replacing it. Swift Testing rejects
+`@available` on suites, so 26-bound tests guard per-test
+(`guard #available`), the pattern the iOS 27 suites already used.
 
 ### D18 — Privacy downgrades are logged by default, not silent
 `PrivacyDisclosure` gains a `.log` case — the downgrade is recorded to the

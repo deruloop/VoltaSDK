@@ -762,7 +762,13 @@ public actor AIOrchestrator {
     // MARK: Provider construction
 
     private static func buildProviders(from config: AIConfiguration) -> [any ModelProvider] {
-        let onDevice: (any ModelProvider)? = config.enableOnDevice ? OnDeviceProvider() : nil
+        // On-device requires the iOS 26 Foundation Models framework; below it
+        // the slot is simply absent and the chain is cloud-only (D19).
+        let onDevice: (any ModelProvider)? = {
+            guard config.enableOnDevice else { return nil }
+            if #available(iOS 26.0, macOS 26.0, *) { return OnDeviceProvider() }
+            return nil
+        }()
         let pcc = buildPrivateCloudComputeProvider(from: config)
         let cloud = buildCloudProvider(from: config)
         // User-account providers and vendor-shipped custom models (iOS 27) are
@@ -804,10 +810,12 @@ public actor AIOrchestrator {
         return []
     }
 
-    /// Builds a chain provider for each configured user account (iOS 27+),
-    /// reached through the public `LanguageModel` protocol via
-    /// `CloudAccountLanguageModel`. Empty on iOS 26 or when none are configured
-    /// — the single `@available` gate for this tier (D14).
+    /// Builds a chain provider for each configured user account. On iOS 27+
+    /// the account goes through the public `LanguageModel` front door
+    /// (`CloudAccountLanguageModel`), so it is also a native model for the
+    /// profiles bridge; below 27 the user's key drives the vendor REST client
+    /// directly (D19) — same transport as the developer key, billed to the
+    /// user.
     static func buildUserAccountProviders(from config: AIConfiguration) -> [any ModelProvider] {
         guard !config.userAccounts.isEmpty else { return [] }
         if #available(iOS 27.0, macOS 27.0, *) {
@@ -824,7 +832,7 @@ public actor AIOrchestrator {
                 )
             }
         }
-        return []
+        return config.userAccounts.map { UserAccountRESTProvider(account: $0) }
     }
 
     /// Private Cloud Compute is the single iOS 27 wire-in point (D14): a

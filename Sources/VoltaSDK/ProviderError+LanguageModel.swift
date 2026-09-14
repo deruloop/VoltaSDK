@@ -13,6 +13,7 @@ import Foundation
 import FoundationModels
 
 @available(iOS 27.0, macOS 27.0, *)
+@available(iOS 27.0, macOS 27.0, *)
 extension ProviderError {
     /// Translates a `LanguageModelError` for the orchestrator: recoverable for
     /// context/rate/language/timeout (the chain can try another provider),

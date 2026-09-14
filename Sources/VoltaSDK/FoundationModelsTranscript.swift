@@ -20,6 +20,7 @@
 import Foundation
 import FoundationModels
 
+@available(iOS 26.0, macOS 26.0, *)
 public enum FoundationModelsTranscript {
 
     /// Maps instructions + history (D12) into native `Transcript` entries —

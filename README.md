@@ -26,18 +26,20 @@ only job is **model resolution**.
 
 | OS | What works |
 |---|---|
-| **iOS / macOS 26.0+** | The whole core: fallback chain, per-call needs, token streaming, typed errors, privacy disclosure (logged by default), multi-turn conversations with warm-session reuse, vendor-agnostic developer key (OpenAI / Claude / Gemini), optional UI components. Context handling is *reactive* (error → fallback). |
+| **iOS 18 / macOS 15+** | The package installs, and the cloud tier works in full: the fallback chain with the developer key or user-supplied keys (OpenAI / Claude / Gemini), per-call needs, token streaming, typed errors, privacy disclosure (logged by default), multi-turn conversations, and the SwiftUI components. `VoltaSDKAuth` is fully usable as a standalone OAuth client. |
+| **iOS / macOS 26.0+** | The **on-device model** (Apple Intelligence) joins the chain as the free, private tier, with warm-session reuse. |
 | **iOS / macOS 26.4+** | The *token-aware* tier lights up on its own: exact on-device token counting, automatic context-window pre-flight, `contextUsage` to know how full the window is. |
-| **iOS / macOS 27+** | **Private Cloud Compute** joins the chain as the free, Apple-hosted "powered" tier ([details](#private-cloud-compute-ios--macos-27)); users can bring [their own vendor account](#user-accounts-ios--macos-27); official vendor packages plug in via [`customModels`](#official-vendor-packages-custommodels); and [`preferred(_:)`](#dynamic-profiles-ios--macos-27) hands the resolved model to a native Dynamic Profile. Each piece degrades gracefully where unavailable. |
+| **iOS / macOS 27+** | **Private Cloud Compute** joins the chain as the free, Apple-hosted "powered" tier ([details](#private-cloud-compute-ios--macos-27)); [user accounts](#user-accounts) switch from direct REST to Apple's `LanguageModel` front door; official vendor packages plug in via [`customModels`](#official-vendor-packages-custommodels); and [`preferred(_:)`](#dynamic-profiles-ios--macos-27) hands the resolved model to a native Dynamic Profile. Each piece degrades gracefully where unavailable. |
 
 Requirements: Swift 6.2+, and **Xcode 27 or newer to build this line** — it
 references the iOS/macOS 27 SDK (Private Cloud Compute). The code is
-`@available`-gated, so the **deployment target stays iOS/macOS 26.0** and it
-runs fine on 26.x (PCC simply doesn't appear). If you are pinned to Xcode 26.4,
-use the **0.3.5** release (the last Xcode-26.4 line) instead. Build requirement
-and deployment target are independent. The on-device model needs a device with
-Apple Intelligence (detected at runtime: if absent, Volta excludes it and
-explains why).
+`@available`-gated, so the package **installs in apps deploying to iOS 18 /
+macOS 15** and each tier appears as the OS underneath provides it; nothing
+crashes on older systems, the newer providers are simply absent from the
+chain. If you are pinned to Xcode 26.4, use the **0.3.5** release (the last
+Xcode-26.4 line) instead. Build requirement and deployment target are
+independent. The on-device model needs a device with Apple Intelligence
+(detected at runtime: if absent, Volta excludes it and explains why).
 
 ## Installation (Swift Package Manager)
 
@@ -58,9 +60,10 @@ UI.
 Add Local… → select the package folder. Note: a local dependency always uses
 the working copy; version tags don't apply.
 
-The latest released version is **1.0.0** (see [CHANGELOG.md](CHANGELOG.md)),
-the complete feature set including the iOS 27 tier. Projects pinned to
-Xcode 26.4 should use **0.3.5**, the last release that builds there.
+The latest released version is **1.1.0** (see [CHANGELOG.md](CHANGELOG.md)):
+the complete feature set including the iOS 27 tier, installable from
+iOS 18 / macOS 15. Projects pinned to Xcode 26.4 should use **0.3.5**, the
+last release that builds there.
 
 ## Usage
 
@@ -384,13 +387,16 @@ quickest confidence check is: with the capability added, the
 `appleCloud`. Testing is allowed via **TestFlight or ad-hoc distribution**, and
 test installs do **not** count toward the 2M-download limit.
 
-## User accounts (iOS / macOS 27)
+## User accounts
 
-Beyond the developer key (which the app pays for), iOS 27 lets a user bring
-**their own** OpenAI / Claude / Gemini account through Apple's public
-`LanguageModel` protocol. Add them to `AIConfiguration.userAccounts`; usage
-bills the user, and the account takes its place in the chain like any other
-provider (never auto-selected).
+Beyond the developer key (which the app pays for), a user can bring
+**their own** OpenAI / Claude / Gemini account. Add it to
+`AIConfiguration.userAccounts`; usage bills the user, and the account takes
+its place in the chain like any other provider (never auto-selected). This
+works from iOS 18, where the user's key drives the vendor client directly;
+on iOS 27 the same account switches to Apple's public `LanguageModel` front
+door, which additionally makes it a native model for Dynamic Profiles. The
+configuration is identical either way.
 
 ```swift
 import VoltaSDK
@@ -409,6 +415,8 @@ package (below).
 
 The optional **`VoltaSDKAuth`** product remains for providers that *do*
 allow third-party OAuth, self-hosted or enterprise endpoints for example. It
+has no dependency on Apple's AI frameworks, so it is fully usable from
+iOS 18 as a standalone OAuth client, with or without the rest of the SDK. It
 runs the whole flow, the sign-in window (`ASWebAuthenticationSession`), PKCE,
 the code exchange, Keychain storage, and silent refresh:
 

@@ -9,6 +9,7 @@
 import Foundation
 import FoundationModels
 
+@available(iOS 26.0, macOS 26.0, *)
 public struct OnDeviceProvider: ModelProvider {
 
     public let identifier = ProviderIdentifier.onDevice

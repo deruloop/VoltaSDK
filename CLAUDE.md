@@ -95,6 +95,11 @@ questions doc into the design doc; release → CHANGELOG + state here.
   ("Missing package product"); both demo `.xcodeproj` are hand-patched to use
   `XCLocalSwiftPackageReference` and are the source of truth — re-apply that fix
   if you regenerate.
+- **1.1.0 RELEASED (Sep 14, 2026): the package floor drops to iOS 18 /
+  macOS 15 (D19).** The cloud tier (developer key + user keys via the new
+  `UserAccountRESTProvider`), streaming, needs, disclosure, and the UI kit
+  work from 18; `VoltaSDKAuth` is standalone-usable from 18; on-device 26,
+  PCC/front door/`preferred` 27, all unchanged. 92 tests in 20 suites.
 - **1.0.0 RELEASED (Sep 12, 2026): `xcode27` merged into `main`; `main` is
   now the 1.0 line.** Tagged on the merge commit (pre-release marker `0.9.0`
   tagged the day before, on the branch tip). Released against the beta
@@ -286,6 +291,7 @@ available); D18's logging makes any further crossing visible.
 - **D16** Streaming as an optional capability; fallback only until the first fragment — visible text is never retracted. *(26 impl)*
 - **D17** Warm-session reuse: same provider + exact conversation continuation → reuse the session; verify, never assume. *(26 impl)*
 - **D18** Privacy downgrades are logged by default (`.log`, unified log) — never silently invisible; `.silent` is an explicit opt-in. *(26 impl)*
+- **D19** Package floor iOS 18/macOS 15; tiers by `@available` — cloud chain + user keys (REST) + UI from 18, on-device from 26, PCC/front door from 27; Auth ungated. *(26 impl)*
 
 ## 5. Roadmap (ordered)
 
