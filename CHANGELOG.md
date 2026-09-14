@@ -5,6 +5,15 @@ All notable changes to this package. Versioning: [SemVer](https://semver.org).
 evolve the API. **1.0.0 will mark the complete feature set**, including the
 iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
 
+## [Unreleased] — quality evaluations (`evaluation` branch)
+
+- **Evaluations harness (D20).** New opt-in test target `VoltaSDKEvals`
+  built on Apple's Evaluations framework (WWDC 2026): a mock-backed smoke
+  evaluation runs the chain end to end under `Evaluation`/`run()` and
+  asserts its aggregate metric, proving the harness links and runs in a
+  plain SPM test target. The real suites (provider parity on fallback,
+  on-device long-context threshold) build on it next.
+
 ## [1.1.0] — 2026-09-14 — installs from iOS 18
 
 > The package floor drops from iOS 26 / macOS 26 to **iOS 18 / macOS 15**

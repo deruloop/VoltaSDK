@@ -292,6 +292,7 @@ available); D18's logging makes any further crossing visible.
 - **D17** Warm-session reuse: same provider + exact conversation continuation → reuse the session; verify, never assume. *(26 impl)*
 - **D18** Privacy downgrades are logged by default (`.log`, unified log) — never silently invisible; `.silent` is an explicit opt-in. *(26 impl)*
 - **D19** Package floor iOS 18/macOS 15; tiers by `@available` — cloud chain + user keys (REST) + UI from 18, on-device from 26, PCC/front door from 27; Auth ungated. *(26 impl)*
+- **D20** Quality is measured, not asserted: Apple's Evaluations framework in a dedicated opt-in test target (`VoltaSDKEvals`), manual `run()` pattern, env-gated when real models are needed. *(27 design §8)*
 
 ## 5. Roadmap (ordered)
 
@@ -370,8 +371,16 @@ available); D18's logging makes any further crossing visible.
 10. **Fetch model lists from vendor APIs** (OpenAI/Anthropic `GET /v1/models`,
     Gemini `ListModels`): once a key is entered, populate a model picker for
     the developer instead of a free-text field. Complements D15.
-11. **Evaluations framework (user decision, Sep 2026 — the next build after
-    the Part 3 article).** Apple's WWDC 2026 Evaluations framework, three
+11. **Evaluations framework — STARTED (Sep 14, 2026, `evaluation` branch,
+    D20).** The framework is surveyed from its `.swiftinterface` and recorded
+    in `docs/iOS27-Design.md` §8 (it is a TEST-TIME framework beside XCTest,
+    links in plain SPM test targets — verified); a working harness exists:
+    `Tests/VoltaSDKEvals/ChainEvaluations.swift` runs the chain under an
+    `Evaluation` (mock-backed, CI-safe, exact-match mean asserted at 1.0).
+    NEXT: the two real suites — provider parity on fallback (Q12/Q13) and
+    the on-device long-context threshold (the D7-amendment belief) — using
+    `ModelJudgeEvaluator` for quality and env-gated real providers.
+    Original brief: Apple's WWDC 2026 Evaluations framework, three
     sessions: 298 "Meet the Evaluations framework" (probabilistic testing,
     metrics, evaluators, Swift Testing integration), 299 "Create robust
     evaluations for agentic apps" (`makeSamples` synthetic data,

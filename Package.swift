@@ -42,6 +42,15 @@ let package = Package(
         .testTarget(
             name: "VoltaSDKTests",
             dependencies: ["VoltaSDK", "VoltaSDKAuth"]
+        ),
+        // Quality evaluations (D20): Apple's Evaluations framework (a
+        // test-time framework, like XCTest) measuring what the chain only
+        // asserts elsewhere — provider parity on fallback, long-context
+        // reliability. Kept separate from the unit tests: eval runs that
+        // need real models/keys are opt-in via environment variables.
+        .testTarget(
+            name: "VoltaSDKEvals",
+            dependencies: ["VoltaSDK"]
         )
     ]
 )

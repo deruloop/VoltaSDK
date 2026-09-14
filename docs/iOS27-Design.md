@@ -358,6 +358,43 @@ a portability mechanism.
 `PrivateCloudComputeLanguageModel.availability` + `isAvailable` for PCC, with
 the reasons above.
 
+**Evaluations framework (verified against beta 27A5237l, Sep 2026 — the
+item-11 build; D20).** Read from the framework's `.swiftinterface` and
+exercised by a working harness.
+- **Where it lives:** NOT in the OS SDK — it is a test-time framework beside
+  XCTest and Swift Testing
+  (`<platform>/Developer/Library/Frameworks/Evaluations.framework`,
+  `import Evaluations`, availability `anyAppleOS 27.0`, tvOS unavailable).
+  **It links in a plain SPM test target with no extra flags** (verified by
+  running) — the same search-path mechanism XCTest uses.
+- **Core shape:** `protocol Evaluation` = `dataset` (a `Loader`:
+  `ArrayLoader`/`JSONLoader`/`StreamLoader`) + `subject(from:)` (run the
+  system under test → `EvaluationSubject`, concretely
+  `ModelSubject<Value>(value:transcript:)`) + `evaluators` (result-builder
+  list) + `aggregateMetrics(using:)`. Samples are
+  `ModelSample<ExpectedValue>(prompt:expected:instructions:generationSchema:expectations:)`.
+  `Metric("name")` with `.passing()/.failing()/.scoring(Double)/.ignore()`
+  factories (all take an optional rationale); `MetricsAggregator` computes
+  mean/median/mode/min/max/stddev/variance/custom, with named groups.
+- **Running:** `try await evaluation.run(info:)` returns `EvaluationResult`
+  (`summary`/`detailed` as TabularData `DataFrame`s,
+  `aggregateValue(.mean(of:))`, `groupedSummary`, timing). Alternatively the
+  Swift Testing trait `.evaluates(_:info:recordTranscripts:)` +
+  `EvaluationContext.current.result` inside the test.
+- **The judge/agent layer (not yet exercised):**
+  `ModelJudgeEvaluator` + `ModelJudgePrompt` + `ScoreDimension`/
+  `ScoringScale`/`ScoreLevel` for model-as-judge scoring;
+  `ToolCallEvaluator` + `TrajectoryExpectation` + `ToolExpectation` +
+  `ArgumentMatcher` (exact/presence/range/pattern/semantic-by-model) for
+  agent trajectories; `actor SampleGenerator` streams synthetic samples from
+  a model.
+- **Integration constraint (D20):** Swift Testing rejects `@available` on
+  `@Test`/`@Suite`, and the trait's symbols are 27-only while the package
+  floor is 18 — so evaluations run through manual `run()` inside
+  availability-guarded tests, in a dedicated opt-in test target
+  (`Tests/VoltaSDKEvals`). Mock-backed harness runs stay CI-safe; suites
+  needing real models/keys gate on environment variables.
+
 **Dynamic Profiles (verified against beta 27A5237l, Aug 2026 — the Part 3
 build).** Read from the same `.swiftinterface`; exercised by the demo's
 `ProfileBridgeSection`.
