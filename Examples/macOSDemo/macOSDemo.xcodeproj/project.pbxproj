@@ -3,11 +3,10 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 60;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		09260035D0BC5355BFF5881F /* EvalTasks in Resources */ = {isa = PBXBuildFile; fileRef = 9413A056851F02AA1FF49D78 /* EvalTasks */; };
 		159394C738D4BE6E333B68FE /* EngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46689095444239ACE35C2EB0 /* EngineTests.swift */; };
 		190518C92C1177EE9C0AA06A /* VoltaSDK in Frameworks */ = {isa = PBXBuildFile; productRef = EC8DA31F0034D9C0536CE05F /* VoltaSDK */; };
 		61EC619CEE6E5C09133BF089 /* macOSDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB0758777210FF98B69B45BB /* macOSDemoApp.swift */; };
@@ -32,7 +31,6 @@
 		4560F2C7FB19526DB55CD183 /* LiveEvaluations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveEvaluations.swift; sourceTree = "<group>"; };
 		46689095444239ACE35C2EB0 /* EngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineTests.swift; sourceTree = "<group>"; };
 		73850072C8378F353ABF68E5 /* macOSDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = macOSDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		9413A056851F02AA1FF49D78 /* EvalTasks */ = {isa = PBXFileReference; lastKnownFileType = folder; name = EvalTasks; path = ../../docs/evals/raviolo/tasks; sourceTree = SOURCE_ROOT; };
 		DB0758777210FF98B69B45BB /* macOSDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = macOSDemoApp.swift; sourceTree = "<group>"; };
 		F22A1CB49677814A60B4A044 /* ChainEvaluations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainEvaluations.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -66,6 +64,14 @@
 			path = Sources;
 			sourceTree = "<group>";
 		};
+		5AC837C4D22CF54B7D003654 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				30BB558524D9EC054DA0A855 /* VoltaSDK */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
 		78C054F14C885DFFC7D8AA03 /* VoltaSDKEvalsTests */ = {
 			isa = PBXGroup;
 			children = (
@@ -80,7 +86,7 @@
 		D17CC3A6B4B35BE92ED9D17A = {
 			isa = PBXGroup;
 			children = (
-				9413A056851F02AA1FF49D78 /* EvalTasks */,
+				5AC837C4D22CF54B7D003654 /* Packages */,
 				4CD097DA503D4497F0F70782 /* Sources */,
 				78C054F14C885DFFC7D8AA03 /* VoltaSDKEvalsTests */,
 				FAF17119FD11C5DF17DEC0B0 /* Products */,
@@ -123,7 +129,6 @@
 			buildConfigurationList = E0EA5FE86DCF7C3FC0067850 /* Build configuration list for PBXNativeTarget "macOSDemoEvals" */;
 			buildPhases = (
 				E47E0184EA8FBB2BFFDF5404 /* Sources */,
-				CB4F6C97B01C759FBADC308A /* Resources */,
 				7D104472BC925EAFFB47D99D /* Frameworks */,
 			);
 			buildRules = (
@@ -146,7 +151,8 @@
 		D85418E51FFCAF34DC07C11C /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 1200;
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					74A146ACA1CA0134C282CE02 = {
 						DevelopmentTeam = J6HPZ958W6;
@@ -159,7 +165,6 @@
 				};
 			};
 			buildConfigurationList = 292528357BF5AAD49F500617 /* Build configuration list for PBXProject "macOSDemo" */;
-			compatibilityVersion = "Xcode 11.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -167,9 +172,12 @@
 				en,
 			);
 			mainGroup = D17CC3A6B4B35BE92ED9D17A;
+			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				B2C3D4E5F6071829A0B1C2D3 /* XCLocalSwiftPackageReference "../.." */,
+				93E6724DBC5C46CCF0EFE479 /* XCLocalSwiftPackageReference "../.." */,
 			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = FAF17119FD11C5DF17DEC0B0 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -178,17 +186,6 @@
 			);
 		};
 /* End PBXProject section */
-
-/* Begin PBXResourcesBuildPhase section */
-		CB4F6C97B01C759FBADC308A /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				09260035D0BC5355BFF5881F /* EvalTasks in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		9137435E6F8B622E5E3DDA5C /* Sources */ = {
@@ -450,7 +447,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		B2C3D4E5F6071829A0B1C2D3 /* XCLocalSwiftPackageReference "../.." */ = {
+		93E6724DBC5C46CCF0EFE479 /* XCLocalSwiftPackageReference "../.." */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../..;
 		};

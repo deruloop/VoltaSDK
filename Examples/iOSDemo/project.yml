@@ -42,8 +42,8 @@ targets:
   # DEVICE: the Mac's Apple Intelligence only stands in for an iPhone's; the
   # real on-device row of the capability map comes from this bundle on the
   # real phone (and the PCC row, when the app carries the entitlement).
-  # Task files travel as a folder reference named EvalTasks (optional: point
-  # it at the client's task directory, git-excluded here). Run with:
+  # Task files: add your own directory as a folder reference named EvalTasks
+  # (a client app keeps its tasks in its own repo). Run with:
   #   xcodebuild test -scheme iOSDemoEvals -destination 'id=<device udid>' \
   #     TEST_RUNNER_VOLTA_EVAL_LIVE=1 TEST_RUNNER_VOLTA_EVAL_TIERS=on-device \
   #     -only-testing:iOSDemoEvals/LiveEvaluations 2>&1 | tee run.log
@@ -57,11 +57,6 @@ targets:
       # compiled here by path.
       - path: ../../Tests/VoltaSDKEvalsTests
         name: VoltaSDKEvalsTests
-      - path: ../../docs/evals/raviolo/tasks
-        name: EvalTasks
-        type: folder
-        buildPhase: resources
-        optional: true
     dependencies:
       - target: iOSDemo
       - package: VoltaSDK

@@ -46,9 +46,8 @@ public struct EvalRunner {
     /// the Mac); on a device the bundle's resources stand in.
     public static var packageRoot: URL {
         URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()   // Engine
             .deletingLastPathComponent()   // VoltaSDKEvals
-            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // Sources
             .deletingLastPathComponent()   // package root
     }
 

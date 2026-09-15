@@ -149,7 +149,7 @@ test bundle on a device.
 DEVELOPER_DIR=~/Downloads/Xcode-beta.app/Contents/Developer swift test --filter VoltaSDKEvalsTests
 
 # Live, on this Mac (on-device = the Mac's Apple Intelligence; cloud with keys)
-VOLTA_EVAL_LIVE=1 VOLTA_EVAL_TASKS=docs/evals/raviolo/tasks \
+VOLTA_EVAL_LIVE=1 VOLTA_EVAL_TASKS=/path/to/your/tasks \
 VOLTA_EVAL_TIERS=on-device VOLTA_EVAL_MODES=raw,structured,structured+repair \
 DEVELOPER_DIR=… swift test --filter LiveEvaluations
 ```
@@ -166,8 +166,9 @@ Environment: `VOLTA_EVAL_LIVE=1`, `VOLTA_EVAL_TASKS` (file or directory),
 A `swift test` process is unentitled, so the PCC tier can only be measured
 from a process signed with the entitlement. `Examples/macOSDemo` carries a
 `macOSDemoEvals` unit-test bundle hosted by the (locally entitled) demo app;
-the bundle compiles the SAME engine sources and carries the task files as a
-folder reference (`../../docs/evals/raviolo/tasks`, optional). `xcodebuild`
+the bundle links the same `VoltaSDKEvals` product and can carry task files
+as a folder reference named `EvalTasks` (add your own; the SDK ships none).
+`xcodebuild`
 forwards `TEST_RUNNER_`-prefixed **environment variables** (not build
 settings) to the test process:
 
@@ -189,8 +190,9 @@ and prints each entry as an `[evals-entry]` line for the merge script.
 ### A real iPhone: the hosted bundle in the iOS demo
 
 The Mac's model only stands in for a phone's. `Examples/iOSDemo` carries an
-`iOSDemoEvals` bundle with the task files bundled as a folder reference
-(`../../docs/evals/raviolo/tasks`, optional, git-excluded client data).
+`iOSDemoEvals` bundle; add your task files as a folder reference named
+`EvalTasks` (a client app keeps its tasks in its own repo, next to its own
+eval test target).
 Results land in the app container and are printed as `[evals-entry]`
 lines; merge them on the Mac:
 

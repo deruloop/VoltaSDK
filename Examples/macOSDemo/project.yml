@@ -82,16 +82,6 @@ targets:
       # compiled here by path.
       - path: ../../Tests/VoltaSDKEvalsTests
         name: VoltaSDKEvalsTests
-      # Task files as a bundled folder reference (optional, git-excluded
-      # client data). Reading them from the bundle avoids macOS's privacy
-      # prompt: a GUI host app opening a folder under ~/Desktop or ~/Documents
-      # blocks on the TCC dialog, and the run hangs. Prefer this to
-      # VOLTA_EVAL_TASKS pointing into a protected folder.
-      - path: ../../docs/evals/raviolo/tasks
-        name: EvalTasks
-        type: folder
-        buildPhase: resources
-        optional: true
     dependencies:
       - target: macOSDemo
       - package: VoltaSDK

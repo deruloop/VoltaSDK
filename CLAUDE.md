@@ -396,9 +396,13 @@ available); D18's logging makes any further crossing visible.
     (`ModelJudgeEvaluator` driven by `CloudAccountLanguageModel`, vendor ≠
     tier under test, Cohen's kappa vs `VOLTA_EVAL_HUMAN_RATINGS`) is built
     and unit-tested; LIVE JUDGE + CLOUD TIERS PENDING KEYS (none in the
-    environment this session). The Raviolo triple (4 tasks, Italian, from
-    `docs/evals/raviolo/handoff-v1.md`) lives git-excluded in
-    `docs/evals/raviolo/tasks` (+ two experiments in `…/experiments`).
+    environment this session). **Raviolo's material moved OUT of the SDK
+    (Sep 15):** tasks, experiments, handoff, and its rows of the map now
+    live in `~/Desktop/RavioloApp/apple/RavioloEvals/` (a `RavioloEvals`
+    unit-test target + scheme that sets `RAVIOLO_EVALS=1`; per-feature
+    tests assert measured floors; Raviolo's `project.yml` points VoltaSDK
+    at the local checkout until 1.2.0 ships). The SDK's committed map now
+    holds only the generic example tasks.
     **Measured (Mac M2 on-device standing in for the iPhone, Sep 14):**
     Phase 0: Italian is declared supported and accepted 100% (0
     `unsupportedLanguage` over 55 samples). Phase 1 raw ceiling: Task C

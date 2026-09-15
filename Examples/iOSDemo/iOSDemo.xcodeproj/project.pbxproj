@@ -3,11 +3,10 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 60;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		1867443C4DD09D7112E04962 /* EvalTasks in Resources */ = {isa = PBXBuildFile; fileRef = CB6AB61B7054E515F6398C44 /* EvalTasks */; };
 		1B2DD9161DC577CE2E214CF2 /* VoltaSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 385CFA3A6F59F7A6610F9C6E /* VoltaSDK */; };
 		1FA9802E0B64000520094A60 /* ChainEvaluations.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA6C407D1D432C3EE580E989 /* ChainEvaluations.swift */; };
 		21453952B75E754CD1FDDD26 /* EngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A1F154251347E0B45F7EB6E /* EngineTests.swift */; };
@@ -33,7 +32,6 @@
 		82B5FF964986B359F7E0093C /* iOSDemoEvals.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = iOSDemoEvals.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B161B8B436DF0E418C592968 /* iOSDemo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = iOSDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B9993C5358C1ECE89FE7CB90 /* iOSDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSDemoApp.swift; sourceTree = "<group>"; };
-		CB6AB61B7054E515F6398C44 /* EvalTasks */ = {isa = PBXFileReference; lastKnownFileType = folder; name = EvalTasks; path = ../../docs/evals/raviolo/tasks; sourceTree = SOURCE_ROOT; };
 		DA6C407D1D432C3EE580E989 /* ChainEvaluations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainEvaluations.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -58,10 +56,18 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		6B94F61089890F854A5F8DFA /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				B67899711871107568FFF57F /* VoltaSDK */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
 		9CB6A1125DCABAF71670C65F = {
 			isa = PBXGroup;
 			children = (
-				CB6AB61B7054E515F6398C44 /* EvalTasks */,
+				6B94F61089890F854A5F8DFA /* Packages */,
 				CB2A50A29AAA2DD897BFBD87 /* Sources */,
 				D4C346BB6E91C20483DD1FD5 /* VoltaSDKEvalsTests */,
 				E827CB84350414BB2A4DD1BD /* Products */,
@@ -104,7 +110,6 @@
 			buildConfigurationList = 89DAF06BE7B97C59B72C8BC3 /* Build configuration list for PBXNativeTarget "iOSDemoEvals" */;
 			buildPhases = (
 				50A1AAA8570F625E7068533E /* Sources */,
-				3B9775119B8DD1277A8312AA /* Resources */,
 				F5E6776E789556495BB5BA81 /* Frameworks */,
 			);
 			buildRules = (
@@ -146,7 +151,8 @@
 		4BEF5274A599263F72511E16 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 1200;
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					37E2AC6111C9AA7078626F3A = {
 						DevelopmentTeam = J6HPZ958W6;
@@ -159,7 +165,6 @@
 				};
 			};
 			buildConfigurationList = 48FB5F7776F0014862044497 /* Build configuration list for PBXProject "iOSDemo" */;
-			compatibilityVersion = "Xcode 11.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -167,9 +172,12 @@
 				en,
 			);
 			mainGroup = 9CB6A1125DCABAF71670C65F;
+			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				B2C3D4E5F6071829A0B1C2D3 /* XCLocalSwiftPackageReference "../.." */,
+				F2B4D2A758B6E1BA6F0ED7B9 /* XCLocalSwiftPackageReference "../.." */,
 			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = E827CB84350414BB2A4DD1BD /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -178,17 +186,6 @@
 			);
 		};
 /* End PBXProject section */
-
-/* Begin PBXResourcesBuildPhase section */
-		3B9775119B8DD1277A8312AA /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				1867443C4DD09D7112E04962 /* EvalTasks in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		50A1AAA8570F625E7068533E /* Sources */ = {
@@ -454,7 +451,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		B2C3D4E5F6071829A0B1C2D3 /* XCLocalSwiftPackageReference "../.." */ = {
+		F2B4D2A758B6E1BA6F0ED7B9 /* XCLocalSwiftPackageReference "../.." */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../..;
 		};
