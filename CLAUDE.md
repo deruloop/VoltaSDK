@@ -95,6 +95,13 @@ questions doc into the design doc; release → CHANGELOG + state here.
   ("Missing package product"); both demo `.xcodeproj` are hand-patched to use
   `XCLocalSwiftPackageReference` and are the source of truth — re-apply that fix
   if you regenerate.
+- **`evaluation` branch (Sep 14, 2026, unreleased): D21 structured output +
+  the D20 evaluation engine + the first capability map.** See roadmap item
+  11 for the numbers; `docs/evals/README.md` for the manual. 120 tests (92 +
+  28) green. Toolchain: beta 27A5237l at `~/Downloads/Xcode-beta.app`.
+  Both demo projects now carry hosted eval bundles and are regenerated with
+  `xcodegen generate` + `Examples/patch-local-package.py` (the hand-patch is
+  scripted; the PCC entitlement stays a local `--entitlements` flag).
 - **1.1.0 RELEASED (Sep 14, 2026): the package floor drops to iOS 18 /
   macOS 15 (D19).** The cloud tier (developer key + user keys via the new
   `UserAccountRESTProvider`), streaming, needs, disclosure, and the UI kit
@@ -292,7 +299,8 @@ available); D18's logging makes any further crossing visible.
 - **D17** Warm-session reuse: same provider + exact conversation continuation → reuse the session; verify, never assume. *(26 impl)*
 - **D18** Privacy downgrades are logged by default (`.log`, unified log) — never silently invisible; `.silent` is an explicit opt-in. *(26 impl)*
 - **D19** Package floor iOS 18/macOS 15; tiers by `@available` — cloud chain + user keys (REST) + UI from 18, on-device from 26, PCC/front door from 27; Auth ungated. *(26 impl)*
-- **D20** Quality is measured, not asserted: Apple's Evaluations framework in a dedicated opt-in test target (`VoltaSDKEvals`), manual `run()` pattern, env-gated when real models are needed. *(27 design §8)*
+- **D20** Quality is measured, not asserted: Apple's Evaluations framework in a dedicated opt-in test target (`VoltaSDKEvals`), manual `run()` pattern, env-gated when real models are needed; a generic triple (schema + dataset + graders, as data) → the capability map. *(27 design §8, docs/evals/README.md)*
+- **D21** Structured output: schema in (`OutputSchema`), validated value out, one repair turn, typed fallback-recoverable failure; native constraint where the provider can (guided generation / JSON mode), prompted otherwise. *(26 impl)*
 
 ## 5. Roadmap (ordered)
 
@@ -371,15 +379,60 @@ available); D18's logging makes any further crossing visible.
 10. **Fetch model lists from vendor APIs** (OpenAI/Anthropic `GET /v1/models`,
     Gemini `ListModels`): once a key is entered, populate a model picker for
     the developer instead of a free-text field. Complements D15.
-11. **Evaluations framework — STARTED (Sep 14, 2026, `evaluation` branch,
-    D20).** The framework is surveyed from its `.swiftinterface` and recorded
-    in `docs/iOS27-Design.md` §8 (it is a TEST-TIME framework beside XCTest,
-    links in plain SPM test targets — verified); a working harness exists:
-    `Tests/VoltaSDKEvals/ChainEvaluations.swift` runs the chain under an
-    `Evaluation` (mock-backed, CI-safe, exact-match mean asserted at 1.0).
-    NEXT: the two real suites — provider parity on fallback (Q12/Q13) and
-    the on-device long-context threshold (the D7-amendment belief) — using
-    `ModelJudgeEvaluator` for quality and env-gated real providers.
+11. **Evaluations — ENGINE BUILT + FIRST CAPABILITY MAP (Sep 14, 2026,
+    `evaluation` branch, D20/D21).** `Tests/VoltaSDKEvals/Engine` runs a
+    generic triple (task JSON = `OutputSchema` + samples + graders) through
+    one tier at a time (on-device, PCC, cloud per vendor) in three modes
+    (raw / structured / structured+repair) and upserts
+    `docs/evals/results/capability-map.{json,md}`. Manual:
+    `docs/evals/README.md`. **D21 structured output shipped in the core**
+    because the first numbers demanded it (see below). Hosted bundles
+    `macOSDemoEvals` (PCC via the entitled host) and `iOSDemoEvals` (real
+    iPhone; results merged with `scripts/evals-merge.py`). The judge layer
+    (`ModelJudgeEvaluator` driven by `CloudAccountLanguageModel`, vendor ≠
+    tier under test, Cohen's kappa vs `VOLTA_EVAL_HUMAN_RATINGS`) is built
+    and unit-tested; LIVE JUDGE + CLOUD TIERS PENDING KEYS (none in the
+    environment this session). The Raviolo triple (4 tasks, Italian, from
+    `docs/evals/raviolo/handoff-v1.md`) lives git-excluded in
+    `docs/evals/raviolo/tasks` (+ two experiments in `…/experiments`).
+    **Measured (Mac M2 on-device standing in for the iPhone, Sep 14):**
+    Phase 0: Italian is declared supported and accepted 100% (0
+    `unsupportedLanguage` over 55 samples). Phase 1 raw ceiling: Task C
+    (recipe extraction) 6/7; Tasks A / A′ / B 0/20, 0/8, 0/20 — the dominant
+    cause is a NEW failure mode (F5): the model copies the enum spec literal
+    (`"present|light|missing"`) into the values, which the app's tolerant
+    parser turns into the reported F2. Phase 2 (D21): schema validity 0% →
+    100% on every task; Task A 0/20 → 13/20; A′ retention unmeasurable →
+    100% (the "on-device can't keep a list across turns" belief is false
+    once output is structured); C 7/7. Remaining failures are content: the
+    note comes back in ENGLISH for Italian input in 35–100% of samples
+    (English instructions dominate; an Italian schema description did not
+    move it — Raviolo should write the instructions in Italian or
+    post-check the language), and Task B stays 0/20 in every mode: on-device
+    never picks the shopping shape for implicit phrasings inside the big
+    prompt, while intent classification as a dedicated one-field structured
+    call scores 25/28 (experiment `task-b2-intent`) — the two-call design is
+    the recommendation. One A′ raw sample overflowed the 4096-token window
+    at generation (output counts against it; D13 pre-flight can't see
+    output). `structured` vs `structured+repair` differ by sampling noise
+    at n=20 (repair only triggers on validator-side constraints under
+    guided generation). **PCC tier (hosted bundle, entitled host, Sep 14):**
+    A 14/20 raw → 18/20 structured; A′ 5/8 → 7/8; B 16/20 in every mode
+    (the four misses are the genuinely ambiguous phrasings); C 6/7 → 7/7
+    with repair. PCC reads the prompt as written (schema 95% raw, Italian
+    notes 90%+), so the map already says which tier earns which feature:
+    extraction everywhere, the record on PCC or on-device-structured, implicit
+    shopping intent PCC-only. One PCC sample died with a bare
+    `LanguageModelError` -1 (scored as a failure; re-run to see if
+    transient). Hosted-run rules learned: pass config as EXPORTED
+    `TEST_RUNNER_VOLTA_EVAL_*` env vars; a GUI host touching ~/Desktop
+    hangs on the TCC prompt (tasks now bundled, results in Application
+    Support, `scripts/evals-merge.py` folds `[evals-entry]` lines into the
+    map and regenerates its Markdown). NEXT: cloud tiers + live judge once keys are provided; the
+    real-iPhone row via `iOSDemoEvals`; the two SDK suites still owed —
+    parity on fallback (Q12/Q13) and the on-device long-context threshold
+    (the D7-amendment belief); Part 4 article draft at
+    `docs/articles/resolution-meets-measurement.md` (git-excluded).
     Original brief: Apple's WWDC 2026 Evaluations framework, three
     sessions: 298 "Meet the Evaluations framework" (probabilistic testing,
     metrics, evaluators, Swift Testing integration), 299 "Create robust

@@ -7,12 +7,58 @@ iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
 
 ## [Unreleased] — quality evaluations (`evaluation` branch)
 
-- **Evaluations harness (D20).** New opt-in test target `VoltaSDKEvals`
-  built on Apple's Evaluations framework (WWDC 2026): a mock-backed smoke
-  evaluation runs the chain end to end under `Evaluation`/`run()` and
-  asserts its aggregate metric, proving the harness links and runs in a
-  plain SPM test target. The real suites (provider parity on fallback,
-  on-device long-context threshold) build on it next.
+- **Structured output (D21).** `respondStructured(to:instructions:history:
+  schema:need:repair:)` and the typed `respond(to:…schema:as:)` on the
+  orchestrator: a vendor-neutral `OutputSchema` (ordered object properties,
+  enum/pattern strings, numbers, integers, booleans, bounded arrays, a named
+  `anyOf`; `Codable`) goes in, a validated `JSONValue` comes out, with one
+  repair turn on a violation (`RepairPolicy.once`, default; `.none` = the
+  first answer or nothing) and a typed, fallback-recoverable
+  `ProviderError.malformedStructuredOutput` when the provider cannot
+  conform. Native modes on every built-in provider: guided generation on
+  on-device and PCC (`DynamicGenerationSchema`), `response_format`
+  json_schema (OpenAI), `output_config.format` (Claude),
+  `responseJsonSchema` (Gemini); the front door forwards the schema to the
+  executor; custom providers get the prompted fallback for free via the new
+  optional `ModelProvider` capability (`supportsNativeStructuredOutput`,
+  `respondStructured`). Patterns and array bounds are enforced by the SDK
+  validator after the call (Apple's dynamic schemas reject a pattern guide
+  at generation time). `MockProvider` gains scripted `structuredAnswers`.
+- **Evaluation engine (D20).** `Tests/VoltaSDKEvals` now runs a generic
+  triple — task = schema + dataset + graders, as a JSON file — through one
+  tier at a time (on-device, PCC, cloud per vendor) in three modes (raw,
+  structured, structured+repair) under Apple's Evaluations framework, and
+  writes a capability map (`docs/evals/results/capability-map.{json,md}`:
+  task × tier × mode → pass rate, per-grader rates, failure rationales,
+  latency). Twelve generic graders, multi-turn carry templates, a model
+  judge on `ModelJudgeEvaluator` driven by `CloudAccountLanguageModel` with
+  Cohen's-kappa agreement against human ratings, two generic example tasks,
+  28 mock-backed tests. Hosted test bundles in both demo apps
+  (`macOSDemoEvals` for the entitled PCC process, `iOSDemoEvals` for a real
+  iPhone) compile the same engine sources; `scripts/evals-merge.py` folds a
+  device run into the map. First measured results (a client's Italian
+  meal-assistant tasks on the Mac's on-device model): structured output
+  takes schema validity from 0% to 100% and two-turn item retention from
+  unmeasurable to 100%; the remaining failures are content, not shape.
+- **Fixed: the package did not compile for a physical iPhone** since the
+  PCC provider shipped — its entitlement self-check used `SecTask`, which is
+  macOS-only. On iOS the check now reads the embedded provisioning profile
+  (development / ad-hoc / enterprise builds); App Store builds carry no
+  profile, so the new `AIConfiguration.privateCloudComputeEntitlement`
+  (`.detect` default, `.granted`, `.absent`) lets a shipping app state it.
+  `PrivateCloudComputeProvider.hasRequiredEntitlement()` is now public.
+- **Fixed: on-device rate limiting surfaced as a terminal generation
+  error.** On iOS 27 the system model throws the framework-wide
+  `LanguageModelError` (observed live: `rateLimited` on every call of a
+  hosted test run while the iPhone was locked); `OnDeviceProvider` now maps
+  that family through the shared mapper, so the chain falls back and the
+  evaluations report it as unavailability rather than model failure.
+- **Demo projects.** `Examples/patch-local-package.py` re-applies the
+  modern local-package reference after `xcodegen generate` (both projects
+  are now in that form); the iOS project gained it in the process.
+- **Evaluations harness (D20, first contact).** The mock-backed smoke
+  evaluation that proved the framework links and runs in a plain SPM test
+  target.
 
 ## [1.1.0] — 2026-09-14 — installs from iOS 18
 

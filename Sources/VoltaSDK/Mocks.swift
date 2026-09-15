@@ -8,6 +8,13 @@
 //
 
 import Foundation
+import Synchronization
+
+/// A reference-typed counter so the value-typed mock can script sequences.
+final class Counter: @unchecked Sendable {
+    private let value = Mutex(0)
+    func next() -> Int { value.withLock { v in defer { v += 1 }; return v } }
+}
 
 /// Fake provider with a configurable outcome. Covers both success and
 /// failure, so the fallback chain can be tested (e.g. one provider that
@@ -31,6 +38,13 @@ public struct MockProvider: ModelProvider {
     private let streamFragments: [String]?
     private let streamFailure: ProviderError?
 
+    /// Simulated structured-output capability (D21). When set, each
+    /// `respondStructured` call pops the next answer (the last one repeats),
+    /// so a test can script "malformed first, fixed on repair"; when nil,
+    /// the prompted default applies over `outcome`.
+    private let structuredAnswers: [String]?
+    private let structuredCounter = Counter()
+
     public init(
         identifier: ProviderIdentifier,
         privacyLevel: PrivacyLevel = .onDevice,
@@ -40,6 +54,7 @@ public struct MockProvider: ModelProvider {
         tokenCount: Int? = nil,
         streamFragments: [String]? = nil,
         streamFailure: ProviderError? = nil,
+        structuredAnswers: [String]? = nil,
         onRespond: (@Sendable (_ prompt: String, _ instructions: String?, _ history: [ChatTurn]) -> Void)? = nil
     ) {
         self.identifier = identifier
@@ -50,7 +65,28 @@ public struct MockProvider: ModelProvider {
         self.tokenCountValue = tokenCount
         self.streamFragments = streamFragments
         self.streamFailure = streamFailure
+        self.structuredAnswers = structuredAnswers
         self.onRespond = onRespond
+    }
+
+    public var supportsNativeStructuredOutput: Bool { structuredAnswers != nil }
+
+    public func respondStructured(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn],
+        schema: OutputSchema
+    ) async throws -> String {
+        guard let structuredAnswers, !structuredAnswers.isEmpty else {
+            return try await respond(
+                to: prompt,
+                instructions: StructuredOutput.promptedInstructions(instructions, schema: schema),
+                history: history
+            )
+        }
+        onRespond?(prompt, instructions, history)
+        let index = min(structuredCounter.next(), structuredAnswers.count - 1)
+        return structuredAnswers[index]
     }
 
     public func availability() async -> ProviderAvailability {

@@ -48,7 +48,11 @@ File map:
 │   │   ├── LanguageModelProvider.swift    // wraps any LanguageModel into the chain (iOS 27)
 │   │   ├── LanguageModelBridge.swift      // LanguageModelConvertible + preferred() conformances (D1, iOS 27)
 │   │   ├── ProviderError+LanguageModel.swift // shared LanguageModelError → ProviderError mapping
-│   │   └── Mocks.swift                    // MockProvider (public, for adopters' tests too)
+│   │   ├── JSONValue.swift                // dependency-free JSON model + lenient extraction (D21)
+│   │   ├── OutputSchema.swift             // vendor-neutral schema: JSON Schema export, validation, Codable (D21)
+│   │   ├── OutputSchema+FoundationModels.swift // schema → DynamicGenerationSchema; guided-generation helper (D21, 26+)
+│   │   ├── StructuredOutput.swift         // respondStructured: validate → repair → typed failure (D21)
+│   │   └── Mocks.swift                    // MockProvider (public, for adopters' tests too; scripted structured answers)
 │   ├── VoltaSDKAuth/                      // OPT-IN OAuth machinery (PKCE, Keychain, refresh) — not in core
 │   ├── VoltaSDKUI/                        // OPTIONAL SwiftUI components (separate product)
 │   │   ├── PrivacyLevelBadge.swift        // badge for a PrivacyLevel
@@ -66,8 +70,16 @@ File map:
 │   ├── project.yml
 │   ├── macOSDemo.xcodeproj
 │   └── Sources/macOSDemoApp.swift         // @main wrapper around DemoRootView
-└── Tests/VoltaSDKTests/
-    └── VoltaSDKTests.swift                // fallback, privacy, history, tokens, parsing
+├── Tests/VoltaSDKTests/
+│   └── VoltaSDKTests.swift                // fallback, privacy, history, tokens, parsing
+├── Tests/VoltaSDKEvals/                   // OPT-IN evaluation engine (D20) — see docs/evals/README.md
+│   ├── Engine/                            // task triple, graders, tiers, TaskEvaluation, CapabilityMap, judge, runner
+│   ├── Fixtures/                          // two generic example tasks (JSON)
+│   ├── EngineTests.swift                  // mock-backed, CI-safe
+│   └── LiveEvaluations.swift              // VOLTA_EVAL_LIVE=1: Phase 0 + the capability map
+├── docs/evals/                            // how to run; results/capability-map.{json,md}
+├── scripts/evals-merge.py                 // fold a device run's [evals-entry] lines into the map
+└── Examples/patch-local-package.py        // re-apply the XCLocalSwiftPackageReference fix after xcodegen
 ```
 
 ## 2. The pieces
@@ -357,6 +369,47 @@ a session (the race loser builds fresh); a config change rebuilds providers
 → cold caches. Scope: one session per provider — alternating between two
 conversations misses every time (no regression, just no benefit).
 
+### D21 — Structured output: schema in, validated value out, repair, typed failure
+The evaluation work (D20) made the gap concrete: a client app asked the
+on-device model for a JSON object with enum-valued fields, and the model
+copied the enum SPEC into the values (`"present|light|missing"`), which the
+app's tolerant parser turned into "everything missing". Only the SDK knows
+which provider answered, so only the SDK can promise a *validated typed
+value* across the chain. D21 adds one vendor-neutral schema value,
+`OutputSchema` (objects with ordered properties, strings with `enum` /
+`pattern`, numbers, integers, booleans, bounded arrays, a named `anyOf` for
+answers that may take one of several shapes; Codable so it can live in a
+data file), and one orchestrator entry point, `respondStructured(to:…
+schema:need:repair:)` (+ a `respond<T: Decodable>(…schema:as:)` typed
+convenience), through the same chain walk as `respond`. Per provider: ask
+(native where possible), extract the JSON leniently (first `{` to last `}`,
+fences tolerated), validate, and on a violation give the SAME provider one
+repair turn quoting the violations (`RepairPolicy.once`, the default;
+`.none` = the raw ceiling). A second failure is
+`ProviderError.malformedStructuredOutput(violations:raw:)`, **recoverable
+by fallback**: a more capable provider down the chain gets its chance, and
+the privacy gate (D7/D18) applies as for any fallback. Native modes: on-device
+and PCC use guided generation (`DynamicGenerationSchema` →
+`GenerationSchema(root:dependencies:)`, `session.respond(to:schema:)`,
+26+); OpenAI `response_format json_schema strict`; Anthropic
+`output_config.format json_schema`; Gemini `responseMimeType` +
+`responseJsonSchema`; wrapped `LanguageModel`s go through the framework's
+schema path (`CloudAccountLanguageModel`'s executor forwards the schema as a
+prompted instruction); anything else gets the prompted fallback (schema
+appended to the instructions) via the protocol's default
+`respondStructured`. Two constraints stay SDK-side by design: string
+`pattern` (Apple rejects a `.pattern` guide in a dynamic schema at
+generation time, "UnsupportedGuide", observed live; the strict cloud modes
+don't all accept it) and array bounds are enforced by the validator after
+the call, and exported only in the dialects that take them. The shared
+admission gate (`AIOrchestrator.admit`) was factored out of
+`respondDetailed`/`runStream` so the three chain walks apply one
+availability + pre-flight + privacy step. Measured effect (Sep 2026,
+docs/evals/results): on the Mac's on-device model, the schema-validity rate
+of a client task went from 0% to 100%, its pass rate from 0/20 to 13/20, and
+a two-turn retention task from unmeasurable to 100% retention — the
+remaining failures are content (language, judgment), not shape.
+
 ## 5. Public API that must stay stable
 
 ```swift
@@ -382,6 +435,12 @@ try await kit.preferred(_ need: ModelNeed? = nil) -> any LanguageModel  // iOS 2
 enum ModelNeed { lightweight, reasoning, largeContext }         // (D7)
 FoundationModelsTranscript.entries(instructions:history:) -> [Transcript.Entry]  // ChatTurn → native transcript (D12↔profile glue)
 struct PlaygroundEngine { label, footnote, stream }  // VoltaSDKUI: app-supplied playground driver (D1)
+try await kit.respondStructured(to:instructions:history:schema:need:repair:) -> StructuredResponse  // (D21)
+try await kit.respond(to:instructions:history:schema:as: T.Type, need:repair:) -> T                  // (D21, Decodable)
+enum RepairPolicy { none, once /* default */ }                                                        // (D21)
+struct StructuredResponse { value: JSONValue, text, provider, privacyLevel, repaired, nativeSchema, hadSurroundingText; decode<T>() }
+indirect enum OutputSchema { object(name:description:properties:), string(description:enumeration:pattern:), number, integer, boolean, array(description:of:minimumCount:maximumCount:), anyOf(name:description:choices:) } // Codable; jsonSchema(dialect:); validate(_:) -> [SchemaViolation]
+indirect enum JSONValue { null, bool, number, string, array, object; init(parsing:); serialized(); decode<T>(); extractObject(from:) }
 await kit.contextUsage(instructions:history:) -> ContextUsage?  // window pressure (D13)
 await kit.availableProviders() -> [ProviderIdentifier]
 await kit.providerStatuses(for: need) -> [ProviderStatus]       // for UI; need previews D7 order
@@ -389,9 +448,11 @@ await kit.providerStatuses(for: need) -> [ProviderStatus]       // for UI; need 
 // extension points
 protocol ModelProvider { identifier; privacyLevel; availability(); respond(to:instructions:history:);
                          streamResponse(to:instructions:history:);               // defaulted: one fragment (D16)
+                         supportsNativeStructuredOutput; respondStructured(to:instructions:history:schema:); // defaulted: prompted JSON (D21)
                          contextSize; tokenCount(prompt:instructions:history:) }  // last two defaulted (D13)
 enum AIStreamEvent { began(provider:privacyLevel:), text(String) }               // (D16)
-enum ProviderError { ...; var isRecoverableByFallback: Bool }
+enum ProviderError { ...; malformedStructuredOutput(violations:raw:) /* recoverable, D21 */; var isRecoverableByFallback: Bool }
+enum PrivateCloudComputeEntitlement { detect /* default */, granted, absent }  // AIConfiguration.privateCloudComputeEntitlement (iOS 27; App Store builds must say .granted)
 enum PrivacyLevel { external < appleCloud < onDevice }
 enum PrivacyDisclosure { silent, log /* default, D18 */, notify(…), askOnPrivacyChange(…), denyDowngrade }
 struct PrivacyDowngrade { from, to, provider }

@@ -1,0 +1,27 @@
+{
+  "id": "example.packing-list",
+  "title": "Example: packing list kept across turns",
+  "schemaVersion": "v1",
+  "language": "en",
+  "instructions": "You help pack a bag. Keep a running list 'items' of everything named so far in the conversation. When a 'List so far' state is given, keep every item in it and ADD the new ones. Reply with ONLY a JSON object, no prose: {\"items\":[\"...\"],\"note\":\"...\"}. The note is one short English sentence.",
+  "schema": {
+    "type": "object",
+    "name": "PackingList",
+    "properties": [
+      { "name": "items", "schema": { "type": "array", "items": { "type": "string" }, "min": 1 } },
+      { "name": "note", "schema": { "type": "string" } }
+    ]
+  },
+  "carry": { "template": "List so far: [{{previous.items|join:{value}|sep:, }}]. The person now says: {{prompt}}" },
+  "graders": [
+    { "kind": "json-only" },
+    { "kind": "schema" },
+    { "kind": "retention", "params": { "keepItems": "items[]" } },
+    { "kind": "expect-contains" }
+  ],
+  "samples": [
+    { "id": "p-01", "turns": ["I'm packing a towel", "and sunscreen"], "canonicalState": { "items": ["towel"] }, "expect": { "contains": { "items": ["towel", "sunscreen"] } } },
+    { "id": "p-02", "turns": ["Passport", "add the charger"], "canonicalState": { "items": ["passport"] }, "expect": { "contains": { "items": ["passport", "charger"] } } },
+    { "id": "p-03", "turns": ["Two books", "and my headphones"], "canonicalState": { "items": ["books"] }, "expect": { "contains": { "items": ["books", "headphones"] } } }
+  ]
+}

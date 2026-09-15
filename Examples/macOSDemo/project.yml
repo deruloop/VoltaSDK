@@ -63,6 +63,47 @@ targets:
         # Cloud Compute" capability in Xcode (Signing & Capabilities) or
         # uncomment the next line and re-run `xcodegen generate`:
         # CODE_SIGN_ENTITLEMENTS: macOSDemo.entitlements
+  # ── Hosted evaluation bundle (D20) ─────────────────────────────────────
+  # The SAME engine sources as the package's `VoltaSDKEvals` test target,
+  # run INSIDE the signed demo app. Why: a plain `swift test` process is
+  # unentitled, so the Private Cloud Compute tier can only be measured from
+  # a process signed with the entitlement — this bundle inherits the host
+  # app's. Run with:
+  #   xcodebuild test -scheme macOSDemoEvals -destination 'platform=macOS' \
+  #     TEST_RUNNER_VOLTA_EVAL_LIVE=1 TEST_RUNNER_VOLTA_EVAL_TIERS=pcc \
+  #     TEST_RUNNER_VOLTA_EVAL_TASKS=/abs/path/to/tasks -only-testing:macOSDemoEvals/LiveEvaluations
+  # (xcodebuild forwards TEST_RUNNER_-prefixed variables to the test process.)
+  macOSDemoEvals:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: ../../Tests/VoltaSDKEvals
+        name: VoltaSDKEvals
+        excludes: ["Fixtures"]
+      - path: ../../Tests/VoltaSDKEvals/Fixtures
+        type: folder
+        buildPhase: resources
+      # Task files as a bundled folder reference (optional, git-excluded
+      # client data). Reading them from the bundle avoids macOS's privacy
+      # prompt: a GUI host app opening a folder under ~/Desktop or ~/Documents
+      # blocks on the TCC dialog, and the run hangs. Prefer this to
+      # VOLTA_EVAL_TASKS pointing into a protected folder.
+      - path: ../../docs/evals/raviolo/tasks
+        name: EvalTasks
+        type: folder
+        buildPhase: resources
+        optional: true
+    dependencies:
+      - target: macOSDemo
+      - package: VoltaSDK
+        product: VoltaSDK
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.voltasdk.demo.macos.evals
+        SWIFT_VERSION: "6.0"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: J6HPZ958W6
 schemes:
   macOSDemo:
     build:
@@ -70,3 +111,12 @@ schemes:
         macOSDemo: all
     run:
       config: Debug
+  macOSDemoEvals:
+    build:
+      targets:
+        macOSDemoEvals: all
+        macOSDemo: all
+    test:
+      config: Debug
+      targets:
+        - macOSDemoEvals

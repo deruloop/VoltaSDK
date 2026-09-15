@@ -140,6 +140,13 @@ public struct AIConfiguration: Sendable {
     /// `.onDeviceOnly` / `.developerKeyOnly` modes.
     public var enablePrivateCloudCompute: Bool = true
 
+    /// How the PCC provider learns whether this process carries the
+    /// entitlement (iOS 27+). `.detect` (default) reads the code signature
+    /// on macOS and the embedded provisioning profile on iOS; **an iOS App
+    /// Store build has no profile to read and must state `.granted`** when it
+    /// ships with the capability, or PCC is silently skipped.
+    public var privateCloudComputeEntitlement: PrivateCloudComputeEntitlement = .detect
+
     /// The user's own cloud accounts (iOS 27+). Each becomes a provider in the
     /// fallback chain, reached through the public `LanguageModel` protocol.
     /// Empty by default; ignored entirely on iOS 26. Like the developer key,
@@ -244,11 +251,11 @@ public enum AIStreamEvent: Sendable, Equatable {
 /// protected mutable state.
 public actor AIOrchestrator {
 
-    private let orderedProviders: [any ModelProvider]
-    private let privacyDisclosure: PrivacyDisclosure
+    let orderedProviders: [any ModelProvider]
+    let privacyDisclosure: PrivacyDisclosure
     /// Tokens reserved for the response during pre-flight (D13): a call that
     /// exactly fills the window would fail at generation anyway.
-    private let responseTokenReserve: Int
+    let responseTokenReserve: Int
 
     // MARK: Explicit init (recommended: no global state)
 
@@ -341,48 +348,15 @@ public actor AIOrchestrator {
         var lastError: ProviderError = .noProviderAvailable
 
         for provider in providers {
-            // Skip unavailable providers without even trying.
-            if case .unavailable = await provider.availability() {
+            // Availability skip, context pre-flight (D13), privacy gate
+            // (D7/D10) — the shared admission step.
+            if let skip = await Self.admit(
+                provider, baseline: baseline, disclosure: privacyDisclosure,
+                reserve: responseTokenReserve,
+                prompt: prompt, instructions: instructions, history: history
+            ) {
+                if let error = skip { lastError = error }
                 continue
-            }
-
-            // Context pre-flight (D13): if the provider can count and the
-            // call cannot fit its window, skip it as if it had already
-            // thrown .contextWindowExceeded — without paying for a doomed
-            // generation. Runs BEFORE the privacy gate: never ask the user
-            // about a provider that can't serve the call.
-            if let window = provider.contextSize,
-               let needed = await provider.tokenCount(
-                   prompt: prompt, instructions: instructions, history: history
-               ),
-               needed + responseTokenReserve >= window {
-                lastError = .contextWindowExceeded
-                continue
-            }
-
-            // Privacy gate: applied before sending any data.
-            if provider.privacyLevel < baseline {
-                let downgrade = PrivacyDowngrade(
-                    from: baseline,
-                    to: provider.privacyLevel,
-                    provider: provider.identifier
-                )
-                switch privacyDisclosure {
-                case .silent:
-                    break
-                case .log:
-                    Self.logDowngrade(downgrade)
-                case .notify(let handler):
-                    handler(downgrade)
-                case .askOnPrivacyChange(let handler):
-                    guard await handler(downgrade) else {
-                        lastError = .privacyRestricted
-                        continue
-                    }
-                case .denyDowngrade:
-                    lastError = .privacyRestricted
-                    continue
-                }
             }
 
             do {
@@ -500,41 +474,12 @@ public actor AIOrchestrator {
                 continuation.finish(throwing: ProviderError.cancelled)
                 return
             }
-            if case .unavailable = await provider.availability() {
+            if let skip = await admit(
+                provider, baseline: baseline, disclosure: disclosure, reserve: reserve,
+                prompt: prompt, instructions: instructions, history: history
+            ) {
+                if let error = skip { lastError = error }
                 continue
-            }
-
-            if let window = provider.contextSize,
-               let needed = await provider.tokenCount(
-                   prompt: prompt, instructions: instructions, history: history
-               ),
-               needed + reserve >= window {
-                lastError = .contextWindowExceeded
-                continue
-            }
-
-            if provider.privacyLevel < baseline {
-                let downgrade = PrivacyDowngrade(
-                    from: baseline,
-                    to: provider.privacyLevel,
-                    provider: provider.identifier
-                )
-                switch disclosure {
-                case .silent:
-                    break
-                case .log:
-                    logDowngrade(downgrade)
-                case .notify(let handler):
-                    handler(downgrade)
-                case .askOnPrivacyChange(let handler):
-                    guard await handler(downgrade) else {
-                        lastError = .privacyRestricted
-                        continue
-                    }
-                case .denyDowngrade:
-                    lastError = .privacyRestricted
-                    continue
-                }
             }
 
             // D16 rule: fallback is legal only until the first fragment is
@@ -576,6 +521,63 @@ public actor AIOrchestrator {
         }
 
         continuation.finish(throwing: lastError)
+    }
+
+    // MARK: Admission (shared by every chain walk)
+
+    /// The gate every provider passes before a call is sent to it: skip
+    /// unavailable providers; skip a provider whose known window cannot fit
+    /// the call (D13 pre-flight, as if it had thrown `.contextWindowExceeded`,
+    /// without paying for a doomed generation — and BEFORE the privacy gate,
+    /// so the user is never asked about a provider that can't serve the
+    /// call); apply the privacy disclosure policy when the provider sits
+    /// below the chain's baseline (D7/D10/D18).
+    ///
+    /// Returns `nil` when the provider is admitted; otherwise the error to
+    /// remember as the reason (`.some(nil)` = plain unavailability).
+    static func admit(
+        _ provider: any ModelProvider,
+        baseline: PrivacyLevel,
+        disclosure: PrivacyDisclosure,
+        reserve: Int,
+        prompt: String,
+        instructions: String?,
+        history: [ChatTurn]
+    ) async -> ProviderError?? {
+        if case .unavailable = await provider.availability() {
+            return .some(nil)
+        }
+
+        if let window = provider.contextSize,
+           let needed = await provider.tokenCount(
+               prompt: prompt, instructions: instructions, history: history
+           ),
+           needed + reserve >= window {
+            return .some(.contextWindowExceeded)
+        }
+
+        if provider.privacyLevel < baseline {
+            let downgrade = PrivacyDowngrade(
+                from: baseline,
+                to: provider.privacyLevel,
+                provider: provider.identifier
+            )
+            switch disclosure {
+            case .silent:
+                break
+            case .log:
+                logDowngrade(downgrade)
+            case .notify(let handler):
+                handler(downgrade)
+            case .askOnPrivacyChange(let handler):
+                guard await handler(downgrade) else {
+                    return .some(.privacyRestricted)
+                }
+            case .denyDowngrade:
+                return .some(.privacyRestricted)
+            }
+        }
+        return nil
     }
 
     // MARK: Resolution (the primitive, not the convenience)
@@ -710,7 +712,7 @@ public actor AIOrchestrator {
     /// `.largeContext`, where a larger known context window ranks first
     /// within its tier (unknown windows rank last there: no pre-flight beats
     /// a wrong pre-flight, D13).
-    private func orderedProviders(for need: ModelNeed?) -> [any ModelProvider] {
+    func orderedProviders(for need: ModelNeed?) -> [any ModelProvider] {
         guard let need else { return orderedProviders }
 
         func tierRank(_ provider: any ModelProvider) -> Int {
@@ -843,7 +845,7 @@ public actor AIOrchestrator {
     ) -> (any ModelProvider)? {
         guard config.enablePrivateCloudCompute else { return nil }
         if #available(iOS 27.0, macOS 27.0, *) {
-            return PrivateCloudComputeProvider()
+            return PrivateCloudComputeProvider(entitlement: config.privateCloudComputeEntitlement)
         }
         return nil
     }

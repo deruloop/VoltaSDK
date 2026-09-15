@@ -27,6 +27,20 @@ import Foundation
 import FoundationModels
 import Security
 
+/// How `PrivateCloudComputeProvider` learns whether the process carries the
+/// PCC entitlement (a wrong "yes" traps at the first call; a wrong "no"
+/// silently skips a free tier).
+public enum PrivateCloudComputeEntitlement: Sendable, Equatable {
+    /// Read it from the code signature (macOS) or the embedded provisioning
+    /// profile (iOS development/ad-hoc/enterprise builds). App Store builds
+    /// on iOS have no profile to read and resolve to "absent".
+    case detect
+    /// The app is signed with the entitlement (the App Store case on iOS).
+    case granted
+    /// Never use PCC in this process.
+    case absent
+}
+
 @available(iOS 27.0, macOS 27.0, *)
 public struct PrivateCloudComputeProvider: ModelProvider {
 
@@ -56,7 +70,22 @@ public struct PrivateCloudComputeProvider: ModelProvider {
     private let sessionCache = SessionCache()
 
     public init() {
-        self.model = Self.hasRequiredEntitlement() ? PrivateCloudComputeLanguageModel() : nil
+        self.init(entitlement: .detect)
+    }
+
+    /// `entitlement` says how the provider decides whether the process may
+    /// call PCC: `.detect` (default) reads the code signature / provisioning
+    /// profile; `.granted` / `.absent` state it outright — needed on iOS for
+    /// App Store builds, which carry no provisioning profile to read (see
+    /// `hasRequiredEntitlement`).
+    public init(entitlement: PrivateCloudComputeEntitlement) {
+        let entitled: Bool
+        switch entitlement {
+        case .detect: entitled = Self.hasRequiredEntitlement()
+        case .granted: entitled = true
+        case .absent: entitled = false
+        }
+        self.model = entitled ? PrivateCloudComputeLanguageModel() : nil
     }
 
     public func availability() async -> ProviderAvailability {
@@ -85,15 +114,51 @@ public struct PrivateCloudComputeProvider: ModelProvider {
         }
     }
 
-    /// Whether the running process is signed with the PCC entitlement. Reads
-    /// the binary's own entitlements via the Security framework; no special
-    /// permission needed. Returns false when absent (the common case), so the
-    /// provider skips itself rather than trapping.
-    static func hasRequiredEntitlement() -> Bool {
+    /// Whether the running process is signed with the PCC entitlement.
+    /// Returns false when absent (the common case), so the provider skips
+    /// itself rather than trapping.
+    ///
+    /// - macOS: the binary's own entitlements via `SecTask` (public API, no
+    ///   special permission).
+    /// - iOS: `SecTask` is not in the public SDK (found the hard way — the
+    ///   package did not compile for a physical iPhone until Sep 2026), so the
+    ///   embedded provisioning profile is read instead: development, ad-hoc,
+    ///   and enterprise builds carry `embedded.mobileprovision`, whose
+    ///   `Entitlements` dictionary lists the capability. App Store builds
+    ///   carry no profile, so `.detect` yields false there; an app that ships
+    ///   with the entitlement passes `.granted` via
+    ///   `AIConfiguration.privateCloudComputeEntitlement`.
+    public static func hasRequiredEntitlement() -> Bool {
+        #if os(macOS)
         guard let task = SecTaskCreateFromSelf(nil) else { return false }
         let value = SecTaskCopyValueForEntitlement(task, requiredEntitlement as CFString, nil)
         if let flag = value as? Bool { return flag }
         return value != nil
+        #else
+        return provisioningProfileGrantsEntitlement()
+        #endif
+    }
+
+    /// Reads `embedded.mobileprovision` (a CMS envelope around a plist; the
+    /// plist is embedded as plain text) and looks for the entitlement key set
+    /// to true. Missing profile or key → false.
+    static func provisioningProfileGrantsEntitlement() -> Bool {
+        guard let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
+              let data = try? Data(contentsOf: url),
+              let text = String(data: data, encoding: .isoLatin1),
+              let start = text.range(of: "<?xml"),
+              let end = text.range(of: "</plist>", range: start.upperBound..<text.endIndex) else {
+            return false
+        }
+        let plist = String(text[start.lowerBound..<end.upperBound])
+        guard let plistData = plist.data(using: .utf8),
+              let object = try? PropertyListSerialization.propertyList(from: plistData, format: nil),
+              let root = object as? [String: Any],
+              let entitlements = root["Entitlements"] as? [String: Any] else {
+            return false
+        }
+        if let flag = entitlements[requiredEntitlement] as? Bool { return flag }
+        return entitlements[requiredEntitlement] != nil
     }
 
     public func respond(
@@ -125,6 +190,40 @@ public struct PrivateCloudComputeProvider: ModelProvider {
             throw Self.map(error)
         } catch let error as LanguageModelError {
             throw ProviderError(error)               // shared mapping
+        } catch is CancellationError {
+            throw ProviderError.cancelled
+        } catch {
+            throw ProviderError.generation(String(describing: error))
+        }
+    }
+
+    // MARK: Structured output (D21) — guided generation
+
+    /// Constrained decoding on PCC, same shape as on-device; same
+    /// entitlement guard and error mapping as the buffered path.
+    public var supportsNativeStructuredOutput: Bool { true }
+
+    public func respondStructured(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn],
+        schema: OutputSchema
+    ) async throws -> String {
+        guard let model else { throw ProviderError.noProviderAvailable }
+        let session = sessionCache.checkOut(instructions: instructions, history: history)
+            ?? Self.makeSession(model: model, instructions: instructions, history: history)
+        do {
+            let json = try await GuidedGeneration.respond(session: session, prompt: prompt, schema: schema)
+            sessionCache.checkIn(
+                session,
+                instructions: instructions,
+                history: history + [.user(prompt), .assistant(json)]
+            )
+            return json
+        } catch let error as PrivateCloudComputeLanguageModel.Error {
+            throw Self.map(error)
+        } catch let error as LanguageModelError {
+            throw ProviderError(error)
         } catch is CancellationError {
             throw ProviderError.cancelled
         } catch {

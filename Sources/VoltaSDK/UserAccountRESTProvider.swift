@@ -61,6 +61,21 @@ struct UserAccountRESTProvider: ModelProvider {
         )
     }
 
+    // MARK: Structured output (D21) — forwarded to the vendor client
+
+    var supportsNativeStructuredOutput: Bool { true }
+
+    func respondStructured(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn],
+        schema: OutputSchema
+    ) async throws -> String {
+        try await makeProvider().respondStructured(
+            to: prompt, instructions: instructions, history: history, schema: schema
+        )
+    }
+
     func streamResponse(
         to prompt: String,
         instructions: String?,

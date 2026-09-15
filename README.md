@@ -211,7 +211,38 @@ if let usage = await kit.contextUsage(history: history), usage.fraction > 0.8 {
 `usage` is `nil` when the resolved provider can't count (an estimate is never
 passed off as a count).
 
-### 6. Resolution without execution (the primitive)
+### 6. Structured output (schema in, validated value out)
+
+Ask for a JSON shape instead of a string. Volta constrains generation
+natively where the provider can (guided generation on-device and on PCC,
+JSON mode on OpenAI, Claude, and Gemini), validates the answer against the
+schema, gives the same provider one repair turn on a violation, and moves
+down the chain with a typed error when that fails too.
+
+```swift
+let schema = OutputSchema.object(name: "CityFacts", properties: [
+    .init("city", .string()),
+    .init("continent", .string(enumeration: ["Europe", "Asia", "Africa", "Americas", "Oceania"])),
+    .init("note", .string(description: "One friendly sentence")),
+])
+
+struct CityFacts: Decodable { let city: String; let continent: String; let note: String }
+let facts: CityFacts = try await kit.respond(to: "Tell me about Rome", schema: schema)
+
+// Or keep the provenance and the path it took:
+let response = try await kit.respondStructured(to: "Tell me about Rome", schema: schema)
+response.value          // JSONValue, validated
+response.repaired       // did it need the repair turn?
+response.nativeSchema   // constrained by the provider, or prompted?
+```
+
+`OutputSchema` is deliberately the intersection every backend honours
+(objects, enum/pattern strings, numbers, booleans, bounded arrays, `anyOf`
+for answers with several possible shapes) and is `Codable`, so a schema can
+live in a data file. Patterns and array bounds are enforced by Volta after
+the call. `repair: .none` returns the first answer or the typed failure.
+
+### 7. Resolution without execution (the primitive)
 
 ```swift
 let provider = try await kit.resolveProvider()          // Volta's own type
@@ -220,7 +251,7 @@ let model    = try await kit.preferred(.reasoning)      // Apple's LanguageModel
 // preferred(_:) returns it as a native model for Apple's own machinery.
 ```
 
-### 7. Explicit instance (no global state)
+### 8. Explicit instance (no global state)
 
 ```swift
 var config = AIConfiguration()
@@ -326,6 +357,15 @@ configuration but **costs you nothing to leave on**:
   simply falls back to on-device (or your developer key). **Nothing crashes,
   and adopting VoltaSDK never forces you to request anything from Apple.** Set
   `enablePrivateCloudCompute = false` if you'd rather it not appear at all.
+- **How detection works, and the one case where you must say so.** On macOS
+  Volta reads the entitlement from the code signature. On iOS it reads the
+  embedded provisioning profile, which development, ad-hoc, and enterprise
+  builds carry; **an App Store build carries no profile**, so a shipping app
+  that has the capability must set
+  `config.privateCloudComputeEntitlement = .granted` (default `.detect`;
+  `.absent` switches PCC off for the process). Saying `.granted` without the
+  entitlement traps at the first call, so keep it tied to your release
+  configuration.
 - **To actually use PCC, you must enable a capability — and that is on you,
   the developer, not your users.** PCC requires the
   `com.apple.developer.private-cloud-compute` entitlement, which Apple assigns
@@ -530,11 +570,32 @@ conversation surviving the switch mid-thread.
 ## Tests
 
 ```bash
-swift test   # 89 tests in 19 suites: fallback, needs, streaming, sessions,
-             # privacy, tokens, PCC wiring, parsing, the profiles bridge
+swift test   # 92 unit tests in 20 suites (fallback, needs, streaming, sessions,
+             # privacy, tokens, PCC wiring, parsing, the profiles bridge)
+             # + 28 evaluation-engine tests in 8 suites (mock-backed)
 ```
 
 Building the tests needs the Xcode 27 toolchain (see Version support).
+
+## Evaluations (measured, not asserted)
+
+`Tests/VoltaSDKEvals` is an opt-in engine on Apple's Evaluations framework
+(WWDC 2026). It runs a **task** (schema + dataset + graders, as a JSON file)
+through one tier of the chain at a time and writes a **capability map**:
+task × tier × mode → pass rate, per-grader rates, and failure rationales.
+Modes compare the raw prompt with Volta's structured path, so the map also
+shows what structured output buys on each tier. A cloud model from another
+vendor can judge the dimensions a deterministic grader cannot, and its
+agreement with human ratings is measured before it is trusted.
+
+```bash
+VOLTA_EVAL_LIVE=1 VOLTA_EVAL_TASKS=path/to/tasks VOLTA_EVAL_TIERS=on-device \
+VOLTA_EVAL_MODES=raw,structured swift test --filter LiveEvaluations
+```
+
+PCC and real devices run through hosted bundles inside the demo apps. The
+manual, the grader registry, and the task-file format are in
+[docs/evals/README.md](docs/evals/README.md).
 
 ## For framework contributors
 
@@ -543,7 +604,7 @@ Internal documentation lives in `docs/`:
   iOS 26 / 26.4 base is implemented (decisions, stable API, verification).
 - [docs/iOS27-Design.md](docs/iOS27-Design.md) — the iOS 27 extension: design
   plus what's verified against the real SDK (§8). Private Cloud Compute, the
-  user-account front door, streaming, per-need chains, and the Dynamic
-  Profiles bridge are implemented; the Evaluations work is next.
+  user-account front door, streaming, per-need chains, the Dynamic
+  Profiles bridge, and the evaluation engine are implemented.
 - [docs/iOS27-OpenQuestions.md](docs/iOS27-OpenQuestions.md) — the remaining
   open questions for the iOS 27 work.

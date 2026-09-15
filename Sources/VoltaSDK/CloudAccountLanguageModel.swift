@@ -81,7 +81,22 @@ public struct CloudAccountLanguageModel: LanguageModel {
             let apiKey = try await model.token()
             guard !apiKey.isEmpty else { throw ProviderError.unauthorized }
 
-            let parts = FoundationModelsTranscript.decompose(request.transcript)
+            var parts = FoundationModelsTranscript.decompose(request.transcript)
+
+            // Structured output (D21): a session calling `respond(to:schema:)`
+            // on this model delivers the schema here. The REST clients take
+            // it as JSON Schema (the framework's schema encodes to one);
+            // the executor forwards it into the client's native JSON mode via
+            // the prompted fallback — the encoded schema appended to the
+            // instructions — so the reply parses into `GeneratedContent`.
+            if let schema = request.schema,
+               let data = try? JSONEncoder().encode(schema),
+               let json = try? JSONValue(parsing: data) {
+                let instruction = "Reply with ONLY a JSON value (no prose, no markdown fences) that conforms to this JSON Schema:\n"
+                    + json.serialized(pretty: true)
+                let base = (parts.instructions ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                parts.instructions = base.isEmpty ? instruction : base + "\n\n" + instruction
+            }
 
             // Build the REST client per call so the framework's per-call
             // generation options (session 339) are honoured: temperature and

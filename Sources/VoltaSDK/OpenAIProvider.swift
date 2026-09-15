@@ -96,8 +96,38 @@ public struct OpenAIProvider: ModelProvider {
         instructions: String?,
         history: [ChatTurn]
     ) async throws -> String {
+        try await perform(prompt: prompt, instructions: instructions, history: history, schema: nil)
+    }
+
+    // MARK: Structured output (D21) — native JSON mode
+
+    /// Chat Completions structured outputs: `response_format` of type
+    /// `json_schema` with `strict: true`, so the answer is constrained to the
+    /// schema server-side. The orchestrator still validates (pattern and
+    /// array-bound constraints are enforced by the SDK, not the vendor).
+    public var supportsNativeStructuredOutput: Bool { true }
+
+    public func respondStructured(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn],
+        schema: OutputSchema
+    ) async throws -> String {
+        try await perform(
+            prompt: prompt, instructions: instructions, history: history,
+            schema: .init(name: schema.rootName, schema: schema.jsonSchema(dialect: .openAI))
+        )
+    }
+
+    private func perform(
+        prompt: String,
+        instructions: String?,
+        history: [ChatTurn],
+        schema: ChatRequest.ResponseFormat.JSONSchema?
+    ) async throws -> String {
         let request = try makeRequest(
-            prompt: prompt, instructions: instructions, history: history, stream: false
+            prompt: prompt, instructions: instructions, history: history, stream: false,
+            schema: schema
         )
 
         let data: Data
@@ -218,7 +248,8 @@ public struct OpenAIProvider: ModelProvider {
         prompt: String,
         instructions: String?,
         history: [ChatTurn],
-        stream: Bool
+        stream: Bool,
+        schema: ChatRequest.ResponseFormat.JSONSchema? = nil
     ) throws -> URLRequest {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
@@ -245,7 +276,8 @@ public struct OpenAIProvider: ModelProvider {
                     messages: messages,
                     maxCompletionTokens: maxTokens,
                     temperature: temperature,
-                    stream: stream
+                    stream: stream,
+                    responseFormat: schema.map { .init(type: "json_schema", jsonSchema: $0) }
                 )
             )
         } catch {
@@ -303,16 +335,35 @@ private struct ChatRequest: Encodable {
     let maxCompletionTokens: Int
     let temperature: Double
     let stream: Bool
+    /// Structured outputs (D21): present only on structured calls.
+    var responseFormat: ResponseFormat? = nil
 
     enum CodingKeys: String, CodingKey {
         case model, messages, temperature, stream
         // `max_tokens` is deprecated: newer models only accept this one.
         case maxCompletionTokens = "max_completion_tokens"
+        case responseFormat = "response_format"
     }
 
     struct Message: Encodable {
         let role: String
         let content: String
+    }
+
+    struct ResponseFormat: Encodable {
+        let type: String
+        let jsonSchema: JSONSchema
+
+        enum CodingKeys: String, CodingKey {
+            case type
+            case jsonSchema = "json_schema"
+        }
+
+        struct JSONSchema: Encodable {
+            let name: String
+            let schema: JSONValue
+            var strict = true
+        }
     }
 }
 

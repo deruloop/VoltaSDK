@@ -1,0 +1,37 @@
+{
+  "id": "example.city-facts",
+  "title": "Example: city facts as JSON",
+  "schemaVersion": "v1",
+  "language": "en",
+  "instructions": "You are a concise geography assistant. Reply with ONLY a JSON object, no markdown and no prose, matching exactly: {\"city\":\"...\",\"country\":\"...\",\"continent\":\"Europe|Asia|Africa|Americas|Oceania\",\"note\":\"...\"}. The note is one friendly sentence in English about the city.",
+  "schema": {
+    "type": "object",
+    "name": "CityFacts",
+    "properties": [
+      { "name": "city", "schema": { "type": "string" } },
+      { "name": "country", "schema": { "type": "string" } },
+      { "name": "continent", "schema": { "type": "string", "enum": ["Europe", "Asia", "Africa", "Americas", "Oceania"] } },
+      { "name": "note", "schema": { "type": "string", "description": "One friendly sentence in English" } }
+    ]
+  },
+  "graders": [
+    { "kind": "json-only" },
+    { "kind": "schema" },
+    { "kind": "required", "params": { "paths": ["city", "country", "note"] } },
+    { "kind": "expect-fields" },
+    { "kind": "language", "params": { "path": "note" } },
+    { "kind": "forbidden-patterns", "params": { "path": "note", "patterns": ["\\d"] } }
+  ],
+  "judge": {
+    "dimensions": [
+      { "name": "note-quality", "description": "The note is friendly, factual, and about the named city." }
+    ]
+  },
+  "samples": [
+    { "id": "c-01", "turns": ["Tell me about Rome"], "expect": { "fields": { "country": ["Italy"], "continent": ["Europe"] } } },
+    { "id": "c-02", "turns": ["Tokyo"], "expect": { "fields": { "country": ["Japan"], "continent": ["Asia"] } } },
+    { "id": "c-03", "turns": ["What about Nairobi?"], "expect": { "fields": { "country": ["Kenya"], "continent": ["Africa"] } } },
+    { "id": "c-04", "turns": ["Buenos Aires please"], "expect": { "fields": { "country": ["Argentina"], "continent": ["Americas"] } } },
+    { "id": "c-05", "turns": ["Sydney"], "expect": { "fields": { "country": ["Australia"], "continent": ["Oceania"] } } }
+  ]
+}

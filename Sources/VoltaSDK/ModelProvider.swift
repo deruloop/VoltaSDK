@@ -122,13 +122,20 @@ public enum ProviderError: Error, Sendable, Equatable {
     case privacyRestricted
     /// Operation cancelled.
     case cancelled
+    /// Structured output (D21): the provider answered, but not with a value
+    /// that conforms to the requested schema — even after the repair turn.
+    /// Carries the violations and the last raw text. Recoverable: a more
+    /// capable provider down the chain may manage what this one could not
+    /// (this is exactly the gap the capability map measures).
+    case malformedStructuredOutput(violations: [String], raw: String)
 
     /// Whether this error allows trying the next provider in the chain.
     /// (On iOS 27 this same property will drive the quota-aware fallback.)
     public var isRecoverableByFallback: Bool {
         switch self {
         case .rateLimited, .network, .contextWindowExceeded,
-             .unsupportedLanguage, .noProviderAvailable:
+             .unsupportedLanguage, .noProviderAvailable,
+             .malformedStructuredOutput:
             return true
         case .unauthorized, .emptyResponse, .encoding, .decoding, .api,
              .guardrailViolation, .generation, .privacyRestricted, .cancelled:
@@ -172,6 +179,25 @@ public protocol ModelProvider: Sendable {
         instructions: String?,
         history: [ChatTurn]
     ) -> AsyncThrowingStream<String, Error>
+
+    // MARK: Optional capability: structured output (D21)
+
+    /// Whether the provider can constrain generation to a schema natively
+    /// (guided generation on Apple models, JSON mode on the cloud vendors).
+    /// `false` = the default implementation prompts for JSON and relies on
+    /// the orchestrator's validation + repair.
+    var supportsNativeStructuredOutput: Bool { get }
+
+    /// Answers with JSON text meant to conform to `schema`. The default
+    /// implementation appends the schema to the instructions and calls
+    /// `respond`; native implementations pass the schema to the model. The
+    /// orchestrator validates the result either way (`respondStructured`).
+    func respondStructured(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn],
+        schema: OutputSchema
+    ) async throws -> String
 
     // MARK: Optional capability: token awareness (D13)
 
@@ -218,6 +244,24 @@ public extension ModelProvider {
             }
             continuation.onTermination = { _ in task.cancel() }
         }
+    }
+
+    /// Default structured output (D21): prompted JSON — the schema travels
+    /// in the instructions, the answer is plain text for the orchestrator to
+    /// validate. Every provider takes part in a structured chain this way.
+    var supportsNativeStructuredOutput: Bool { false }
+
+    func respondStructured(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn],
+        schema: OutputSchema
+    ) async throws -> String {
+        try await respond(
+            to: prompt,
+            instructions: StructuredOutput.promptedInstructions(instructions, schema: schema),
+            history: history
+        )
     }
 
     /// Default: capability unsupported. Existing custom providers keep

@@ -116,6 +116,18 @@ already promises adopters one stable API where features light up.
 Practical constraint: iOS 27 code physically requires the iOS 27 SDK
 (Xcode beta) to compile — until then, iOS 27 remains design-only.
 
+### D20 — Quality is measured, not asserted
+Apple's Evaluations framework (WWDC 2026, sessions 298/299/335) in a
+dedicated opt-in test target, manual `run()` pattern, env-gated when real
+models are needed. The chain's promises (parity on fallback, the D7
+amendment's long-context belief, and any client's "can this tier do this
+task?") are numbers in a **capability map**, produced by a generic engine
+(task = schema + dataset + graders, as data) that treats every client's
+task the same way. Details, findings, and the run manual: §8 "Evaluations
+framework" and `docs/evals/README.md`. D21 (structured output) is the first
+SDK change the numbers forced; it is documented with the shipped code in
+`docs/iOS26-Implementation.md`.
+
 ## 3. iOS 26 vs iOS 27 capability split
 
 **Available in iOS 26 (base is built on this):**
@@ -394,6 +406,57 @@ exercised by a working harness.
   availability-guarded tests, in a dedicated opt-in test target
   (`Tests/VoltaSDKEvals`). Mock-backed harness runs stay CI-safe; suites
   needing real models/keys gate on environment variables.
+- **Two SDK bugs the real iPhone surfaced (Sep 15, 2026).** (1) The PCC
+  provider's `SecTask` entitlement self-check is macOS-only, so the package
+  had NOT compiled for a physical iOS device since the provider shipped
+  (simulator and macOS builds never noticed). iOS now reads the embedded
+  provisioning profile (`embedded.mobileprovision` → `Entitlements`), which
+  development/ad-hoc/enterprise builds carry; App Store builds carry none,
+  hence the explicit `AIConfiguration.privateCloudComputeEntitlement`
+  (`.detect`/`.granted`/`.absent`). (2) On iOS 27 the SYSTEM model throws
+  the framework-wide `LanguageModelError` too, not only
+  `GenerationError`: a hosted test run with the phone locked got
+  `.rateLimited` ("background request") on every call after the first,
+  and the 26-era provider surfaced it as terminal `.generation`. Mapped
+  through the shared `ProviderError(LanguageModelError)` now. Operational
+  rule for device runs: keep the iPhone unlocked with the host app in the
+  foreground; the on-device model rate-limits background callers.
+- **The engine (built Sep 14, 2026; `docs/evals/README.md` is the manual).**
+  A generic triple — task = schema (`OutputSchema`, D21) + dataset + graders,
+  as JSON — run through one tier at a time (`EvalTier`: on-device, PCC,
+  cloud per vendor; each a one-element chain, so provenance is exact) in
+  three modes (`raw` = the app's prompt verbatim, `structured`,
+  `structured+repair` = D21 with `RepairPolicy.none`/`.once`). A grader
+  registry (json-only, schema, required, forbidden-fields, expect-fields /
+  -contains / -shape, language via NLLanguageRecognizer, forbidden-patterns,
+  elements-match, claimed-action, retention) composes PASS; infrastructure
+  failures are `ignore`d and reported as availability / language-accepted
+  rates, so pass rates measure the model. Multi-turn samples use a carry
+  template (`{{previous.items|join:{name} ({compound})|sep:, }}`) with a
+  per-sample canonical state as fallback. Output: `CapabilityMap`
+  (task × tier × mode → pass rate, per-grader rates, failure rationales,
+  latency, judge dimensions), upserted into
+  `docs/evals/results/capability-map.{json,md}`. The judge layer builds a
+  `ModelJudgeEvaluator` whose judge is `CloudAccountLanguageModel` (the
+  front door doubles as the judge's model; never the vendor under test) and
+  measures Cohen's kappa against a human-ratings file before the judge is
+  trusted — built and unit-tested, live run pending a key. Framework
+  findings from the build: (1) `Sample.ExpectedValue == Subject.Value` is a
+  hard constraint, so the outcome type doubles as the sample's expected
+  type and the deterministic expectations live on the sample itself; (2)
+  `ModelSampleProtocol` conformance drags 27-only types into the sample, so
+  the data sample stays plain and a 27-only `FrameworkSample` adapter
+  conforms; (3) the framework's generic `DataFrame[column: ResultColumn<T>]`
+  does not resolve against this SDK's TabularData (the `Int` overload wins)
+  — `frame[column.name, T.self]` does the same job; (4) `saveJSON` writes
+  `.xcevalresult` files with per-row metrics and the `Response` value as a
+  JSON string. Execution findings: a hosted unit-test bundle inside the
+  signed demo app (`macOSDemoEvals`, `iOSDemoEvals`, same engine sources by
+  path) is the way to measure PCC (entitled process) and a real iPhone;
+  `xcodebuild` forwards `TEST_RUNNER_`-prefixed *environment variables* to
+  that process (as build settings they are dropped); and a GUI host app
+  reading a folder under `~/Desktop` blocks on the TCC prompt and hangs the
+  run — task files travel as a bundled folder reference instead.
 
 **Dynamic Profiles (verified against beta 27A5237l, Aug 2026 — the Part 3
 build).** Read from the same `.swiftinterface`; exercised by the demo's

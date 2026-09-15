@@ -59,7 +59,40 @@ public struct OnDeviceProvider: ModelProvider {
         } catch is CancellationError {
             throw ProviderError.cancelled
         } catch {
-            throw ProviderError.generation(String(describing: error))
+            throw Self.mapOther(error)
+        }
+    }
+
+    // MARK: Structured output (D21) — guided generation
+
+    /// Constrained decoding: the schema becomes a `GenerationSchema` and the
+    /// session generates a value that is well-formed by construction. The
+    /// orchestrator still validates the SDK-side constraints (patterns,
+    /// array bounds) and content the schema cannot express.
+    public var supportsNativeStructuredOutput: Bool { true }
+
+    public func respondStructured(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn],
+        schema: OutputSchema
+    ) async throws -> String {
+        let session = sessionCache.checkOut(instructions: instructions, history: history)
+            ?? Self.makeSession(instructions: instructions, history: history)
+        do {
+            let json = try await GuidedGeneration.respond(session: session, prompt: prompt, schema: schema)
+            sessionCache.checkIn(
+                session,
+                instructions: instructions,
+                history: history + [.user(prompt), .assistant(json)]
+            )
+            return json
+        } catch let error as LanguageModelSession.GenerationError {
+            throw Self.map(error)
+        } catch is CancellationError {
+            throw ProviderError.cancelled
+        } catch {
+            throw Self.mapOther(error)
         }
     }
 
@@ -83,7 +116,7 @@ public struct OnDeviceProvider: ModelProvider {
                     return Self.map(generation)
                 }
                 if error is CancellationError { return ProviderError.cancelled }
-                return ProviderError.generation(String(describing: error))
+                return Self.mapOther(error)
             }
         )
     }
@@ -151,6 +184,20 @@ public struct OnDeviceProvider: ModelProvider {
         default:
             return .generation(String(describing: error))
         }
+    }
+
+    /// Errors outside `GenerationError`. On iOS 27 the system model can also
+    /// throw the framework-wide `LanguageModelError` — observed live on an
+    /// iPhone 15 Pro Max (Sep 2026): a hosted test run with the screen
+    /// locked got `rateLimited` ("Request has been rate limited … background
+    /// request") on every call after the first. Without this mapping that
+    /// surfaced as a terminal `.generation(...)`, so the chain could neither
+    /// fall back nor report it as unavailability.
+    private static func mapOther(_ error: any Error) -> ProviderError {
+        if #available(iOS 27.0, macOS 27.0, *), let framework = error as? LanguageModelError {
+            return ProviderError(framework)
+        }
+        return .generation(String(describing: error))
     }
 
     private static func describe(

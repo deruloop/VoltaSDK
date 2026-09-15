@@ -90,8 +90,38 @@ public struct AnthropicProvider: ModelProvider {
         instructions: String?,
         history: [ChatTurn]
     ) async throws -> String {
+        try await perform(prompt: prompt, instructions: instructions, history: history, schema: nil)
+    }
+
+    // MARK: Structured output (D21) — native JSON mode
+
+    /// Messages API structured outputs: `output_config.format` of type
+    /// `json_schema`. Every object carries `additionalProperties: false` and
+    /// a full `required` list, as the API demands; pattern and array-bound
+    /// constraints stay with the SDK validator.
+    public var supportsNativeStructuredOutput: Bool { true }
+
+    public func respondStructured(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn],
+        schema: OutputSchema
+    ) async throws -> String {
+        try await perform(
+            prompt: prompt, instructions: instructions, history: history,
+            schema: schema.jsonSchema(dialect: .anthropic)
+        )
+    }
+
+    private func perform(
+        prompt: String,
+        instructions: String?,
+        history: [ChatTurn],
+        schema: JSONValue?
+    ) async throws -> String {
         let request = try makeRequest(
-            prompt: prompt, instructions: instructions, history: history, stream: false
+            prompt: prompt, instructions: instructions, history: history, stream: false,
+            schema: schema
         )
 
         let data: Data
@@ -217,7 +247,8 @@ public struct AnthropicProvider: ModelProvider {
         prompt: String,
         instructions: String?,
         history: [ChatTurn],
-        stream: Bool
+        stream: Bool,
+        schema: JSONValue? = nil
     ) throws -> URLRequest {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
@@ -242,7 +273,8 @@ public struct AnthropicProvider: ModelProvider {
                     maxTokens: maxTokens,
                     system: (instructions?.isEmpty == false) ? instructions : nil,
                     messages: messages,
-                    stream: stream
+                    stream: stream,
+                    outputConfig: schema.map { .init(format: .init(type: "json_schema", schema: $0)) }
                 )
             )
         } catch {
@@ -310,15 +342,26 @@ private struct MessagesRequest: Encodable {
     let system: String?
     let messages: [Message]
     let stream: Bool
+    /// Structured outputs (D21): present only on structured calls.
+    var outputConfig: OutputConfig? = nil
 
     enum CodingKeys: String, CodingKey {
         case model, system, messages, stream
         case maxTokens = "max_tokens"
+        case outputConfig = "output_config"
     }
 
     struct Message: Encodable {
         let role: String
         let content: String
+    }
+
+    struct OutputConfig: Encodable {
+        let format: Format
+        struct Format: Encodable {
+            let type: String
+            let schema: JSONValue
+        }
     }
 }
 

@@ -87,6 +87,43 @@ struct LanguageModelProvider: ModelProvider {
         }
     }
 
+    // MARK: Structured output (D21)
+
+    /// The framework's schema path on the wrapped model: `respond(to:schema:)`
+    /// hands the `GenerationSchema` to the model's executor, which decides
+    /// how to honour it (a vendor package may constrain natively;
+    /// `CloudAccountLanguageModel`'s executor prompts for it). Reported as
+    /// native because it is the model's own path; the orchestrator validates
+    /// regardless.
+    var supportsNativeStructuredOutput: Bool { true }
+
+    func respondStructured(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn],
+        schema: OutputSchema
+    ) async throws -> String {
+        let session = sessionCache.checkOut(instructions: instructions, history: history)
+            ?? makeSession(instructions: instructions, history: history)
+        do {
+            let json = try await GuidedGeneration.respond(session: session, prompt: prompt, schema: schema)
+            sessionCache.checkIn(
+                session,
+                instructions: instructions,
+                history: history + [.user(prompt), .assistant(json)]
+            )
+            return json
+        } catch let error as ProviderError {
+            throw error
+        } catch let error as LanguageModelError {
+            throw ProviderError(error)
+        } catch is CancellationError {
+            throw ProviderError.cancelled
+        } catch {
+            throw ProviderError.generation(String(describing: error))
+        }
+    }
+
     // MARK: Streaming (D16)
 
     /// Native token streaming via the session's `streamResponse` (shared

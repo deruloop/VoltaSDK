@@ -7,12 +7,48 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		09260035D0BC5355BFF5881F /* EvalTasks in Resources */ = {isa = PBXBuildFile; fileRef = 9413A056851F02AA1FF49D78 /* EvalTasks */; };
+		116A6F24555650B437A451A4 /* Judge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 689C986C1E75B198FE13DDCB /* Judge.swift */; };
+		116C48F5D03745E18EF19D06 /* ChainEvaluations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65A1413692C381B12C726C4B /* ChainEvaluations.swift */; };
+		190518C92C1177EE9C0AA06A /* VoltaSDK in Frameworks */ = {isa = PBXBuildFile; productRef = EC8DA31F0034D9C0536CE05F /* VoltaSDK */; };
+		4B6878BA8698B85324918662 /* EvalRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AE7AB1B436A7A5E6DB62B04 /* EvalRunner.swift */; };
 		61EC619CEE6E5C09133BF089 /* macOSDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB0758777210FF98B69B45BB /* macOSDemoApp.swift */; };
+		6368604C269A9587C2141BD3 /* EngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8719EFE92BB46A8E38BAA480 /* EngineTests.swift */; };
+		708ED0BBD5BF73662198CC23 /* Tiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 094843135C9042F460815D88 /* Tiers.swift */; };
+		72257B797B3BE769E1BFB41E /* LiveEvaluations.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0B5715B391FD43A95EDD3AA /* LiveEvaluations.swift */; };
+		7BE3E4F69E5C75ED08E91FE1 /* EvalTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F62C6282EAAA6193586A891 /* EvalTask.swift */; };
+		862BD6317D70A3A2B14EF2A6 /* Fixtures in Resources */ = {isa = PBXBuildFile; fileRef = B5004E7F165EB4F0A7B3726D /* Fixtures */; };
+		B7898CEDBE3160115AE53D22 /* TaskEvaluation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E3C6E90E54232941CD1689 /* TaskEvaluation.swift */; };
+		BE944D86E4F0CB5F77447E60 /* Graders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40001BE57028D5C85F300828 /* Graders.swift */; };
 		BF6F45825F6B56C7E3BC4E70 /* VoltaSDKDemoUI in Frameworks */ = {isa = PBXBuildFile; productRef = C37924CA15EB5DA841C0149C /* VoltaSDKDemoUI */; };
+		FDCE9696BB682B16C6F38D6F /* CapabilityMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6A21618F79EBC1ADCC2E4AC /* CapabilityMap.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		8D2B60BA0E5BADFD8EA5EA6F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D85418E51FFCAF34DC07C11C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 74A146ACA1CA0134C282CE02;
+			remoteInfo = macOSDemo;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		094843135C9042F460815D88 /* Tiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tiers.swift; sourceTree = "<group>"; };
+		1CED1FECBAC66CA70F6ED8DB /* macOSDemoEvals.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = macOSDemoEvals.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		3AE7AB1B436A7A5E6DB62B04 /* EvalRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvalRunner.swift; sourceTree = "<group>"; };
+		40001BE57028D5C85F300828 /* Graders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Graders.swift; sourceTree = "<group>"; };
+		4F62C6282EAAA6193586A891 /* EvalTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvalTask.swift; sourceTree = "<group>"; };
+		65A1413692C381B12C726C4B /* ChainEvaluations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainEvaluations.swift; sourceTree = "<group>"; };
+		689C986C1E75B198FE13DDCB /* Judge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Judge.swift; sourceTree = "<group>"; };
 		73850072C8378F353ABF68E5 /* macOSDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = macOSDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		77E3C6E90E54232941CD1689 /* TaskEvaluation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskEvaluation.swift; sourceTree = "<group>"; };
+		8719EFE92BB46A8E38BAA480 /* EngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineTests.swift; sourceTree = "<group>"; };
+		9413A056851F02AA1FF49D78 /* EvalTasks */ = {isa = PBXFileReference; lastKnownFileType = folder; name = EvalTasks; path = ../../docs/evals/raviolo/tasks; sourceTree = SOURCE_ROOT; };
+		A6A21618F79EBC1ADCC2E4AC /* CapabilityMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapabilityMap.swift; sourceTree = "<group>"; };
+		B5004E7F165EB4F0A7B3726D /* Fixtures */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Fixtures; path = ../../Tests/VoltaSDKEvals/Fixtures; sourceTree = SOURCE_ROOT; };
+		C0B5715B391FD43A95EDD3AA /* LiveEvaluations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveEvaluations.swift; sourceTree = "<group>"; };
 		DB0758777210FF98B69B45BB /* macOSDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = macOSDemoApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -22,6 +58,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				BF6F45825F6B56C7E3BC4E70 /* VoltaSDKDemoUI in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7D104472BC925EAFFB47D99D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				190518C92C1177EE9C0AA06A /* VoltaSDK in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -36,10 +80,39 @@
 			path = Sources;
 			sourceTree = "<group>";
 		};
+		6472CFF92E0EF9E8F9DC2402 /* VoltaSDKEvals */ = {
+			isa = PBXGroup;
+			children = (
+				65A1413692C381B12C726C4B /* ChainEvaluations.swift */,
+				8719EFE92BB46A8E38BAA480 /* EngineTests.swift */,
+				C0B5715B391FD43A95EDD3AA /* LiveEvaluations.swift */,
+				99956CAB49F53B5184EA12C2 /* Engine */,
+			);
+			name = VoltaSDKEvals;
+			path = ../../Tests/VoltaSDKEvals;
+			sourceTree = "<group>";
+		};
+		99956CAB49F53B5184EA12C2 /* Engine */ = {
+			isa = PBXGroup;
+			children = (
+				A6A21618F79EBC1ADCC2E4AC /* CapabilityMap.swift */,
+				3AE7AB1B436A7A5E6DB62B04 /* EvalRunner.swift */,
+				4F62C6282EAAA6193586A891 /* EvalTask.swift */,
+				40001BE57028D5C85F300828 /* Graders.swift */,
+				689C986C1E75B198FE13DDCB /* Judge.swift */,
+				77E3C6E90E54232941CD1689 /* TaskEvaluation.swift */,
+				094843135C9042F460815D88 /* Tiers.swift */,
+			);
+			path = Engine;
+			sourceTree = "<group>";
+		};
 		D17CC3A6B4B35BE92ED9D17A = {
 			isa = PBXGroup;
 			children = (
+				9413A056851F02AA1FF49D78 /* EvalTasks */,
+				B5004E7F165EB4F0A7B3726D /* Fixtures */,
 				4CD097DA503D4497F0F70782 /* Sources */,
+				6472CFF92E0EF9E8F9DC2402 /* VoltaSDKEvals */,
 				FAF17119FD11C5DF17DEC0B0 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -48,6 +121,7 @@
 			isa = PBXGroup;
 			children = (
 				73850072C8378F353ABF68E5 /* macOSDemo.app */,
+				1CED1FECBAC66CA70F6ED8DB /* macOSDemoEvals.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -74,6 +148,27 @@
 			productReference = 73850072C8378F353ABF68E5 /* macOSDemo.app */;
 			productType = "com.apple.product-type.application";
 		};
+		B1591058A3527CE1B34508B8 /* macOSDemoEvals */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E0EA5FE86DCF7C3FC0067850 /* Build configuration list for PBXNativeTarget "macOSDemoEvals" */;
+			buildPhases = (
+				E47E0184EA8FBB2BFFDF5404 /* Sources */,
+				CB4F6C97B01C759FBADC308A /* Resources */,
+				7D104472BC925EAFFB47D99D /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				DADBE60B0EA7523CD5996E6B /* PBXTargetDependency */,
+			);
+			name = macOSDemoEvals;
+			packageProductDependencies = (
+				EC8DA31F0034D9C0536CE05F /* VoltaSDK */,
+			);
+			productName = macOSDemoEvals;
+			productReference = 1CED1FECBAC66CA70F6ED8DB /* macOSDemoEvals.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -83,6 +178,10 @@
 				LastUpgradeCheck = 1200;
 				TargetAttributes = {
 					74A146ACA1CA0134C282CE02 = {
+						DevelopmentTeam = J6HPZ958W6;
+						ProvisioningStyle = Automatic;
+					};
+					B1591058A3527CE1B34508B8 = {
 						DevelopmentTeam = J6HPZ958W6;
 						ProvisioningStyle = Automatic;
 					};
@@ -104,9 +203,22 @@
 			projectRoot = "";
 			targets = (
 				74A146ACA1CA0134C282CE02 /* macOSDemo */,
+				B1591058A3527CE1B34508B8 /* macOSDemoEvals */,
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		CB4F6C97B01C759FBADC308A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				862BD6317D70A3A2B14EF2A6 /* Fixtures in Resources */,
+				09260035D0BC5355BFF5881F /* EvalTasks in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		9137435E6F8B622E5E3DDA5C /* Sources */ = {
@@ -117,9 +229,74 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E47E0184EA8FBB2BFFDF5404 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FDCE9696BB682B16C6F38D6F /* CapabilityMap.swift in Sources */,
+				116C48F5D03745E18EF19D06 /* ChainEvaluations.swift in Sources */,
+				6368604C269A9587C2141BD3 /* EngineTests.swift in Sources */,
+				4B6878BA8698B85324918662 /* EvalRunner.swift in Sources */,
+				7BE3E4F69E5C75ED08E91FE1 /* EvalTask.swift in Sources */,
+				BE944D86E4F0CB5F77447E60 /* Graders.swift in Sources */,
+				116A6F24555650B437A451A4 /* Judge.swift in Sources */,
+				72257B797B3BE769E1BFB41E /* LiveEvaluations.swift in Sources */,
+				B7898CEDBE3160115AE53D22 /* TaskEvaluation.swift in Sources */,
+				708ED0BBD5BF73662198CC23 /* Tiers.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		DADBE60B0EA7523CD5996E6B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 74A146ACA1CA0134C282CE02 /* macOSDemo */;
+			targetProxy = 8D2B60BA0E5BADFD8EA5EA6F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		0A0E81A4B58320B6D38927AC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = J6HPZ958W6;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.voltasdk.demo.macos.evals;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/macOSDemo.app/Contents/MacOS/macOSDemo";
+			};
+			name = Release;
+		};
+		4004E09C7F713327E855F1B3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = J6HPZ958W6;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.voltasdk.demo.macos.evals;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/macOSDemo.app/Contents/MacOS/macOSDemo";
+			};
+			name = Debug;
+		};
 		47A01201D6A7449759D4D325 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -298,6 +475,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
+		E0EA5FE86DCF7C3FC0067850 /* Build configuration list for PBXNativeTarget "macOSDemoEvals" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4004E09C7F713327E855F1B3 /* Debug */,
+				0A0E81A4B58320B6D38927AC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -312,6 +498,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B2C3D4E5F6071829A0B1C2D3 /* XCLocalSwiftPackageReference "../.." */;
 			productName = VoltaSDKDemoUI;
+		};
+		EC8DA31F0034D9C0536CE05F /* VoltaSDK */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B2C3D4E5F6071829A0B1C2D3 /* XCLocalSwiftPackageReference "../.." */;
+			productName = VoltaSDK;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

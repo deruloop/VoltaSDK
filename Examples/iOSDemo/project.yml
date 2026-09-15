@@ -37,6 +37,44 @@ targets:
         # Cloud Compute" capability in Xcode (Signing & Capabilities) or
         # uncomment the next line and re-run `xcodegen generate`:
         # CODE_SIGN_ENTITLEMENTS: iOSDemo.entitlements
+  # ── Hosted evaluation bundle (D20) ─────────────────────────────────────
+  # The package's `VoltaSDKEvals` engine, run inside the demo app ON A
+  # DEVICE: the Mac's Apple Intelligence only stands in for an iPhone's; the
+  # real on-device row of the capability map comes from this bundle on the
+  # real phone (and the PCC row, when the app carries the entitlement).
+  # Task files travel as a folder reference named EvalTasks (optional: point
+  # it at the client's task directory, git-excluded here). Run with:
+  #   xcodebuild test -scheme iOSDemoEvals -destination 'id=<device udid>' \
+  #     TEST_RUNNER_VOLTA_EVAL_LIVE=1 TEST_RUNNER_VOLTA_EVAL_TIERS=on-device \
+  #     -only-testing:iOSDemoEvals/LiveEvaluations 2>&1 | tee run.log
+  #   python3 ../../scripts/evals-merge.py run.log   # fold [evals-entry] lines into the map
+  iOSDemoEvals:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ../../Tests/VoltaSDKEvals
+        name: VoltaSDKEvals
+        excludes: ["Fixtures"]
+      - path: ../../Tests/VoltaSDKEvals/Fixtures
+        type: folder
+        buildPhase: resources
+      - path: ../../docs/evals/raviolo/tasks
+        name: EvalTasks
+        type: folder
+        buildPhase: resources
+        optional: true
+    dependencies:
+      - target: iOSDemo
+      - package: VoltaSDK
+        product: VoltaSDK
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.voltasdk.demo.ios.evals
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: J6HPZ958W6
 schemes:
   iOSDemo:
     build:
@@ -44,3 +82,12 @@ schemes:
         iOSDemo: all
     run:
       config: Debug
+  iOSDemoEvals:
+    build:
+      targets:
+        iOSDemoEvals: all
+        iOSDemo: all
+    test:
+      config: Debug
+      targets:
+        - iOSDemoEvals

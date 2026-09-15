@@ -345,6 +345,8 @@ public struct AIPlaygroundView: View {
             return "Blocked by the privacy policy"
         case .cancelled:
             return "Operation cancelled"
+        case .malformedStructuredOutput(let violations, _):
+            return "Answer did not match the requested schema: \(violations.joined(separator: "; "))"
         }
     }
 }

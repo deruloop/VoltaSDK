@@ -84,7 +84,32 @@ public struct GeminiProvider: ModelProvider {
         instructions: String?,
         history: [ChatTurn]
     ) async throws -> String {
-        let body = makeBody(prompt: prompt, instructions: instructions, history: history)
+        try await perform(
+            makeBody(prompt: prompt, instructions: instructions, history: history)
+        )
+    }
+
+    // MARK: Structured output (D21) — native JSON mode
+
+    /// `generationConfig.responseMimeType = application/json` plus
+    /// `responseJsonSchema`, on both transports (the Code Assist envelope
+    /// wraps the same request). Pattern and array bounds stay with the SDK
+    /// validator.
+    public var supportsNativeStructuredOutput: Bool { true }
+
+    public func respondStructured(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn],
+        schema: OutputSchema
+    ) async throws -> String {
+        var body = makeBody(prompt: prompt, instructions: instructions, history: history)
+        body.generationConfig.responseMimeType = "application/json"
+        body.generationConfig.responseJsonSchema = schema.jsonSchema(dialect: .gemini)
+        return try await perform(body)
+    }
+
+    private func perform(_ body: GenerateRequest) async throws -> String {
 
         // Credential detection, D15-style: an API key — classic "AIza…"
         // Standard or the new "AQ.…" Auth key (mid-2026 migration) — speaks
@@ -522,7 +547,7 @@ public struct GeminiProvider: ModelProvider {
 private struct GenerateRequest: Encodable {
     let systemInstruction: Content?
     let contents: [Content]
-    let generationConfig: GenerationConfig
+    var generationConfig: GenerationConfig
 
     struct Content: Encodable {
         let role: String?
@@ -536,6 +561,9 @@ private struct GenerateRequest: Encodable {
     struct GenerationConfig: Encodable {
         let temperature: Double
         let maxOutputTokens: Int
+        /// Structured output (D21): set only on structured calls.
+        var responseMimeType: String? = nil
+        var responseJsonSchema: JSONValue? = nil
     }
 }
 
