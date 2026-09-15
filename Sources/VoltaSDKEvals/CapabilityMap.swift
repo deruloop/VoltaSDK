@@ -13,52 +13,57 @@ import Evaluations
 import Foundation
 import TabularData
 
-struct CapabilityMap: Codable {
-    var generatedAt: Date
-    var entries: [Entry]
+public struct CapabilityMap: Codable {
+    public var generatedAt: Date
+    public var entries: [Entry]
 
-    struct Entry: Codable, Identifiable {
-        var task: String
-        var taskTitle: String
-        var schemaVersion: String
-        var tier: String
-        var tierLabel: String
-        var mode: String
-        /// Where the run happened (the Mac stands in for a device only when
-        /// it says so here).
-        var host: String
-        var runAt: Date
-        var samples: Int
-        /// Samples the model actually answered (infrastructure failures
-        /// excluded).
-        var scored: Int
-        var passed: Int
-        var passRate: Double
-        /// Phase 0: fraction of samples the model accepted at all.
-        var availabilityRate: Double
-        var languageAcceptedRate: Double
-        /// Per-grader pass rates.
-        var graders: [String: Double]
-        /// Judge dimensions (means) when a judge ran, and its agreement with
-        /// human ratings when those were supplied.
-        var judge: JudgeSummary?
-        /// A few failure rationales, for the article and for debugging.
-        var failureSamples: [String]
-        var meanLatencySeconds: Double?
-
-        var id: String { "\(task)|\(tier)|\(mode)" }
+    public init(generatedAt: Date = Date(), entries: [Entry] = []) {
+        self.generatedAt = generatedAt
+        self.entries = entries
     }
 
-    struct JudgeSummary: Codable {
-        var vendor: String
-        var dimensions: [String: Double]
-        var agreement: JudgeAgreement?
+    public struct Entry: Codable, Identifiable {
+        public var task: String
+        public var taskTitle: String
+        public var schemaVersion: String
+        public var tier: String
+        public var tierLabel: String
+        public var mode: String
+        /// Where the run happened (the Mac stands in for a device only when
+        /// it says so here).
+        public var host: String
+        public var runAt: Date
+        public var samples: Int
+        /// Samples the model actually answered (infrastructure failures
+        /// excluded).
+        public var scored: Int
+        public var passed: Int
+        public var passRate: Double
+        /// Phase 0: fraction of samples the model accepted at all.
+        public var availabilityRate: Double
+        public var languageAcceptedRate: Double
+        /// Per-grader pass rates.
+        public var graders: [String: Double]
+        /// Judge dimensions (means) when a judge ran, and its agreement with
+        /// human ratings when those were supplied.
+        public var judge: JudgeSummary?
+        /// A few failure rationales, for the article and for debugging.
+        public var failureSamples: [String]
+        public var meanLatencySeconds: Double?
+
+        public var id: String { "\(task)|\(tier)|\(mode)" }
+    }
+
+    public struct JudgeSummary: Codable {
+        public var vendor: String
+        public var dimensions: [String: Double]
+        public var agreement: JudgeAgreement?
     }
 
     // MARK: Building an entry from a framework result
 
     @available(iOS 27.0, macOS 27.0, *)
-    static func entry(
+    public static func entry(
         from result: EvaluationResult,
         evaluation: TaskEvaluation,
         host: String,
@@ -87,8 +92,8 @@ struct CapabilityMap: Codable {
             task: evaluation.task.id,
             taskTitle: evaluation.task.title,
             schemaVersion: evaluation.task.schemaVersion,
-            tier: evaluation.tier.rawValue,
-            tierLabel: evaluation.tier.label(),
+            tier: evaluation.tier,
+            tierLabel: evaluation.tierLabel,
             mode: evaluation.mode.description,
             host: host,
             runAt: result.endTime,
@@ -105,15 +110,15 @@ struct CapabilityMap: Codable {
         )
     }
 
-    struct Tally {
-        var total = 0
-        var scored = 0
-        var passed = 0
-        var rationales: [String] = []
+    public struct Tally {
+        public var total = 0
+        public var scored = 0
+        public var passed = 0
+        public var rationales: [String] = []
     }
 
     @available(iOS 27.0, macOS 27.0, *)
-    static func tally(_ frame: DataFrame, metric: Metric) -> Tally {
+    public static func tally(_ frame: DataFrame, metric: Metric) -> Tally {
         var tally = Tally()
         guard frame.containsColumn(metric.name) else { return tally }
         for value in frame[metric: metric] {
@@ -140,7 +145,7 @@ struct CapabilityMap: Codable {
 
     // MARK: Persistence
 
-    static func load(from url: URL) -> CapabilityMap {
+    public static func load(from url: URL) -> CapabilityMap {
         guard let data = try? Data(contentsOf: url),
               let map = try? Self.decoder.decode(CapabilityMap.self, from: data) else {
             return CapabilityMap(generatedAt: Date(), entries: [])
@@ -148,20 +153,20 @@ struct CapabilityMap: Codable {
         return map
     }
 
-    mutating func upsert(_ entry: Entry) {
+    public mutating func upsert(_ entry: Entry) {
         entries.removeAll { $0.id == entry.id }
         entries.append(entry)
         entries.sort { ($0.task, $0.tier, $0.mode) < ($1.task, $1.tier, $1.mode) }
         generatedAt = Date()
     }
 
-    func save(to url: URL) throws {
+    public func save(to url: URL) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Self.encoder.encode(self).write(to: url)
         try markdown.write(to: url.deletingPathExtension().appendingPathExtension("md"), atomically: true, encoding: .utf8)
     }
 
-    static let encoder: JSONEncoder = {
+    public static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
@@ -169,14 +174,14 @@ struct CapabilityMap: Codable {
     }()
 
     /// Compact, one-line encoding for log output.
-    static let lineEncoder: JSONEncoder = {
+    public static let lineEncoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         encoder.dateEncodingStrategy = .iso8601
         return encoder
     }()
 
-    static let decoder: JSONDecoder = {
+    public static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return decoder
@@ -187,7 +192,7 @@ struct CapabilityMap: Codable {
     /// One table per task: rows = tiers, columns = modes. Cells show the
     /// pass rate over scored samples, with the availability rate when it
     /// is below 100%.
-    var markdown: String {
+    public var markdown: String {
         var text = "# Capability map\n\nGenerated \(Self.dateFormatter.string(from: generatedAt)). Pass rate = passed / scored; scored excludes infrastructure failures (unsupported language, unavailability, rate limits), which show as availability.\n"
         let tasks = Dictionary(grouping: entries, by: \.task).sorted { $0.key < $1.key }
         for (task, rows) in tasks {
@@ -225,14 +230,14 @@ struct CapabilityMap: Codable {
         return text
     }
 
-    static func percent(_ value: Double) -> String { String(format: "%.0f%%", value * 100) }
+    public static func percent(_ value: Double) -> String { String(format: "%.0f%%", value * 100) }
 
-    static func modeOrder(_ a: String, _ b: String) -> Bool {
+    public static func modeOrder(_ a: String, _ b: String) -> Bool {
         let order = ["raw", "structured", "structured+repair"]
         return (order.firstIndex(of: a) ?? 99) < (order.firstIndex(of: b) ?? 99)
     }
 
-    static let dateFormatter: DateFormatter = {
+    public static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm"
         return formatter

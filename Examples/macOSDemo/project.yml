@@ -77,12 +77,11 @@ targets:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - path: ../../Tests/VoltaSDKEvals
-        name: VoltaSDKEvals
-        excludes: ["Fixtures"]
-      - path: ../../Tests/VoltaSDKEvals/Fixtures
-        type: folder
-        buildPhase: resources
+      # The engine itself comes from the package product VoltaSDKEvals; only
+      # the SDK's own eval tests (the live sweep + the engine tests) are
+      # compiled here by path.
+      - path: ../../Tests/VoltaSDKEvalsTests
+        name: VoltaSDKEvalsTests
       # Task files as a bundled folder reference (optional, git-excluded
       # client data). Reading them from the bundle avoids macOS's privacy
       # prompt: a GUI host app opening a folder under ~/Desktop or ~/Documents
@@ -97,6 +96,8 @@ targets:
       - target: macOSDemo
       - package: VoltaSDK
         product: VoltaSDK
+      - package: VoltaSDK
+        product: VoltaSDKEvals
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

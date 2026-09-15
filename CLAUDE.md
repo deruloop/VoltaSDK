@@ -299,7 +299,7 @@ available); D18's logging makes any further crossing visible.
 - **D17** Warm-session reuse: same provider + exact conversation continuation → reuse the session; verify, never assume. *(26 impl)*
 - **D18** Privacy downgrades are logged by default (`.log`, unified log) — never silently invisible; `.silent` is an explicit opt-in. *(26 impl)*
 - **D19** Package floor iOS 18/macOS 15; tiers by `@available` — cloud chain + user keys (REST) + UI from 18, on-device from 26, PCC/front door from 27; Auth ungated. *(26 impl)*
-- **D20** Quality is measured, not asserted: Apple's Evaluations framework in a dedicated opt-in test target (`VoltaSDKEvals`), manual `run()` pattern, env-gated when real models are needed; a generic triple (schema + dataset + graders, as data) → the capability map. *(27 design §8, docs/evals/README.md)*
+- **D20** Quality is measured, not asserted: Apple's Evaluations framework, wrapped by the `VoltaSDKEvals` LIBRARY for adopters' test targets (`TaskEvaluation(task:provider:mode:)` → `passRate`), manual `run()` pattern; a generic triple (schema + dataset + graders, as data) → the capability map. *(27 design §8, docs/evals/README.md)*
 - **D21** Structured output: schema in (`OutputSchema`), validated value out, one repair turn, typed fallback-recoverable failure; native constraint where the provider can (guided generation / JSON mode), prompted otherwise. *(26 impl)*
 
 ## 5. Roadmap (ordered)
@@ -380,7 +380,11 @@ available); D18's logging makes any further crossing visible.
     Gemini `ListModels`): once a key is entered, populate a model picker for
     the developer instead of a free-text field. Complements D15.
 11. **Evaluations — ENGINE BUILT + FIRST CAPABILITY MAP (Sep 14, 2026,
-    `evaluation` branch, D20/D21).** `Tests/VoltaSDKEvals/Engine` runs a
+    `evaluation` branch, D20/D21).** **Sep 15: the engine became the
+    `VoltaSDKEvals` LIBRARY product** (adopters import it from their test
+    target: `EvalTask` JSON/Swift, `TaskEvaluation(task:provider:mode:)`,
+    `result.passRate`/`failureReasons`; SDK tests in
+    `Tests/VoltaSDKEvalsTests`; demo bundles depend on the product). It runs a
     generic triple (task JSON = `OutputSchema` + samples + graders) through
     one tier at a time (on-device, PCC, cloud per vendor) in three modes
     (raw / structured / structured+repair) and upserts

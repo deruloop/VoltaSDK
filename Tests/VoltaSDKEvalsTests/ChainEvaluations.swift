@@ -1,6 +1,6 @@
 //
 //  ChainEvaluations.swift
-//  VoltaSDKEvals
+//  VoltaSDKEvalsTests
 //
 //  First contact with Apple's Evaluations framework (WWDC 2026, sessions
 //  298/299/335) — D20. This file holds the HARNESS smoke evaluation: the

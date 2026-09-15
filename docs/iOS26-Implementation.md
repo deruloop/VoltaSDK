@@ -72,11 +72,18 @@ File map:
 │   └── Sources/macOSDemoApp.swift         // @main wrapper around DemoRootView
 ├── Tests/VoltaSDKTests/
 │   └── VoltaSDKTests.swift                // fallback, privacy, history, tokens, parsing
-├── Tests/VoltaSDKEvals/                   // OPT-IN evaluation engine (D20) — see docs/evals/README.md
-│   ├── Engine/                            // task triple, graders, tiers, TaskEvaluation, CapabilityMap, judge, runner
-│   ├── Fixtures/                          // two generic example tasks (JSON)
+├── Sources/VoltaSDKEvals/                 // LIBRARY product for adopters' test targets (D20) — docs/evals/README.md
+│   ├── EvalTask.swift                     // the triple as data: task, samples, expectations, carry template, JSON paths
+│   ├── Graders.swift                      // the deterministic grader registry
+│   ├── TaskEvaluation.swift               // Apple `Evaluation` conformance: (task, provider, mode) → result; passRate
+│   ├── CapabilityMap.swift                // task × tier × mode → pass rate, JSON + Markdown
+│   ├── Judge.swift                        // ModelJudgeEvaluator via CloudAccountLanguageModel; Cohen's kappa
+│   ├── Tiers.swift                        // EvalTier (the sweep's vocabulary), EvalMode
+│   ├── EvalRunner.swift                   // the environment-driven sweep (VoltaSDK's own use)
+│   └── Examples/                          // two generic example tasks (resources, `EvalTask.examples`)
+├── Tests/VoltaSDKEvalsTests/
 │   ├── EngineTests.swift                  // mock-backed, CI-safe
-│   └── LiveEvaluations.swift              // VOLTA_EVAL_LIVE=1: Phase 0 + the capability map
+│   └── LiveEvaluations.swift              // VOLTA_EVAL_LIVE=1: Phase 0 + the capability map sweep
 ├── docs/evals/                            // how to run; results/capability-map.{json,md}
 ├── scripts/evals-merge.py                 // fold a device run's [evals-entry] lines into the map
 └── Examples/patch-local-package.py        // re-apply the XCLocalSwiftPackageReference fix after xcodegen

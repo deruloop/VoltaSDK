@@ -52,12 +52,11 @@ targets:
     type: bundle.unit-test
     platform: iOS
     sources:
-      - path: ../../Tests/VoltaSDKEvals
-        name: VoltaSDKEvals
-        excludes: ["Fixtures"]
-      - path: ../../Tests/VoltaSDKEvals/Fixtures
-        type: folder
-        buildPhase: resources
+      # The engine itself comes from the package product VoltaSDKEvals; only
+      # the SDK's own eval tests (the live sweep + the engine tests) are
+      # compiled here by path.
+      - path: ../../Tests/VoltaSDKEvalsTests
+        name: VoltaSDKEvalsTests
       - path: ../../docs/evals/raviolo/tasks
         name: EvalTasks
         type: folder
@@ -67,6 +66,8 @@ targets:
       - target: iOSDemo
       - package: VoltaSDK
         product: VoltaSDK
+      - package: VoltaSDK
+        product: VoltaSDKEvals
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

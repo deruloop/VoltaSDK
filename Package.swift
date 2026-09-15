@@ -23,7 +23,11 @@ let package = Package(
         // Optional OAuth automation for user-account providers (iOS 27). Uses
         // AuthenticationServices/Keychain, so it's separate from the headless
         // core: apps that want managed sign-in add this; others ignore it.
-        .library(name: "VoltaSDKAuth", targets: ["VoltaSDKAuth"])
+        .library(name: "VoltaSDKAuth", targets: ["VoltaSDKAuth"]),
+        // Evaluation engine (D20): add to your app's TEST target. Runs a task
+        // (schema + dataset + graders, JSON or Swift) against one provider
+        // under Apple's Evaluations framework and writes a capability map.
+        .library(name: "VoltaSDKEvals", targets: ["VoltaSDKEvals"])
     ],
     targets: [
         .target(name: "VoltaSDK"),
@@ -39,18 +43,24 @@ let package = Package(
             name: "VoltaSDKDemoUI",
             dependencies: ["VoltaSDK", "VoltaSDKUI"]
         ),
+        // The evaluation engine is a LIBRARY so adopters import it from their
+        // own test targets (Apple's Evaluations framework links from a plain
+        // library target — verified). Its example tasks ship as resources.
+        .target(
+            name: "VoltaSDKEvals",
+            dependencies: ["VoltaSDK"],
+            resources: [.copy("Examples")]
+        ),
         .testTarget(
             name: "VoltaSDKTests",
             dependencies: ["VoltaSDK", "VoltaSDKAuth"]
         ),
-        // Quality evaluations (D20): Apple's Evaluations framework (a
-        // test-time framework, like XCTest) measuring what the chain only
-        // asserts elsewhere — provider parity on fallback, long-context
-        // reliability. Kept separate from the unit tests: eval runs that
-        // need real models/keys are opt-in via environment variables.
+        // The engine's own tests (mock-backed, CI-safe) plus VoltaSDK's live
+        // sweep (`LiveEvaluations`, opt-in via VOLTA_EVAL_LIVE=1) — the same
+        // shape an adopter's eval test target takes.
         .testTarget(
-            name: "VoltaSDKEvals",
-            dependencies: ["VoltaSDK"]
+            name: "VoltaSDKEvalsTests",
+            dependencies: ["VoltaSDK", "VoltaSDKEvals"]
         )
     ]
 )

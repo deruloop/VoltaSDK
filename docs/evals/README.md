@@ -1,10 +1,80 @@
-# Evaluations (D20): how to run
+# Evaluations (D20): how it works, how to use it
 
-The engine lives in the opt-in test target `Tests/VoltaSDKEvals` and runs a
-generic triple, a **task** = schema + dataset + graders, through any tier of
-the chain, under Apple's Evaluations framework. The first client triple
-(Raviolo) stays in the client's own files, consumed by path; the engine
-ships with two small generic example tasks under `Tests/VoltaSDKEvals/Fixtures`.
+`VoltaSDKEvals` is a library you add to your app's **test target**. It runs
+one of your app's model features, many times, against one model tier, and
+counts how often the answer meets your rules. Nothing in your app runs;
+only its prompt does.
+
+## How it works (the actors)
+
+- **Your prompt.** The system instructions your app sends, verbatim, and
+  the JSON shape it expects back. They go into a *task*.
+- **Your dataset.** Twenty or so inputs a user would type, each with what a
+  correct answer must contain. Also in the task.
+- **The model under test.** One VoltaSDK provider you pick in code:
+  `OnDeviceProvider()`, `PrivateCloudComputeProvider()`, or a developer-key
+  provider. VoltaSDK is called exactly as your app would call it.
+- **The graders.** Small deterministic rules from a fixed registry (is the
+  reply only JSON, does it match the schema, is the note in Italian, did
+  the model keep the items from the previous turn). Each returns pass or
+  fail with a reason.
+- **Apple's Evaluations framework** (WWDC 2026, session 298). The
+  conductor: it loops over the dataset, calls VoltaSDK for each input, hands
+  the answer to the graders, averages the metrics, and saves every prompt,
+  answer, and verdict to an `.xcevalresult` file.
+- **The capability map.** The table the averages land in, one row per
+  model tier, one column per mode.
+
+For one input the flow is: the framework takes the sample; the engine sends
+your instructions plus the sample to the provider (`respond`, or
+`respondStructured` in structured mode); the model answers; each grader
+inspects the answer; the sample passes only if every grader passes; the
+framework moves to the next sample. At the end it averages, and the engine
+writes the row.
+
+## Your flow as an adopter
+
+1. **Add the product** to your app's test target (`VoltaSDKEvals`, from the
+   same package as `VoltaSDK`).
+2. **Write a task** for each model feature: a JSON file next to your tests
+   (or the same thing in Swift). Copy `EvalTask.examples` to start.
+3. **Write a test** that runs it against the provider you ship with, in the
+   mode you ship with, and asserts on the pass rate:
+
+```swift
+import Testing
+import VoltaSDK
+import VoltaSDKEvals
+
+@Suite struct MealRecordEvals {
+    let task = try! EvalTask(contentsOf: Bundle.module.url(forResource: "meal-record", withExtension: "json")!)
+
+    @Test func onDeviceStructured() async throws {
+        guard #available(iOS 27, macOS 27, *) else { return }   // the framework is OS 27+
+        let result = try await TaskEvaluation(task: task, provider: OnDeviceProvider(), mode: .structured).run()
+        #expect(result.passRate >= 0.6, "\(result.failureReasons)")
+    }
+}
+```
+
+4. **Run it with Cmd-U** (or `swift test`). A failing test prints the
+   reasons the graders recorded, one per failed sample.
+5. **Decide from the numbers.** Where the shape fails, switch that call to
+   `respondStructured` with the same schema. Where a tier cannot do a
+   feature at all, gate it or change the design. Keep a `CapabilityMap`
+   if you want the table across tiers (`CapabilityMap.entry(from:evaluation:host:judge:)`).
+
+Session 298 also shows the Swift Testing trait form,
+`@Test(.evaluates(TaskEvaluation(...)))`; it works the same way, since
+`TaskEvaluation` is a plain `Evaluation`.
+
+### Where things live
+
+- Your tasks and your results: in **your** repo, next to your tests.
+- The engine, the grader registry, and two example tasks: this package.
+- VoltaSDK's own sweep across every tier (the environment-variable runner
+  described below): this package's `Tests/VoltaSDKEvalsTests`. It is how the
+  SDK produces its capability map for the articles; adopters do not need it.
 
 ## The triple, as data
 
@@ -67,11 +137,16 @@ Modes (`VOLTA_EVAL_MODES`): `raw` (the app's prompt, verbatim: the raw
 ceiling), `structured` (the SDK's `respondStructured` with the task schema,
 no repair), `structured+repair` (one repair turn).
 
-## Running
+## VoltaSDK's own sweep (the environment-variable runner)
+
+`EvalRunner` runs every task in a directory against every tier this process
+can reach, in the requested modes, and upserts the map. Environment-driven
+so the same code runs under `swift test` on the Mac and inside a hosted
+test bundle on a device.
 
 ```bash
 # CI-safe engine tests (mock-backed), part of `swift test`
-DEVELOPER_DIR=~/Downloads/Xcode-beta.app/Contents/Developer swift test --filter VoltaSDKEvals
+DEVELOPER_DIR=~/Downloads/Xcode-beta.app/Contents/Developer swift test --filter VoltaSDKEvalsTests
 
 # Live, on this Mac (on-device = the Mac's Apple Intelligence; cloud with keys)
 VOLTA_EVAL_LIVE=1 VOLTA_EVAL_TASKS=docs/evals/raviolo/tasks \

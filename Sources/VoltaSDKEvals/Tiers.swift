@@ -18,9 +18,9 @@
 //
 
 import Foundation
-@testable import VoltaSDK
+import VoltaSDK
 
-enum EvalTier: String, CaseIterable, Sendable {
+public enum EvalTier: String, CaseIterable, Sendable {
     case onDevice = "on-device"
     case privateCloudCompute = "pcc"
     case cloudOpenAI = "cloud-openai"
@@ -28,7 +28,7 @@ enum EvalTier: String, CaseIterable, Sendable {
     case cloudGemini = "cloud-gemini"
 
     /// The vendor behind the tier, when it is a cloud vendor.
-    var vendor: CloudVendor? {
+    public var vendor: CloudVendor? {
         switch self {
         case .cloudOpenAI: return .openAI
         case .cloudAnthropic: return .anthropic
@@ -38,7 +38,7 @@ enum EvalTier: String, CaseIterable, Sendable {
     }
 
     /// Environment variable carrying the developer key for a cloud tier.
-    var keyVariable: String? {
+    public var keyVariable: String? {
         switch self {
         case .cloudOpenAI: return "VOLTA_EVAL_OPENAI_KEY"
         case .cloudAnthropic: return "VOLTA_EVAL_ANTHROPIC_KEY"
@@ -48,13 +48,13 @@ enum EvalTier: String, CaseIterable, Sendable {
     }
 
     /// Optional model override (`VOLTA_EVAL_<VENDOR>_MODEL`).
-    var modelVariable: String? {
+    public var modelVariable: String? {
         keyVariable?.replacingOccurrences(of: "_KEY", with: "_MODEL")
     }
 
     /// Builds the tier's provider, or explains why it cannot exist in this
     /// process. Availability (model ready, key valid) is checked separately.
-    func makeProvider(environment: [String: String] = ProcessInfo.processInfo.environment) -> Result<any ModelProvider, TierUnreachable> {
+    public func makeProvider(environment: [String: String] = ProcessInfo.processInfo.environment) -> Result<any ModelProvider, TierUnreachable> {
         switch self {
         case .onDevice:
             if #available(iOS 26.0, macOS 26.0, *) { return .success(OnDeviceProvider()) }
@@ -84,7 +84,7 @@ enum EvalTier: String, CaseIterable, Sendable {
     }
 
     /// A human-readable label with the model name where one is configured.
-    func label(environment: [String: String] = ProcessInfo.processInfo.environment) -> String {
+    public func label(environment: [String: String] = ProcessInfo.processInfo.environment) -> String {
         guard let vendor else { return rawValue }
         let model = modelVariable.flatMap { environment[$0] } ?? vendor.defaultModel
         return "\(rawValue) (\(model))"
@@ -92,20 +92,20 @@ enum EvalTier: String, CaseIterable, Sendable {
 }
 
 /// Why a tier cannot exist in this process.
-struct TierUnreachable: Error, CustomStringConvertible {
-    let description: String
-    init(_ description: String) { self.description = description }
+public struct TierUnreachable: Error, CustomStringConvertible {
+    public let description: String
+    public init(_ description: String) { self.description = description }
 }
 
 /// How the engine asks the model: the raw prompt as the app sends it, or
 /// the SDK's structured path (schema in, validated value out).
-enum EvalMode: Sendable, Hashable, CustomStringConvertible {
+public enum EvalMode: Sendable, Hashable, CustomStringConvertible {
     /// `respond` with the task instructions verbatim — the raw ceiling.
     case raw
     /// `respondStructured` with the task schema and the given repair policy.
     case structured(repair: RepairPolicy)
 
-    var description: String {
+    public var description: String {
         switch self {
         case .raw: return "raw"
         case .structured(.none): return "structured"
@@ -113,7 +113,7 @@ enum EvalMode: Sendable, Hashable, CustomStringConvertible {
         }
     }
 
-    static func parse(_ text: String) -> EvalMode? {
+    public static func parse(_ text: String) -> EvalMode? {
         switch text {
         case "raw": return .raw
         case "structured": return .structured(repair: .none)
@@ -122,3 +122,9 @@ enum EvalMode: Sendable, Hashable, CustomStringConvertible {
         }
     }
 }
+
+// MARK: - Vendor identification for the judge rule
+
+extension OpenAIProvider: CloudVendorIdentifying { public var cloudVendor: CloudVendor? { .openAI } }
+extension AnthropicProvider: CloudVendorIdentifying { public var cloudVendor: CloudVendor? { .anthropic } }
+extension GeminiProvider: CloudVendorIdentifying { public var cloudVendor: CloudVendor? { .gemini } }

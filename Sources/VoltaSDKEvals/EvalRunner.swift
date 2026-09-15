@@ -24,23 +24,27 @@ import Foundation
 import TabularData
 import VoltaSDK
 
-/// Anchors `Bundle(for:)` lookups to the test bundle.
-final class EvalBundleMarker {}
+public struct EvalRunner {
+    public let environment: [String: String]
+    /// Bundles searched for a `tasks` (or `EvalTasks`) folder when
+    /// `VOLTA_EVAL_TASKS` is unset — a hosted test bundle passes itself.
+    public let resourceBundles: [Bundle]
 
-struct EvalRunner {
-    let environment: [String: String]
-
-    init(environment: [String: String] = ProcessInfo.processInfo.environment) {
+    public init(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        resourceBundles: [Bundle] = [.main]
+    ) {
         self.environment = environment
+        self.resourceBundles = resourceBundles
     }
 
-    var isLive: Bool { environment["VOLTA_EVAL_LIVE"] == "1" }
+    public var isLive: Bool { environment["VOLTA_EVAL_LIVE"] == "1" }
 
     /// The repo root, derived from this file's location: the default place
     /// for results when no directory is configured. Exists only on the
     /// machine that compiled the tests (`swift test`, or a hosted bundle on
     /// the Mac); on a device the bundle's resources stand in.
-    static var packageRoot: URL {
+    public static var packageRoot: URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()   // Engine
             .deletingLastPathComponent()   // VoltaSDKEvals
@@ -48,16 +52,14 @@ struct EvalRunner {
             .deletingLastPathComponent()   // package root
     }
 
-    static var packageRootExists: Bool {
+    public static var packageRootExists: Bool {
         FileManager.default.fileExists(atPath: packageRoot.appendingPathComponent("Package.swift").path)
     }
 
-    /// The test bundle (for resources copied into a hosted bundle).
-    static var bundle: Bundle { Bundle(for: EvalBundleMarker.self) }
 
     /// Folders a GUI host cannot read without a TCC prompt (which nobody
     /// answers during an automated run).
-    static func isPrivacyProtected(_ path: String) -> Bool {
+    public static func isPrivacyProtected(_ path: String) -> Bool {
         #if os(macOS)
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         return ["Desktop", "Documents", "Downloads"].contains { path.hasPrefix(home + "/" + $0) }
@@ -66,11 +68,13 @@ struct EvalRunner {
         #endif
     }
 
-    static var bundledTasksDirectory: URL? {
-        guard let resources = bundle.resourceURL else { return nil }
-        for name in ["EvalTasks", "tasks"] {
-            let candidate = resources.appendingPathComponent(name)
-            if FileManager.default.fileExists(atPath: candidate.path) { return candidate }
+    public var bundledTasksDirectory: URL? {
+        for bundle in resourceBundles {
+            guard let resources = bundle.resourceURL else { continue }
+            for name in ["EvalTasks", "tasks"] {
+                let candidate = resources.appendingPathComponent(name)
+                if FileManager.default.fileExists(atPath: candidate.path) { return candidate }
+            }
         }
         return nil
     }
@@ -80,11 +84,11 @@ struct EvalRunner {
     /// on macOS, reading or writing under ~/Desktop or ~/Documents blocks on
     /// the privacy (TCC) prompt and the run hangs; on a device the repo
     /// does not exist at all.
-    static var isHostedInApp: Bool {
+    public static var isHostedInApp: Bool {
         Bundle.main.bundleURL.pathExtension == "app"
     }
 
-    var resultsDirectory: URL {
+    public var resultsDirectory: URL {
         if let configured = environment["VOLTA_EVAL_RESULTS"] { return URL(fileURLWithPath: configured) }
         if !Self.isHostedInApp, Self.packageRootExists {
             return Self.packageRoot.appendingPathComponent("docs/evals/results")
@@ -100,9 +104,9 @@ struct EvalRunner {
         return (base ?? URL(fileURLWithPath: NSTemporaryDirectory())).appendingPathComponent("VoltaSDKEvals/results")
     }
 
-    var capabilityMapURL: URL { resultsDirectory.appendingPathComponent("capability-map.json") }
+    public var capabilityMapURL: URL { resultsDirectory.appendingPathComponent("capability-map.json") }
 
-    var host: String {
+    public var host: String {
         if let configured = environment["VOLTA_EVAL_HOST"] { return configured }
         #if os(iOS)
         return "iOS device"
@@ -114,12 +118,12 @@ struct EvalRunner {
 
     // MARK: Task discovery
 
-    func taskURLs() -> [URL] {
+    public func taskURLs() -> [URL] {
         let url: URL
         if let path = environment["VOLTA_EVAL_TASKS"], !Self.isHostedInApp || !Self.isPrivacyProtected(path),
            FileManager.default.fileExists(atPath: path) {
             url = URL(fileURLWithPath: path)
-        } else if let bundled = Self.bundledTasksDirectory {
+        } else if let bundled = bundledTasksDirectory {
             // A hosted bundle carries the task files as a folder reference
             // (see the demo project.yml); Xcode copies the folder under its
             // on-disk name, so both spellings are accepted.
@@ -134,21 +138,21 @@ struct EvalRunner {
         return contents.filter { $0.pathExtension == "json" }.sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
-    func modes() -> [EvalMode] {
+    public func modes() -> [EvalMode] {
         let configured = environment["VOLTA_EVAL_MODES"]?.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) } ?? ["raw"]
         return configured.compactMap(EvalMode.parse)
     }
 
-    func requestedTiers() -> [EvalTier] {
+    public func requestedTiers() -> [EvalTier] {
         guard let configured = environment["VOLTA_EVAL_TIERS"] else { return EvalTier.allCases }
         return configured.split(separator: ",").compactMap { EvalTier(rawValue: String($0).trimmingCharacters(in: .whitespaces)) }
     }
 
-    var limit: Int? { environment["VOLTA_EVAL_LIMIT"].flatMap(Int.init) }
+    public var limit: Int? { environment["VOLTA_EVAL_LIMIT"].flatMap(Int.init) }
 
     /// Tiers this process can build AND that report available right now,
     /// with the reason for each one it cannot reach.
-    func reachableTiers() async -> (reachable: [(EvalTier, any ModelProvider)], skipped: [(EvalTier, String)]) {
+    public func reachableTiers() async -> (reachable: [(EvalTier, any ModelProvider)], skipped: [(EvalTier, String)]) {
         var reachable: [(EvalTier, any ModelProvider)] = []
         var skipped: [(EvalTier, String)] = []
         for tier in requestedTiers() {
@@ -168,14 +172,14 @@ struct EvalRunner {
 
     // MARK: Running
 
-    struct RunReport {
-        var entries: [CapabilityMap.Entry] = []
-        var skipped: [(EvalTier, String)] = []
-        var log: [String] = []
+    public struct RunReport {
+        public var entries: [CapabilityMap.Entry] = []
+        public var skipped: [(EvalTier, String)] = []
+        public var log: [String] = []
     }
 
     @available(iOS 27.0, macOS 27.0, *)
-    func runAll() async throws -> RunReport {
+    public func runAll() async throws -> RunReport {
         var report = RunReport()
         let tasks = try taskURLs().map(EvalTask.load(from:))
         guard !tasks.isEmpty else {
@@ -212,7 +216,7 @@ struct EvalRunner {
     }
 
     @available(iOS 27.0, macOS 27.0, *)
-    func run(
+    public func run(
         task: EvalTask,
         tier: EvalTier,
         provider: any ModelProvider,

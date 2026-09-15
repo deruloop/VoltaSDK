@@ -24,7 +24,10 @@ iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
   `respondStructured`). Patterns and array bounds are enforced by the SDK
   validator after the call (Apple's dynamic schemas reject a pattern guide
   at generation time). `MockProvider` gains scripted `structuredAnswers`.
-- **Evaluation engine (D20).** `Tests/VoltaSDKEvals` now runs a generic
+- **Evaluation engine (D20), as a library.** The new `VoltaSDKEvals`
+  product is added to an app's test target: `EvalTask` (JSON or Swift),
+  `TaskEvaluation(task:provider:mode:)` conforming to Apple's `Evaluation`,
+  `EvaluationResult.passRate` / `failureReasons`, `CapabilityMap`. It runs a generic
   triple — task = schema + dataset + graders, as a JSON file — through one
   tier at a time (on-device, PCC, cloud per vendor) in three modes (raw,
   structured, structured+repair) under Apple's Evaluations framework, and

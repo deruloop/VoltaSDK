@@ -1,6 +1,6 @@
 //
 //  LiveEvaluations.swift
-//  VoltaSDKEvals
+//  VoltaSDKEvalsTests
 //
 //  The real runs (opt-in: VOLTA_EVAL_LIVE=1). Two entry points:
 //
@@ -25,10 +25,15 @@ import Foundation
 import FoundationModels
 import Testing
 import VoltaSDK
+import VoltaSDKEvals
+
+/// Anchors `Bundle(for:)` to THIS test bundle, so a hosted run finds the
+/// task files copied into it.
+private final class TestBundleMarker {}
 
 @Suite("LiveEvaluations")
 struct LiveEvaluations {
-    let runner = EvalRunner()
+    let runner = EvalRunner(resourceBundles: [Bundle(for: TestBundleMarker.self), .main])
 
     @Test("Phase 0: language acceptance on the on-device model")
     func phase0LanguageAcceptance() async throws {

@@ -403,9 +403,12 @@ exercised by a working harness.
 - **Integration constraint (D20):** Swift Testing rejects `@available` on
   `@Test`/`@Suite`, and the trait's symbols are 27-only while the package
   floor is 18 — so evaluations run through manual `run()` inside
-  availability-guarded tests, in a dedicated opt-in test target
-  (`Tests/VoltaSDKEvals`). Mock-backed harness runs stay CI-safe; suites
-  needing real models/keys gate on environment variables.
+  availability-guarded tests. The engine is a LIBRARY product
+  (`VoltaSDKEvals`, verified: a plain library target imports the
+  Evaluations framework and a test target runs what it defines), so
+  adopters use it from their own test targets, Apple-style; the SDK's own
+  tests live in `Tests/VoltaSDKEvalsTests`. Mock-backed runs stay CI-safe;
+  runs needing real models/keys gate on environment variables.
 - **Two SDK bugs the real iPhone surfaced (Sep 15, 2026).** (1) The PCC
   provider's `SecTask` entitlement self-check is macOS-only, so the package
   had NOT compiled for a physical iOS device since the provider shipped

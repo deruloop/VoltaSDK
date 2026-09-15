@@ -1,6 +1,6 @@
 //
 //  EngineTests.swift
-//  VoltaSDKEvals
+//  VoltaSDKEvalsTests
 //
 //  The engine under test with NO real model: schema data round-trips,
 //  validation, lenient extraction, the carry template, every grader
@@ -15,19 +15,15 @@ import Synchronization
 import TabularData
 import Testing
 import VoltaSDK
+import VoltaSDKEvals
 
 // MARK: - Fixtures
 
+/// The example tasks ship inside the library's resource bundle.
 enum Fixtures {
-    /// Next to this file under `swift test`; copied into the bundle for a
-    /// hosted run on a device.
-    static var directory: URL {
-        let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures")
-        if FileManager.default.fileExists(atPath: source.path) { return source }
-        return EvalRunner.bundle.resourceURL!.appendingPathComponent("Fixtures")
-    }
     static func task(_ name: String) throws -> EvalTask {
-        try EvalTask.load(from: directory.appendingPathComponent(name))
+        let id = name == "example-task.json" ? "example.city-facts" : "example.packing-list"
+        return try EvalTask.example(id)
     }
 }
 
@@ -380,9 +376,11 @@ struct TaskEvaluationTests {
             let index = answers.withLock { value -> Int in defer { value += 1 }; return value }
             return scripted[min(index, scripted.count - 1)]
         }
-        let evaluation = TaskEvaluation(task: task, tier: .onDevice, mode: .raw, provider: provider, judgeEvaluator: nil, limit: nil)
+        let evaluation = TaskEvaluation(task: task, provider: provider, mode: .raw)
         let result = try await evaluation.run()
         #expect(result.aggregateValue(.mean(of: Graders.passMetric)) == 0.8)
+        #expect(result.passRate == 0.8)
+        #expect(result.failureReasons.count == 1)
         #expect(result.aggregateValue(.mean(of: Metric("json-only"))) == 0.8)
         #expect(result.aggregateValue(.mean(of: Metric("schema"))) == 1.0)
 
@@ -414,7 +412,7 @@ struct TaskEvaluationTests {
             let word = prompt.split(separator: " ").last!.lowercased()
             return "{\"items\":[\"\(word)\"],\"note\":\"Noted.\"}"
         }
-        let evaluation = TaskEvaluation(task: task, tier: .onDevice, mode: .raw, provider: provider, judgeEvaluator: nil, limit: nil)
+        let evaluation = TaskEvaluation(task: task, provider: provider, mode: .raw)
         let result = try await evaluation.run()
         let sent = prompts.withLock { $0 }
         #expect(sent.contains("List so far: [towel]. The person now says: and sunscreen"))
@@ -431,7 +429,7 @@ struct TaskEvaluationTests {
             "{\"city\":\"Rome\",\"country\":\"Italy\",\"continent\":\"Mars\",\"note\":\"Rome wears its centuries lightly.\"}",
             "{\"city\":\"Rome\",\"country\":\"Italy\",\"continent\":\"Europe\",\"note\":\"Rome wears its centuries lightly.\"}",
         ])
-        let evaluation = TaskEvaluation(task: task, tier: .onDevice, mode: .structured(repair: .once), provider: provider, judgeEvaluator: nil, limit: nil)
+        let evaluation = TaskEvaluation(task: task, provider: provider, mode: .structured(repair: .once))
         let result = try await evaluation.run()
         #expect(result.aggregateValue(.mean(of: Graders.passMetric)) == 1.0)
         let outcome = try #require(result.detailed[evaluation.responseColumn.name, ModelSubject<EvalOutcome>.self].first??.value)
@@ -439,9 +437,9 @@ struct TaskEvaluationTests {
         #expect(outcome.turns.first?.nativeSchema == true)
 
         // Without repair the same script is a typed failure the graders score as FAIL.
-        let raw = TaskEvaluation(task: task, tier: .onDevice, mode: .structured(repair: .none),
+        let raw = TaskEvaluation(task: task,
                                  provider: MockProvider(identifier: .onDevice, structuredAnswers: ["{\"city\":\"Rome\",\"country\":\"Italy\",\"continent\":\"Mars\",\"note\":\"x\"}"]),
-                                 judgeEvaluator: nil, limit: nil)
+                                 mode: .structured(repair: .none))
         let rawResult = try await raw.run()
         #expect(rawResult.aggregateValue(.mean(of: Graders.passMetric)) == 0.0)
         #expect(rawResult.aggregateValue(.mean(of: Graders.availabilityMetric)) == 1.0)

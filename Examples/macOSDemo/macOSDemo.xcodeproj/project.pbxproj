@@ -8,20 +8,13 @@
 
 /* Begin PBXBuildFile section */
 		09260035D0BC5355BFF5881F /* EvalTasks in Resources */ = {isa = PBXBuildFile; fileRef = 9413A056851F02AA1FF49D78 /* EvalTasks */; };
-		116A6F24555650B437A451A4 /* Judge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 689C986C1E75B198FE13DDCB /* Judge.swift */; };
-		116C48F5D03745E18EF19D06 /* ChainEvaluations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65A1413692C381B12C726C4B /* ChainEvaluations.swift */; };
+		159394C738D4BE6E333B68FE /* EngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46689095444239ACE35C2EB0 /* EngineTests.swift */; };
 		190518C92C1177EE9C0AA06A /* VoltaSDK in Frameworks */ = {isa = PBXBuildFile; productRef = EC8DA31F0034D9C0536CE05F /* VoltaSDK */; };
-		4B6878BA8698B85324918662 /* EvalRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AE7AB1B436A7A5E6DB62B04 /* EvalRunner.swift */; };
 		61EC619CEE6E5C09133BF089 /* macOSDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB0758777210FF98B69B45BB /* macOSDemoApp.swift */; };
-		6368604C269A9587C2141BD3 /* EngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8719EFE92BB46A8E38BAA480 /* EngineTests.swift */; };
-		708ED0BBD5BF73662198CC23 /* Tiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 094843135C9042F460815D88 /* Tiers.swift */; };
-		72257B797B3BE769E1BFB41E /* LiveEvaluations.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0B5715B391FD43A95EDD3AA /* LiveEvaluations.swift */; };
-		7BE3E4F69E5C75ED08E91FE1 /* EvalTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F62C6282EAAA6193586A891 /* EvalTask.swift */; };
-		862BD6317D70A3A2B14EF2A6 /* Fixtures in Resources */ = {isa = PBXBuildFile; fileRef = B5004E7F165EB4F0A7B3726D /* Fixtures */; };
-		B7898CEDBE3160115AE53D22 /* TaskEvaluation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E3C6E90E54232941CD1689 /* TaskEvaluation.swift */; };
-		BE944D86E4F0CB5F77447E60 /* Graders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40001BE57028D5C85F300828 /* Graders.swift */; };
+		A995487057FBB63BB64856CD /* ChainEvaluations.swift in Sources */ = {isa = PBXBuildFile; fileRef = F22A1CB49677814A60B4A044 /* ChainEvaluations.swift */; };
+		B65091732E295DE7A6785FD3 /* LiveEvaluations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4560F2C7FB19526DB55CD183 /* LiveEvaluations.swift */; };
 		BF6F45825F6B56C7E3BC4E70 /* VoltaSDKDemoUI in Frameworks */ = {isa = PBXBuildFile; productRef = C37924CA15EB5DA841C0149C /* VoltaSDKDemoUI */; };
-		FDCE9696BB682B16C6F38D6F /* CapabilityMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6A21618F79EBC1ADCC2E4AC /* CapabilityMap.swift */; };
+		F43219316FAEFEEFFC8975D4 /* VoltaSDKEvals in Frameworks */ = {isa = PBXBuildFile; productRef = 362AD79BD7DB61327BDB99A4 /* VoltaSDKEvals */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -35,21 +28,13 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		094843135C9042F460815D88 /* Tiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tiers.swift; sourceTree = "<group>"; };
 		1CED1FECBAC66CA70F6ED8DB /* macOSDemoEvals.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = macOSDemoEvals.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		3AE7AB1B436A7A5E6DB62B04 /* EvalRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvalRunner.swift; sourceTree = "<group>"; };
-		40001BE57028D5C85F300828 /* Graders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Graders.swift; sourceTree = "<group>"; };
-		4F62C6282EAAA6193586A891 /* EvalTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvalTask.swift; sourceTree = "<group>"; };
-		65A1413692C381B12C726C4B /* ChainEvaluations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainEvaluations.swift; sourceTree = "<group>"; };
-		689C986C1E75B198FE13DDCB /* Judge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Judge.swift; sourceTree = "<group>"; };
+		4560F2C7FB19526DB55CD183 /* LiveEvaluations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveEvaluations.swift; sourceTree = "<group>"; };
+		46689095444239ACE35C2EB0 /* EngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineTests.swift; sourceTree = "<group>"; };
 		73850072C8378F353ABF68E5 /* macOSDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = macOSDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		77E3C6E90E54232941CD1689 /* TaskEvaluation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskEvaluation.swift; sourceTree = "<group>"; };
-		8719EFE92BB46A8E38BAA480 /* EngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineTests.swift; sourceTree = "<group>"; };
 		9413A056851F02AA1FF49D78 /* EvalTasks */ = {isa = PBXFileReference; lastKnownFileType = folder; name = EvalTasks; path = ../../docs/evals/raviolo/tasks; sourceTree = SOURCE_ROOT; };
-		A6A21618F79EBC1ADCC2E4AC /* CapabilityMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapabilityMap.swift; sourceTree = "<group>"; };
-		B5004E7F165EB4F0A7B3726D /* Fixtures */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Fixtures; path = ../../Tests/VoltaSDKEvals/Fixtures; sourceTree = SOURCE_ROOT; };
-		C0B5715B391FD43A95EDD3AA /* LiveEvaluations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveEvaluations.swift; sourceTree = "<group>"; };
 		DB0758777210FF98B69B45BB /* macOSDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = macOSDemoApp.swift; sourceTree = "<group>"; };
+		F22A1CB49677814A60B4A044 /* ChainEvaluations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainEvaluations.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -66,6 +51,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				190518C92C1177EE9C0AA06A /* VoltaSDK in Frameworks */,
+				F43219316FAEFEEFFC8975D4 /* VoltaSDKEvals in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -80,39 +66,23 @@
 			path = Sources;
 			sourceTree = "<group>";
 		};
-		6472CFF92E0EF9E8F9DC2402 /* VoltaSDKEvals */ = {
+		78C054F14C885DFFC7D8AA03 /* VoltaSDKEvalsTests */ = {
 			isa = PBXGroup;
 			children = (
-				65A1413692C381B12C726C4B /* ChainEvaluations.swift */,
-				8719EFE92BB46A8E38BAA480 /* EngineTests.swift */,
-				C0B5715B391FD43A95EDD3AA /* LiveEvaluations.swift */,
-				99956CAB49F53B5184EA12C2 /* Engine */,
+				F22A1CB49677814A60B4A044 /* ChainEvaluations.swift */,
+				46689095444239ACE35C2EB0 /* EngineTests.swift */,
+				4560F2C7FB19526DB55CD183 /* LiveEvaluations.swift */,
 			);
-			name = VoltaSDKEvals;
-			path = ../../Tests/VoltaSDKEvals;
-			sourceTree = "<group>";
-		};
-		99956CAB49F53B5184EA12C2 /* Engine */ = {
-			isa = PBXGroup;
-			children = (
-				A6A21618F79EBC1ADCC2E4AC /* CapabilityMap.swift */,
-				3AE7AB1B436A7A5E6DB62B04 /* EvalRunner.swift */,
-				4F62C6282EAAA6193586A891 /* EvalTask.swift */,
-				40001BE57028D5C85F300828 /* Graders.swift */,
-				689C986C1E75B198FE13DDCB /* Judge.swift */,
-				77E3C6E90E54232941CD1689 /* TaskEvaluation.swift */,
-				094843135C9042F460815D88 /* Tiers.swift */,
-			);
-			path = Engine;
+			name = VoltaSDKEvalsTests;
+			path = ../../Tests/VoltaSDKEvalsTests;
 			sourceTree = "<group>";
 		};
 		D17CC3A6B4B35BE92ED9D17A = {
 			isa = PBXGroup;
 			children = (
 				9413A056851F02AA1FF49D78 /* EvalTasks */,
-				B5004E7F165EB4F0A7B3726D /* Fixtures */,
 				4CD097DA503D4497F0F70782 /* Sources */,
-				6472CFF92E0EF9E8F9DC2402 /* VoltaSDKEvals */,
+				78C054F14C885DFFC7D8AA03 /* VoltaSDKEvalsTests */,
 				FAF17119FD11C5DF17DEC0B0 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -164,6 +134,7 @@
 			name = macOSDemoEvals;
 			packageProductDependencies = (
 				EC8DA31F0034D9C0536CE05F /* VoltaSDK */,
+				362AD79BD7DB61327BDB99A4 /* VoltaSDKEvals */,
 			);
 			productName = macOSDemoEvals;
 			productReference = 1CED1FECBAC66CA70F6ED8DB /* macOSDemoEvals.xctest */;
@@ -213,7 +184,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				862BD6317D70A3A2B14EF2A6 /* Fixtures in Resources */,
 				09260035D0BC5355BFF5881F /* EvalTasks in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -233,16 +203,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				FDCE9696BB682B16C6F38D6F /* CapabilityMap.swift in Sources */,
-				116C48F5D03745E18EF19D06 /* ChainEvaluations.swift in Sources */,
-				6368604C269A9587C2141BD3 /* EngineTests.swift in Sources */,
-				4B6878BA8698B85324918662 /* EvalRunner.swift in Sources */,
-				7BE3E4F69E5C75ED08E91FE1 /* EvalTask.swift in Sources */,
-				BE944D86E4F0CB5F77447E60 /* Graders.swift in Sources */,
-				116A6F24555650B437A451A4 /* Judge.swift in Sources */,
-				72257B797B3BE769E1BFB41E /* LiveEvaluations.swift in Sources */,
-				B7898CEDBE3160115AE53D22 /* TaskEvaluation.swift in Sources */,
-				708ED0BBD5BF73662198CC23 /* Tiers.swift in Sources */,
+				A995487057FBB63BB64856CD /* ChainEvaluations.swift in Sources */,
+				159394C738D4BE6E333B68FE /* EngineTests.swift in Sources */,
+				B65091732E295DE7A6785FD3 /* LiveEvaluations.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -494,6 +457,11 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		362AD79BD7DB61327BDB99A4 /* VoltaSDKEvals */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B2C3D4E5F6071829A0B1C2D3 /* XCLocalSwiftPackageReference "../.." */;
+			productName = VoltaSDKEvals;
+		};
 		C37924CA15EB5DA841C0149C /* VoltaSDKDemoUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B2C3D4E5F6071829A0B1C2D3 /* XCLocalSwiftPackageReference "../.." */;

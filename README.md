@@ -572,29 +572,37 @@ conversation surviving the switch mid-thread.
 ```bash
 swift test   # 92 unit tests in 20 suites (fallback, needs, streaming, sessions,
              # privacy, tokens, PCC wiring, parsing, the profiles bridge)
-             # + 28 evaluation-engine tests in 8 suites (mock-backed)
+             # + 28 evaluation-engine tests in 8 suites (mock-backed, VoltaSDKEvalsTests)
 ```
 
 Building the tests needs the Xcode 27 toolchain (see Version support).
 
 ## Evaluations (measured, not asserted)
 
-`Tests/VoltaSDKEvals` is an opt-in engine on Apple's Evaluations framework
-(WWDC 2026). It runs a **task** (schema + dataset + graders, as a JSON file)
-through one tier of the chain at a time and writes a **capability map**:
-task × tier × mode → pass rate, per-grader rates, and failure rationales.
-Modes compare the raw prompt with Volta's structured path, so the map also
-shows what structured output buys on each tier. A cloud model from another
-vendor can judge the dimensions a deterministic grader cannot, and its
-agreement with human ratings is measured before it is trusted.
+`VoltaSDKEvals` is a library for your app's **test target**, built on
+Apple's Evaluations framework (WWDC 2026, session 298). You describe one
+model feature as a **task** (your instructions verbatim, the JSON shape you
+expect, twenty inputs a user would type, the pass rules), and run it against
+one provider in one mode. The result is a pass rate with the reasons behind
+every failure, and, across tiers, a **capability map**: which model can
+carry which feature.
 
-```bash
-VOLTA_EVAL_LIVE=1 VOLTA_EVAL_TASKS=path/to/tasks VOLTA_EVAL_TIERS=on-device \
-VOLTA_EVAL_MODES=raw,structured swift test --filter LiveEvaluations
+```swift
+import VoltaSDK
+import VoltaSDKEvals
+
+let task = try EvalTask(contentsOf: url)                       // JSON, or build it in Swift
+let evaluation = TaskEvaluation(task: task, provider: OnDeviceProvider(), mode: .structured)
+let result = try await evaluation.run()                        // Apple's framework runs it
+#expect(result.passRate >= 0.6, "\(result.failureReasons)")
 ```
 
-PCC and real devices run through hosted bundles inside the demo apps. The
-manual, the grader registry, and the task-file format are in
+Modes compare the raw prompt with Volta's structured path, so the same task
+also measures what structured output buys on each tier. Graders are
+deterministic rules from a fixed registry; for the rest, a cloud model from
+another vendor can judge, and its agreement with human ratings is measured
+before it is trusted. The flow, the grader registry, the task format, and
+how to reach PCC and real devices are in
 [docs/evals/README.md](docs/evals/README.md).
 
 ## For framework contributors

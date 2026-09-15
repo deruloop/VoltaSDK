@@ -19,34 +19,81 @@ import VoltaSDK
 
 /// One evaluation task: the schema the app expects, the instructions it
 /// sends, the samples it collected, and the graders that define PASS.
-struct EvalTask: Codable, Sendable {
+public struct EvalTask: Codable, Sendable {
     /// Stable identifier, e.g. `raviolo.task-a`. Rows of the capability map
     /// are keyed by it.
-    var id: String
-    var title: String
+    public var id: String
+    public var title: String
     /// Version of the schema + prompt this dataset was written against.
     /// Datasets are keyed to it: a schema change means a re-run.
-    var schemaVersion: String
+    public var schemaVersion: String
     /// The system instructions, verbatim as the app sends them.
-    var instructions: String
+    public var instructions: String
     /// Expected language of the answer's prose fields (BCP-47), if any.
-    var language: String?
+    public var language: String?
     /// The output shape. Optional: a task may be free text.
-    var schema: OutputSchema?
+    public var schema: OutputSchema?
     /// How a later turn's prompt is built from the previous turn (multi-turn
     /// tasks). Absent = turns are sent as typed, history carries the rest.
-    var carry: CarryTemplate?
+    public var carry: CarryTemplate?
     /// The grader list. PASS for a sample = every grader passes.
-    var graders: [GraderSpec]
+    public var graders: [GraderSpec]
     /// Optional model-judge dimensions (session 335); a cloud judge scores
     /// them when configured, and its agreement with human ratings is
     /// measured before it is trusted.
-    var judge: JudgeSpec?
-    var samples: [EvalSample]
+    public var judge: JudgeSpec?
+    public var samples: [EvalSample]
+
+    public init(
+        id: String,
+        title: String,
+        schemaVersion: String = "v1",
+        instructions: String,
+        language: String? = nil,
+        schema: OutputSchema? = nil,
+        carry: CarryTemplate? = nil,
+        graders: [GraderSpec],
+        judge: JudgeSpec? = nil,
+        samples: [EvalSample]
+    ) {
+        self.id = id
+        self.title = title
+        self.schemaVersion = schemaVersion
+        self.instructions = instructions
+        self.language = language
+        self.schema = schema
+        self.carry = carry
+        self.graders = graders
+        self.judge = judge
+        self.samples = samples
+    }
 
     /// Loads a task file (JSON).
-    static func load(from url: URL) throws -> EvalTask {
+    public static func load(from url: URL) throws -> EvalTask {
         try JSONDecoder().decode(EvalTask.self, from: Data(contentsOf: url))
+    }
+
+    public init(contentsOf url: URL) throws {
+        self = try Self.load(from: url)
+    }
+
+    /// The generic example tasks shipped with the engine — a starting point
+    /// to copy, and the dataset the engine's own tests run.
+    public static var examples: [EvalTask] {
+        get throws {
+            guard let directory = Bundle.module.url(forResource: "Examples", withExtension: nil) else { return [] }
+            let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            return try files.filter { $0.pathExtension == "json" }
+                .sorted { $0.lastPathComponent < $1.lastPathComponent }
+                .map(load(from:))
+        }
+    }
+
+    public static func example(_ id: String) throws -> EvalTask {
+        guard let task = try examples.first(where: { $0.id == id }) else {
+            throw EvalEngineError.taskNotFound(id)
+        }
+        return task
     }
 }
 
@@ -55,18 +102,26 @@ struct EvalTask: Codable, Sendable {
 /// One dataset entry: the user's turns (one or more) and the expectations
 /// the graders check. Plain data; `FrameworkSample` adapts it to the
 /// framework's sample protocols.
-struct EvalSample: Codable, Sendable, Identifiable, Equatable {
-    var id: String
+public struct EvalSample: Codable, Sendable, Identifiable, Equatable {
+    public var id: String
     /// The user's turns, as typed in the app.
-    var turns: [String]
+    public var turns: [String]
     /// A fallback conversation state for the carry template when the
     /// previous turn produced nothing usable (the handoff's "canonical
     /// expected state").
-    var canonicalState: JSONValue?
+    public var canonicalState: JSONValue?
     /// What the graders check for this sample specifically.
-    var expect: EvalExpectation?
+    public var expect: EvalExpectation?
     /// Free-form notes (why the sample exists, the ambiguity it probes).
-    var notes: String?
+    public var notes: String?
+
+    public init(id: String, turns: [String], canonicalState: JSONValue? = nil, expect: EvalExpectation? = nil, notes: String? = nil) {
+        self.id = id
+        self.turns = turns
+        self.canonicalState = canonicalState
+        self.expect = expect
+        self.notes = notes
+    }
 }
 
 /// The framework-facing sample: an `EvalSample` plus the instructions the
@@ -75,94 +130,131 @@ struct EvalSample: Codable, Sendable, Identifiable, Equatable {
 /// outcome type (the framework requires subject and expectation to share
 /// a type); the deterministic expectations live on `sample.expect`.
 @available(iOS 27.0, macOS 27.0, *)
-struct FrameworkSample: ModelSampleProtocol, Codable, Sendable {
-    typealias ExpectedValue = EvalOutcome
-    typealias Expectation = TrajectoryExpectation
+public struct FrameworkSample: ModelSampleProtocol, Codable, Sendable {
+    public typealias ExpectedValue = EvalOutcome
+    public typealias Expectation = TrajectoryExpectation
 
-    var sample: EvalSample
-    var instructions: String
+    public var sample: EvalSample
+    public var instructions: String
 
-    var id: String { sample.id }
+    public var id: String { sample.id }
 
-    var input: ModelSampleInput {
+    public var input: ModelSampleInput {
         ModelSampleInput(
             prompt: Prompt(sample.turns.joined(separator: "\n---\n")),
             instructions: Instructions(instructions)
         )
     }
 
-    var output: ModelSampleOutput<EvalOutcome, TrajectoryExpectation> {
+    public var output: ModelSampleOutput<EvalOutcome, TrajectoryExpectation> {
         ModelSampleOutput(value: nil, expectations: nil)
     }
 
-    var expected: EvalOutcome? { nil }
+    public var expected: EvalOutcome? { nil }
 }
 
 /// Per-sample expectations, all generic: field values, array contents,
 /// forbidden fields. A task's graders decide which ones apply.
-struct EvalExpectation: Codable, Sendable, Equatable {
+public struct EvalExpectation: Codable, Sendable, Equatable {
     /// `path → allowed values` — the value at the path must be one of them
     /// (strings compared case-insensitively).
-    var fields: [String: [String]]?
+    public var fields: [String: [String]]?
     /// `path → required elements` — the array at the path must contain each
     /// element (normalized: case-insensitive, articles stripped, substring
     /// match either way).
-    var contains: [String: [String]]?
+    public var contains: [String: [String]]?
     /// Which `anyOf` choice (by object name) the answer should take.
-    var shape: String?
+    public var shape: String?
+
+    public init(fields: [String: [String]]? = nil, contains: [String: [String]]? = nil, shape: String? = nil) {
+        self.fields = fields
+        self.contains = contains
+        self.shape = shape
+    }
 }
 
 // MARK: - Outcome (what the engine produces)
 
 /// The engine's record of one sample's run: every turn's raw text, parsed
 /// value, provenance, and error, plus what the carry template produced.
-struct EvalOutcome: Codable, Sendable, Equatable {
-    var turns: [TurnOutcome]
-    var tier: String
-    var mode: String
+public struct EvalOutcome: Codable, Sendable, Equatable {
+    public var turns: [TurnOutcome]
+    public var tier: String
+    public var mode: String
 
-    struct TurnOutcome: Codable, Sendable, Equatable {
+    public struct TurnOutcome: Codable, Sendable, Equatable {
         /// The prompt actually sent (post-carry).
-        var prompt: String
-        var text: String?
-        var value: JSONValue?
-        var provider: String?
-        var error: String?
+        public var prompt: String
+        public var text: String?
+        public var value: JSONValue?
+        public var provider: String?
+        public var error: String?
         /// The `ProviderError` case name when the provider failed.
-        var errorKind: String?
-        var repaired: Bool?
-        var nativeSchema: Bool?
-        var carriedFromCanonicalState: Bool?
-        var latencySeconds: Double?
+        public var errorKind: String?
+        public var repaired: Bool?
+        public var nativeSchema: Bool?
+        public var carriedFromCanonicalState: Bool?
+        public var latencySeconds: Double?
+
+        public init(
+            prompt: String, text: String? = nil, value: JSONValue? = nil, provider: String? = nil,
+            error: String? = nil, errorKind: String? = nil, repaired: Bool? = nil,
+            nativeSchema: Bool? = nil, carriedFromCanonicalState: Bool? = nil, latencySeconds: Double? = nil
+        ) {
+            self.prompt = prompt; self.text = text; self.value = value; self.provider = provider
+            self.error = error; self.errorKind = errorKind; self.repaired = repaired
+            self.nativeSchema = nativeSchema; self.carriedFromCanonicalState = carriedFromCanonicalState
+            self.latencySeconds = latencySeconds
+        }
     }
 
-    var last: TurnOutcome? { turns.last }
-    var failedTurn: TurnOutcome? { turns.first { $0.error != nil } }
+    public init(turns: [TurnOutcome], tier: String, mode: String) {
+        self.turns = turns; self.tier = tier; self.mode = mode
+    }
+
+    public var last: TurnOutcome? { turns.last }
+    public var failedTurn: TurnOutcome? { turns.first { $0.error != nil } }
 }
 
 // MARK: - Grader / judge specs (data)
 
 /// A grader declared in the task file: a kind from the registry + params.
-struct GraderSpec: Codable, Sendable, Equatable {
-    var kind: String
-    var params: [String: JSONValue]?
+public struct GraderSpec: Codable, Sendable, Equatable {
+    public var kind: String
+    public var params: [String: JSONValue]?
 
-    func string(_ key: String) -> String? { params?[key]?.stringValue }
-    func strings(_ key: String) -> [String]? { params?[key]?.arrayValue?.compactMap(\.stringValue) }
-    func int(_ key: String) -> Int? { params?[key]?.numberValue.map { Int($0) } }
-    func double(_ key: String) -> Double? { params?[key]?.numberValue }
-    func bool(_ key: String) -> Bool? { params?[key]?.boolValue }
+    public init(kind: String, params: [String: JSONValue]? = nil) {
+        self.kind = kind
+        self.params = params
+    }
+
+    public func string(_ key: String) -> String? { params?[key]?.stringValue }
+    public func strings(_ key: String) -> [String]? { params?[key]?.arrayValue?.compactMap(\.stringValue) }
+    public func int(_ key: String) -> Int? { params?[key]?.numberValue.map { Int($0) } }
+    public func double(_ key: String) -> Double? { params?[key]?.numberValue }
+    public func bool(_ key: String) -> Bool? { params?[key]?.boolValue }
 }
 
-struct JudgeSpec: Codable, Sendable, Equatable {
-    var instructions: String?
-    var dimensions: [Dimension]
-    struct Dimension: Codable, Sendable, Equatable {
-        var name: String
-        var description: String?
+public struct JudgeSpec: Codable, Sendable, Equatable {
+    public var instructions: String?
+    public var dimensions: [Dimension]
+    public struct Dimension: Codable, Sendable, Equatable {
+        public var name: String
+        public var description: String?
         /// `passFail` (default) or a numeric scale `[value: label]` given as
         /// `{"1":"...","5":"..."}`.
-        var scale: [String: String]?
+        public var scale: [String: String]?
+
+        public init(name: String, description: String? = nil, scale: [String: String]? = nil) {
+            self.name = name
+            self.description = description
+            self.scale = scale
+        }
+    }
+
+    public init(instructions: String? = nil, dimensions: [Dimension]) {
+        self.instructions = instructions
+        self.dimensions = dimensions
     }
 }
 
@@ -182,10 +274,12 @@ struct JudgeSpec: Codable, Sendable, Equatable {
 /// When the previous turn produced no parsed value, the sample's
 /// `canonicalState` stands in (and the outcome records that); when there
 /// is none either, the prompt is sent unwrapped.
-struct CarryTemplate: Codable, Sendable, Equatable {
-    var template: String
+public struct CarryTemplate: Codable, Sendable, Equatable {
+    public var template: String
 
-    func render(prompt: String, previous: JSONValue?, previousRaw: String?) -> String {
+    public init(template: String) { self.template = template }
+
+    public func render(prompt: String, previous: JSONValue?, previousRaw: String?) -> String {
         var output = ""
         var rest = Substring(template)
         while let open = rest.range(of: "{{") {
@@ -240,7 +334,7 @@ struct CarryTemplate: Codable, Sendable, Equatable {
     }
 
     /// Strings unquoted, everything else compact JSON.
-    static func plain(_ value: JSONValue) -> String {
+    public static func plain(_ value: JSONValue) -> String {
         if let string = value.stringValue { return string }
         return value.serialized()
     }
@@ -250,15 +344,15 @@ struct CarryTemplate: Codable, Sendable, Equatable {
 
 /// Dot paths with array indices and a `[]` wildcard: `items[].name`
 /// collects every element's `name`; `compounds.protein` reads one member.
-enum JSONPath {
-    static func value(at path: String, in root: JSONValue) -> JSONValue? {
+public enum JSONPath {
+    public static func value(at path: String, in root: JSONValue) -> JSONValue? {
         let values = collect(at: path, in: root)
         if path.contains("[]") { return .array(values) }
         return values.first
     }
 
     /// All values the path addresses (one unless a `[]` wildcard is used).
-    static func collect(at path: String, in root: JSONValue) -> [JSONValue] {
+    public static func collect(at path: String, in root: JSONValue) -> [JSONValue] {
         var current: [JSONValue] = [root]
         for component in path.split(separator: ".").map(String.init) where !component.isEmpty {
             var next: [JSONValue] = []

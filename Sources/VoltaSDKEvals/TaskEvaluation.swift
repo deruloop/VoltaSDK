@@ -15,22 +15,68 @@ import Foundation
 import VoltaSDK
 
 @available(iOS 27.0, macOS 27.0, *)
-struct TaskEvaluation: Evaluation {
-    typealias Sample = FrameworkSample
-    typealias Subject = ModelSubject<EvalOutcome>
+public struct TaskEvaluation: Evaluation {
+    public typealias Sample = FrameworkSample
+    public typealias Subject = ModelSubject<EvalOutcome>
 
-    let task: EvalTask
-    let tier: EvalTier
-    let mode: EvalMode
-    let provider: any ModelProvider
+    public let task: EvalTask
+    /// The provider under test — ONE provider, so provenance is exact.
+    public let provider: any ModelProvider
+    public let mode: EvalMode
+    /// The row key in the capability map (a tier name such as "on-device",
+    /// or whatever the adopter calls this provider) and its display label.
+    public let tier: String
+    public let tierLabel: String
     /// A judge evaluator, when a cloud judge from another vendor is configured.
-    let judgeEvaluator: (any EvaluatorProtocol<FrameworkSample, ModelSubject<EvalOutcome>>)?
+    public let judgeEvaluator: (any EvaluatorProtocol<FrameworkSample, ModelSubject<EvalOutcome>>)?
     /// Cap on samples per run (quick iterations); nil = the whole dataset.
-    let limit: Int?
+    public let limit: Int?
 
-    var name: String { "\(task.id) @ \(tier.rawValue) [\(mode)]" }
+    /// The adopter's entry point: a task against one provider, in one mode.
+    ///
+    /// ```swift
+    /// let evaluation = TaskEvaluation(task: task, provider: OnDeviceProvider(), mode: .structured)
+    /// let result = try await evaluation.run()
+    /// #expect(result.passRate >= 0.8)
+    /// ```
+    public init(
+        task: EvalTask,
+        provider: any ModelProvider,
+        mode: EvalMode = .raw,
+        tierLabel: String? = nil,
+        judge: JudgeConfiguration? = nil,
+        limit: Int? = nil
+    ) {
+        self.task = task
+        self.provider = provider
+        self.mode = mode
+        self.tier = tierLabel ?? provider.identifier.rawValue
+        self.tierLabel = self.tier
+        self.judgeEvaluator = judge?.makeEvaluator(for: task, vendorUnderTest: (provider as? CloudVendorIdentifying)?.cloudVendor)
+        self.limit = limit
+    }
 
-    var dataset: ArrayLoader<FrameworkSample> {
+    /// The sweep's entry point: a named tier (see `EvalTier`).
+    public init(
+        task: EvalTask,
+        tier: EvalTier,
+        mode: EvalMode,
+        provider: any ModelProvider,
+        judgeEvaluator: (any EvaluatorProtocol<FrameworkSample, ModelSubject<EvalOutcome>>)? = nil,
+        limit: Int? = nil
+    ) {
+        self.task = task
+        self.provider = provider
+        self.mode = mode
+        self.tier = tier.rawValue
+        self.tierLabel = tier.label()
+        self.judgeEvaluator = judgeEvaluator
+        self.limit = limit
+    }
+
+    public var name: String { "\(task.id) @ \(tierLabel) [\(mode)]" }
+
+    public var dataset: ArrayLoader<FrameworkSample> {
         var samples = task.samples
         if let limit { samples = Array(samples.prefix(limit)) }
         // The evaluators (and the judge prompt) see the instructions the
@@ -38,7 +84,7 @@ struct TaskEvaluation: Evaluation {
         return ArrayLoader(samples: samples.map { FrameworkSample(sample: $0, instructions: task.instructions) })
     }
 
-    func subject(from framework: FrameworkSample) async throws -> ModelSubject<EvalOutcome> {
+    public func subject(from framework: FrameworkSample) async throws -> ModelSubject<EvalOutcome> {
         let sample = framework.sample
         let kit = AIOrchestrator(providers: [provider])
         var turns: [EvalOutcome.TurnOutcome] = []
@@ -108,15 +154,15 @@ struct TaskEvaluation: Evaluation {
             previousRaw = text
         }
 
-        return ModelSubject(value: EvalOutcome(turns: turns, tier: tier.rawValue, mode: mode.description))
+        return ModelSubject(value: EvalOutcome(turns: turns, tier: tier, mode: mode.description))
     }
 
-    var evaluators: [any EvaluatorProtocol<FrameworkSample, ModelSubject<EvalOutcome>>] {
+    public var evaluators: [any EvaluatorProtocol<FrameworkSample, ModelSubject<EvalOutcome>>] {
         GraderEvaluator(task: task)
         if let judgeEvaluator { judgeEvaluator }
     }
 
-    func aggregateMetrics(using aggregator: inout MetricsAggregator) {
+    public func aggregateMetrics(using aggregator: inout MetricsAggregator) {
         for metric in Graders.metrics(for: task) {
             aggregator.computeMean(of: metric)
         }
@@ -128,7 +174,7 @@ struct TaskEvaluation: Evaluation {
     }
 
     /// The `ProviderError` case name, for the graders' infrastructure rule.
-    static func kind(of error: ProviderError) -> String {
+    public static func kind(of error: ProviderError) -> String {
         switch error {
         case .rateLimited: return "rateLimited"
         case .unauthorized: return "unauthorized"
@@ -152,25 +198,57 @@ struct TaskEvaluation: Evaluation {
 /// All deterministic graders of a task, as one framework evaluator that
 /// returns every metric at once (the `Evaluator` helper returns one).
 @available(iOS 27.0, macOS 27.0, *)
-struct GraderEvaluator: EvaluatorProtocol {
-    typealias Input = FrameworkSample
-    typealias Subject = ModelSubject<EvalOutcome>
+public struct GraderEvaluator: EvaluatorProtocol {
+    public typealias Input = FrameworkSample
+    public typealias Subject = ModelSubject<EvalOutcome>
 
-    let task: EvalTask
+    public let task: EvalTask
 
-    func metrics(subject: ModelSubject<EvalOutcome>, input: FrameworkSample) async throws -> [Metric] {
+    public func metrics(subject: ModelSubject<EvalOutcome>, input: FrameworkSample) async throws -> [Metric] {
         Graders.grade(task: task, sample: input.sample, outcome: subject.value)
     }
 }
 
-enum EvalEngineError: Error, CustomStringConvertible {
+public enum EvalEngineError: Error, CustomStringConvertible {
     case taskHasNoSchema(String)
+    case taskNotFound(String)
     case tierUnreachable(EvalTier, String)
 
-    var description: String {
+    public var description: String {
         switch self {
         case .taskHasNoSchema(let id): return "task \(id) has no schema; structured mode needs one"
+        case .taskNotFound(let id): return "no example task named \(id)"
         case .tierUnreachable(let tier, let reason): return "\(tier.rawValue) unreachable: \(reason)"
         }
     }
+}
+
+// MARK: - Reading a result
+
+@available(iOS 27.0, macOS 27.0, *)
+extension EvaluationResult {
+    /// Passed / scored, where scored excludes infrastructure failures
+    /// (unsupported language, unavailability, rate limits): the number an
+    /// adopter asserts on.
+    public var passRate: Double {
+        let tally = CapabilityMap.tally(detailed, metric: Graders.passMetric)
+        return tally.scored > 0 ? Double(tally.passed) / Double(tally.scored) : 0
+    }
+
+    /// Fraction of samples the model actually answered.
+    public var availabilityRate: Double {
+        let tally = CapabilityMap.tally(detailed, metric: Graders.availabilityMetric)
+        return tally.total > 0 ? Double(tally.passed) / Double(tally.total) : 0
+    }
+
+    /// The rationales behind the failed samples, for a failing test's message.
+    public var failureReasons: [String] {
+        CapabilityMap.tally(detailed, metric: Graders.passMetric).rationales
+    }
+}
+
+/// A provider that can say which cloud vendor it speaks to — used only to
+/// keep a judge from scoring its own vendor.
+public protocol CloudVendorIdentifying {
+    var cloudVendor: CloudVendor? { get }
 }

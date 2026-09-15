@@ -23,29 +23,29 @@ import VoltaSDK
 // MARK: - Registry
 
 @available(iOS 27.0, macOS 27.0, *)
-enum Graders {
+public enum Graders {
 
     /// The metric name the capability map reports as the task's pass rate.
-    static let passMetric = Metric("pass")
+    public static let passMetric = Metric("pass")
     /// Per-sample availability of the model itself (Phase 0's number).
-    static let availabilityMetric = Metric("model-available")
+    public static let availabilityMetric = Metric("model-available")
     /// Whether the on-device tier rejected the language (Phase 0, D-series).
-    static let languageAcceptedMetric = Metric("language-accepted")
+    public static let languageAcceptedMetric = Metric("language-accepted")
 
     /// Every metric a task will report, for aggregation.
-    static func metrics(for task: EvalTask) -> [Metric] {
+    public static func metrics(for task: EvalTask) -> [Metric] {
         [passMetric, availabilityMetric, languageAcceptedMetric]
             + task.graders.map { Metric(name(of: $0)) }
     }
 
-    static func name(of spec: GraderSpec) -> String {
+    public static func name(of spec: GraderSpec) -> String {
         if let custom = spec.string("name") { return custom }
         if let path = spec.string("path") { return "\(spec.kind):\(path)" }
         return spec.kind
     }
 
     /// Runs every grader of the task on one outcome.
-    static func grade(task: EvalTask, sample: EvalSample, outcome: EvalOutcome) -> [Metric] {
+    public static func grade(task: EvalTask, sample: EvalSample, outcome: EvalOutcome) -> [Metric] {
         var metrics: [Metric] = []
 
         // Infrastructure first: availability and language are reported on
@@ -88,7 +88,7 @@ enum Graders {
     }
 
     /// Failures that say nothing about the model's ability at the task.
-    static func isInfrastructureFailure(_ errorKind: String) -> Bool {
+    public static func isInfrastructureFailure(_ errorKind: String) -> Bool {
         ["unsupportedLanguage", "noProviderAvailable", "rateLimited", "network",
          "unauthorized", "privacyRestricted", "cancelled", "contextWindowExceeded"]
             .contains(errorKind)
@@ -96,7 +96,7 @@ enum Graders {
 
     // MARK: Dispatch
 
-    static func run(_ spec: GraderSpec, task: EvalTask, sample: EvalSample, outcome: EvalOutcome) -> Metric {
+    public static func run(_ spec: GraderSpec, task: EvalTask, sample: EvalSample, outcome: EvalOutcome) -> Metric {
         let metric = Metric(name(of: spec))
         guard let turn = outcome.last else {
             return metric.failing(rationale: "no turns")
@@ -143,7 +143,7 @@ enum Graders {
 
     /// The whole reply is the JSON object (a bare code fence is tolerated by
     /// default, since the app's parser strips it; prose is not).
-    static func jsonOnly(_ metric: Metric, text: String, allowFences: Bool) -> Metric {
+    public static func jsonOnly(_ metric: Metric, text: String, allowFences: Bool) -> Metric {
         do {
             let (_, surrounded) = try JSONValue.extractObject(from: text)
             if surrounded { return metric.failing(rationale: "text outside the JSON object") }
@@ -157,7 +157,7 @@ enum Graders {
     }
 
     /// Validates against the task schema (or a grader-supplied one).
-    static func schema(_ metric: Metric, spec: GraderSpec, task: EvalTask, value: JSONValue?) -> Metric {
+    public static func schema(_ metric: Metric, spec: GraderSpec, task: EvalTask, value: JSONValue?) -> Metric {
         guard let schema = task.schema else { return metric.ignore(rationale: "task has no schema") }
         guard let value else { return metric.failing(rationale: "no parsed JSON") }
         let violations = schema.validate(value)
@@ -168,7 +168,7 @@ enum Graders {
 
     /// Fields present and non-empty; arrays may carry `min`/`max` counts
     /// via `paths` entries like `completions:1:3`.
-    static func required(_ metric: Metric, spec: GraderSpec, value: JSONValue?) -> Metric {
+    public static func required(_ metric: Metric, spec: GraderSpec, value: JSONValue?) -> Metric {
         guard let value else { return metric.failing(rationale: "no parsed JSON") }
         var missing: [String] = []
         for entry in spec.strings("paths") ?? [] {
@@ -193,7 +193,7 @@ enum Graders {
     }
 
     /// The listed fields must be absent (or empty).
-    static func forbiddenFields(_ metric: Metric, spec: GraderSpec, value: JSONValue?) -> Metric {
+    public static func forbiddenFields(_ metric: Metric, spec: GraderSpec, value: JSONValue?) -> Metric {
         guard let value else { return metric.failing(rationale: "no parsed JSON") }
         let present = (spec.strings("paths") ?? []).filter { path in
             guard let field = JSONPath.value(at: path, in: value) else { return false }
@@ -206,7 +206,7 @@ enum Graders {
 
     /// Per-sample `expect.fields`: each path's value must be one of the
     /// allowed values.
-    static func expectFields(_ metric: Metric, sample: EvalSample, value: JSONValue?) -> Metric {
+    public static func expectFields(_ metric: Metric, sample: EvalSample, value: JSONValue?) -> Metric {
         guard let fields = sample.expect?.fields, !fields.isEmpty else {
             return metric.ignore(rationale: "no field expectations")
         }
@@ -223,7 +223,7 @@ enum Graders {
 
     /// Per-sample `expect.contains`: the array at each path must contain
     /// every listed element (normalized).
-    static func expectContains(_ metric: Metric, sample: EvalSample, value: JSONValue?) -> Metric {
+    public static func expectContains(_ metric: Metric, sample: EvalSample, value: JSONValue?) -> Metric {
         guard let contains = sample.expect?.contains, !contains.isEmpty else {
             return metric.ignore(rationale: "no containment expectations")
         }
@@ -244,7 +244,7 @@ enum Graders {
 
     /// Per-sample `expect.shape`: which `anyOf` choice (object name) the
     /// answer must match.
-    static func expectShape(_ metric: Metric, sample: EvalSample, task: EvalTask, value: JSONValue?) -> Metric {
+    public static func expectShape(_ metric: Metric, sample: EvalSample, task: EvalTask, value: JSONValue?) -> Metric {
         guard let wanted = sample.expect?.shape else { return metric.ignore(rationale: "no shape expectation") }
         guard let value else { return metric.failing(rationale: "no parsed JSON") }
         guard case .anyOf(_, _, let choices)? = task.schema else {
@@ -266,7 +266,7 @@ enum Graders {
 
     /// The prose at `path` (or the whole text) is in the task's language.
     /// Short strings are ignored (language detection needs a few words).
-    static func language(_ metric: Metric, spec: GraderSpec, task: EvalTask, value: JSONValue?, text: String) -> Metric {
+    public static func language(_ metric: Metric, spec: GraderSpec, task: EvalTask, value: JSONValue?, text: String) -> Metric {
         guard let expected = spec.string("language") ?? task.language else {
             return metric.ignore(rationale: "no language expectation")
         }
@@ -294,7 +294,7 @@ enum Graders {
 
     /// None of the regex patterns may match the field at `path` (or the
     /// whole text). Case-insensitive.
-    static func forbiddenPatterns(_ metric: Metric, spec: GraderSpec, value: JSONValue?, text: String) -> Metric {
+    public static func forbiddenPatterns(_ metric: Metric, spec: GraderSpec, value: JSONValue?, text: String) -> Metric {
         let target: String
         if let path = spec.string("path") {
             guard let value, let field = JSONPath.value(at: path, in: value) else {
@@ -312,7 +312,7 @@ enum Graders {
 
     /// At least `minFraction` (default 1.0) of the array's string elements
     /// match the regex.
-    static func elementsMatch(_ metric: Metric, spec: GraderSpec, value: JSONValue?) -> Metric {
+    public static func elementsMatch(_ metric: Metric, spec: GraderSpec, value: JSONValue?) -> Metric {
         guard let path = spec.string("path"), let pattern = spec.string("pattern") else {
             return metric.ignore(rationale: "elements-match needs path + pattern")
         }
@@ -333,7 +333,7 @@ enum Graders {
 
     /// The reply claims an action in prose (any pattern matches the text)
     /// while the action field is absent — the "said added, didn't add" case.
-    static func claimedAction(_ metric: Metric, spec: GraderSpec, value: JSONValue?, text: String) -> Metric {
+    public static func claimedAction(_ metric: Metric, spec: GraderSpec, value: JSONValue?, text: String) -> Metric {
         guard let field = spec.string("field") else { return metric.ignore(rationale: "claimed-action needs field") }
         if let value, let action = JSONPath.value(at: field, in: value), !(action.arrayValue?.isEmpty ?? false) {
             return metric.passing()
@@ -350,7 +350,7 @@ enum Graders {
     /// established. `keepItems` = a `[]` path whose set of (normalized)
     /// values must not shrink; `keepStates` = an object path whose members
     /// must not drop from `from` to `notTo`.
-    static func retention(_ metric: Metric, spec: GraderSpec, outcome: EvalOutcome) -> Metric {
+    public static func retention(_ metric: Metric, spec: GraderSpec, outcome: EvalOutcome) -> Metric {
         let parsed = outcome.turns.compactMap(\.value)
         guard parsed.count >= 2, let first = outcome.turns.first?.value, let last = outcome.last?.value else {
             return metric.failing(rationale: "needs a parsed value on both turns (got \(parsed.count))")
@@ -378,10 +378,10 @@ enum Graders {
 
 // MARK: - Normalization for item matching
 
-enum TextNormalizer {
+public enum TextNormalizer {
     /// Lowercased, diacritics folded, leading articles/partitives stripped,
     /// punctuation removed — enough to match "il latte" against "latte".
-    static func normalize(_ text: String) -> String {
+    public static func normalize(_ text: String) -> String {
         var value = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil).lowercased()
         value = value.replacingOccurrences(of: "[^\\p{L}\\p{N} ]", with: " ", options: .regularExpression)
         let articles = ["il", "lo", "la", "le", "gli", "i", "un", "una", "uno", "del", "della", "dello", "dei", "degli", "delle",
