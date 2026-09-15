@@ -428,7 +428,15 @@ available); D18's logging makes any further crossing visible.
     `TEST_RUNNER_VOLTA_EVAL_*` env vars; a GUI host touching ~/Desktop
     hangs on the TCC prompt (tasks now bundled, results in Application
     Support, `scripts/evals-merge.py` folds `[evals-entry]` lines into the
-    map and regenerates its Markdown). NEXT: cloud tiers + live judge once keys are provided; the
+    map and regenerates its Markdown). **Real iPhone 15 Pro Max (iOS
+    27.0, Sep 15):** `iOSDemoEvals` builds, signs, runs on the device and
+    its first answer reproduced the enum-copying failure; two SDK bugs fell
+    out (the `SecTask` check never compiled for a physical iOS device;
+    `LanguageModelError.rateLimited` from the system model surfaced as
+    terminal) — both fixed. The full device row is PENDING: the phone must
+    stay unlocked with the host app in the foreground (locked = every call
+    rate-limited as a background request; xcodebuild itself stops on
+    "Unlock iPhone to Continue"). NEXT: cloud tiers + live judge once keys are provided; the
     real-iPhone row via `iOSDemoEvals`; the two SDK suites still owed —
     parity on fallback (Q12/Q13) and the on-device long-context threshold
     (the D7-amendment belief); Part 4 article draft at
