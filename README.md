@@ -242,7 +242,33 @@ for answers with several possible shapes) and is `Codable`, so a schema can
 live in a data file. Patterns and array bounds are enforced by Volta after
 the call. `repair: .none` returns the first answer or the typed failure.
 
-### 7. Resolution without execution (the primitive)
+### 7. Gating by measurement
+
+Once the evaluation engine has measured a feature per provider (see
+Evaluations below), the app bundles the resulting `capability-map.json`
+and names the task on each call. A provider that measured below the task's
+floor is skipped for that call; providers the map never measured are still
+tried, and availability, pre-flight, privacy, and fallback apply as before.
+
+```swift
+var config = AIConfiguration()
+config.capabilities = try MeasuredCapabilities(contentsOf: Bundle.main.url(forResource: "capability-map", withExtension: "json")!)
+let kit = AIOrchestrator(configuration: config)
+
+let task = TaskRequirement("myapp.meal-record", minimumPassRate: 0.6)
+let record = try await kit.respondStructured(to: input, instructions: prompt, schema: schema, task: task)
+// on-device measured 85% for this task → tried first; a tier that measured 0% is skipped and logged
+
+if await kit.canServe(TaskRequirement("myapp.shopping-intent"), mode: .structured) == false {
+    // the feature cannot exist on this device's chain; keep the deterministic path
+}
+```
+
+Every entry point takes `task:`; `resolveProvider`, `providerStatuses`, and
+`canServe` take the mode too (`raw`, `structured`, `structured+repair`),
+because a raw prompt and a schema-constrained call are measured separately.
+
+### 8. Resolution without execution (the primitive)
 
 ```swift
 let provider = try await kit.resolveProvider()          // Volta's own type
@@ -251,7 +277,7 @@ let model    = try await kit.preferred(.reasoning)      // Apple's LanguageModel
 // preferred(_:) returns it as a native model for Apple's own machinery.
 ```
 
-### 8. Explicit instance (no global state)
+### 9. Explicit instance (no global state)
 
 ```swift
 var config = AIConfiguration()

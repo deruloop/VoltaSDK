@@ -1353,3 +1353,76 @@ struct UserAccountRESTProviderTests {
         }
     }
 }
+
+// MARK: - Measured capabilities (D22)
+
+@Suite("Measured capabilities gate the chain per task (D22)")
+struct MeasuredCapabilitiesTests {
+    let map = MeasuredCapabilities(measurements: [
+        .init(task: "app.record", provider: .onDevice, mode: .structured, passRate: 0.85, samples: 20),
+        .init(task: "app.record", provider: .onDevice, mode: .raw, passRate: 0.0, samples: 20),
+        .init(task: "app.shopping", provider: .onDevice, mode: .structured, passRate: 0.0, samples: 20),
+        .init(task: "app.shopping", provider: .privateCloudCompute, mode: .structured, passRate: 0.8, samples: 20),
+        .init(task: "app.tiny", provider: .onDevice, mode: .raw, passRate: 0.0, samples: 3),
+    ])
+
+    func chain() -> AIOrchestrator {
+        AIOrchestrator(providers: [
+            MockProvider(identifier: .onDevice, privacyLevel: .onDevice, outcome: .success("device"), structuredAnswers: ["{\"a\":1}"]),
+            MockProvider(identifier: .privateCloudCompute, privacyLevel: .appleCloud, outcome: .success("pcc"), structuredAnswers: ["{\"a\":2}"]),
+        ], capabilities: map)
+    }
+
+    @Test("A provider measured below the floor is skipped for that task only")
+    func skipsBelowFloor() async throws {
+        let kit = chain()
+        let schema = OutputSchema.object(name: "T", properties: [.init("a", .integer())])
+        let shopping = try await kit.respondStructured(to: "x", schema: schema, repair: .none, task: TaskRequirement("app.shopping"))
+        #expect(shopping.provider == .privateCloudCompute)        // on-device measured 0% structured → skipped
+        let record = try await kit.respondDetailed(to: "x", task: TaskRequirement("app.record"))
+        #expect(record.provider == .privateCloudCompute)          // raw mode: on-device measured 0% raw
+        let structured = try await kit.respondStructured(to: "x", schema: schema, repair: .none, task: TaskRequirement("app.record"))
+        #expect(structured.provider == .onDevice)                 // structured mode: 85% ≥ floor
+        // A raw call is never judged by a structured row (different prompt shape).
+        let rawShopping = try await kit.respondDetailed(to: "x", task: TaskRequirement("app.shopping"))
+        #expect(rawShopping.provider == .onDevice)
+    }
+
+    @Test("Unmeasured tasks and thin evidence never skip a provider")
+    func unmeasuredPasses() async throws {
+        let kit = chain()
+        let unknown = try await kit.respondDetailed(to: "x", task: TaskRequirement("app.never-measured"))
+        #expect(unknown.provider == .onDevice)
+        let thin = try await kit.respondDetailed(to: "x", task: TaskRequirement("app.tiny"))
+        #expect(thin.provider == .onDevice)                        // 3 samples < minimumSamples
+        let none = try await kit.respondDetailed(to: "x")
+        #expect(none.provider == .onDevice)                        // no task named: heuristics only
+    }
+
+    @Test("canServe and providerStatuses answer per task")
+    func canServe() async {
+        let kit = chain()
+        #expect(await kit.canServe(TaskRequirement("app.shopping"), mode: .structured))
+        #expect(await kit.providerStatuses(task: TaskRequirement("app.shopping"), mode: .structured).map(\.identifier) == [.privateCloudCompute])
+        let deviceOnly = AIOrchestrator(providers: [MockProvider(identifier: .onDevice)], capabilities: map)
+        #expect(await deviceOnly.canServe(TaskRequirement("app.shopping"), mode: .structured) == false)
+        #expect(await deviceOnly.canServe(TaskRequirement("app.shopping", minimumPassRate: 0.0), mode: .structured))
+    }
+
+    @Test("The engine's map file loads, with tier names mapped to providers")
+    func loadsEngineFile() throws {
+        let json = """
+        {"generatedAt":"2026-09-16T10:00:00Z","entries":[
+          {"task":"app.record","tier":"pcc","tierLabel":"pcc","mode":"structured","passRate":0.9,"scored":20,"passed":18,"samples":20,"host":"mac","runAt":"2026-09-16T10:00:00Z","schemaVersion":"v1","taskTitle":"t","availabilityRate":1,"languageAcceptedRate":1,"graders":{},"failureSamples":[]},
+          {"task":"app.record","tier":"cloud-gemini","provider":"gemini","mode":"raw","passRate":0.5,"scored":10,"passed":5,"samples":10,"host":"mac","runAt":"2026-09-16T10:00:00Z","schemaVersion":"v1","taskTitle":"t","availabilityRate":1,"languageAcceptedRate":1,"graders":{},"failureSamples":[]},
+          {"task":"app.record","tier":"x","mode":"weird","passRate":1,"scored":1}
+        ]}
+        """
+        let loaded = try MeasuredCapabilities(data: Data(json.utf8))
+        #expect(loaded.measurements.count == 2)
+        #expect(loaded.measurement(task: "app.record", provider: .privateCloudCompute, mode: .structuredWithRepair)?.passRate == 0.9)
+        #expect(loaded.measurement(task: "app.record", provider: .gemini, mode: .raw)?.samples == 10)
+        #expect(loaded.measurement(task: "app.record", provider: .gemini, mode: .structured) == nil)
+        #expect(loaded.tasks == ["app.record"])
+    }
+}

@@ -52,6 +52,7 @@ File map:
 │   │   ├── OutputSchema.swift             // vendor-neutral schema: JSON Schema export, validation, Codable (D21)
 │   │   ├── OutputSchema+FoundationModels.swift // schema → DynamicGenerationSchema; guided-generation helper (D21, 26+)
 │   │   ├── StructuredOutput.swift         // respondStructured: validate → repair → typed failure (D21)
+│   │   ├── MeasuredCapabilities.swift     // the capability map at runtime + TaskRequirement (D22)
 │   │   └── Mocks.swift                    // MockProvider (public, for adopters' tests too; scripted structured answers)
 │   ├── VoltaSDKAuth/                      // OPT-IN OAuth machinery (PKCE, Keychain, refresh) — not in core
 │   ├── VoltaSDKUI/                        // OPTIONAL SwiftUI components (separate product)
@@ -418,6 +419,26 @@ of a client task went from 0% to 100%, its pass rate from 0/20 to 13/20, and
 a two-turn retention task from unmeasurable to 100% retention — the
 remaining failures are content (language, judgment), not shape.
 
+### D22 — The capability map gates the chain at runtime, per task
+The evaluation engine produces pass rates per (task, provider, mode). D22
+makes that file a runtime input: `AIConfiguration.capabilities` takes a
+`MeasuredCapabilities` (decoded tolerantly from the engine's
+`capability-map.json`; rows carry the provider identifier, older rows map
+tier names), and every chain entry point takes `task: TaskRequirement?`
+(task id, `minimumPassRate`, `minimumSamples`). The chain for that call is
+the D7-ordered chain with every provider whose measured row for the task
+and mode falls below the floor removed and logged (`Logger` subsystem
+"VoltaSDK", category "capabilities"). Three rules keep it honest: an
+unmeasured provider is never skipped (absence of evidence); a row over
+fewer than `minimumSamples` is not evidence; a raw call is judged only by a
+raw row and a structured call by a structured row (the two are different
+prompts), with `structured` and `structured+repair` standing in for each
+other. `canServe(_:need:mode:)` answers the app-level question ("can this
+feature exist on this device's chain?") before any call is made. Everything
+else (availability, pre-flight, privacy gate, fallback) applies unchanged
+after the filter. First adopter: Raviolo bundles its map and names its
+tasks per language.
+
 ## 5. Public API that must stay stable
 
 ```swift
@@ -443,7 +464,10 @@ try await kit.preferred(_ need: ModelNeed? = nil) -> any LanguageModel  // iOS 2
 enum ModelNeed { lightweight, reasoning, largeContext }         // (D7)
 FoundationModelsTranscript.entries(instructions:history:) -> [Transcript.Entry]  // ChatTurn → native transcript (D12↔profile glue)
 struct PlaygroundEngine { label, footnote, stream }  // VoltaSDKUI: app-supplied playground driver (D1)
-try await kit.respondStructured(to:instructions:history:schema:need:repair:) -> StructuredResponse  // (D21)
+try await kit.respondStructured(to:instructions:history:schema:need:repair:task:) -> StructuredResponse  // (D21, D22)
+struct TaskRequirement { id, minimumPassRate = 0.5, minimumSamples = 5 }                            // (D22) — `task:` on every entry point
+struct MeasuredCapabilities { init(contentsOf:); measurement(task:provider:mode:); tasks }          // (D22) AIConfiguration.capabilities
+await kit.canServe(_ task:need:mode:) -> Bool                                                      // (D22)
 try await kit.respond(to:instructions:history:schema:as: T.Type, need:repair:) -> T                  // (D21, Decodable)
 enum RepairPolicy { none, once /* default */ }                                                        // (D21)
 struct StructuredResponse { value: JSONValue, text, provider, privacyLevel, repaired, nativeSchema, hadSurroundingText; decode<T>() }

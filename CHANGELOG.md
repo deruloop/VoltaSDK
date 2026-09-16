@@ -43,6 +43,14 @@ iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
   meal-assistant tasks on the Mac's on-device model): structured output
   takes schema validity from 0% to 100% and two-turn item retention from
   unmeasurable to 100%; the remaining failures are content, not shape.
+- **The capability map gates the chain at runtime (D22).**
+  `AIConfiguration.capabilities` takes the evaluation engine's
+  `capability-map.json` (`MeasuredCapabilities`), and every entry point
+  gains `task: TaskRequirement?`: a provider that measured below the task's
+  floor for that mode is skipped for the call and logged; unmeasured
+  providers and thin evidence never skip anything; `canServe` answers
+  whether a feature can exist on the device's chain. `ProviderIdentifier`
+  is now `Codable`; map rows carry the provider identifier.
 - **Task format, made authorable.** `docs/evals/TASK-FORMAT.md` is the
   complete reference for task files (fields, schema form, every grader
   with its parameters, carry grammar, expectations, loader errors,

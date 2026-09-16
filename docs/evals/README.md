@@ -84,9 +84,12 @@ worked on the first client, and the one this library is built around:
    branch or a classification fails at 0% inside the assistant prompt, add
    a task for the same decision as its own one-field call and measure it.
    If it passes, the app makes two calls.
-4. **Gate by tier.** The map says which tier clears which feature. Offer a
-   feature on a tier only where its row clears the floor; keep the
-   deterministic path for the rest.
+4. **Gate by tier.** The map says which tier clears which feature. Bundle
+   `capability-map.json` in the app, set `AIConfiguration.capabilities`,
+   and name the task on each call (`task: TaskRequirement("myapp.meal-record")`);
+   the chain skips a provider that measured below the floor for that task
+   and mode, and `canServe` answers whether the feature can exist on this
+   device's chain at all. Unmeasured providers are always tried.
 5. **Keep the floors as tests.** One `@Test` per feature per shipped tier,
    asserting the measured pass rate, so a prompt edit or an OS update that
    regresses shows up with reasons attached.

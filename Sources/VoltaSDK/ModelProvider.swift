@@ -15,10 +15,21 @@ import Foundation
 /// Extensible provider identifier.
 /// Deliberately not a closed enum: new providers (pcc, gemini, claude)
 /// can be added without breaking existing code.
-public struct ProviderIdentifier: Hashable, Sendable, CustomStringConvertible {
+public struct ProviderIdentifier: Hashable, Sendable, CustomStringConvertible, Codable {
     public let rawValue: String
     public init(_ rawValue: String) { self.rawValue = rawValue }
     public var description: String { rawValue }
+
+    /// Encoded as its raw string, so identifiers travel in data files
+    /// (the capability map) as plainly as they read.
+    public init(from decoder: any Decoder) throws {
+        self.rawValue = try decoder.singleValueContainer().decode(String.self)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 
     public static let onDevice  = ProviderIdentifier("on-device")
     public static let openAI    = ProviderIdentifier("openai")

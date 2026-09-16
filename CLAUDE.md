@@ -300,6 +300,7 @@ available); D18's logging makes any further crossing visible.
 - **D18** Privacy downgrades are logged by default (`.log`, unified log) — never silently invisible; `.silent` is an explicit opt-in. *(26 impl)*
 - **D19** Package floor iOS 18/macOS 15; tiers by `@available` — cloud chain + user keys (REST) + UI from 18, on-device from 26, PCC/front door from 27; Auth ungated. *(26 impl)*
 - **D20** Quality is measured, not asserted: Apple's Evaluations framework, wrapped by the `VoltaSDKEvals` LIBRARY for adopters' test targets (`TaskEvaluation(task:provider:mode:)` → `passRate`), manual `run()` pattern; a generic triple (schema + dataset + graders, as data) → the capability map. *(27 design §8, docs/evals/README.md)*
+- **D22** The capability map gates the chain at runtime, per task: `AIConfiguration.capabilities` + `task: TaskRequirement` on every call; measured-below-floor → skipped and logged; unmeasured → tried; raw and structured rows judge only their own mode; `canServe` for feature gating. *(26 impl)*
 - **D21** Structured output: schema in (`OutputSchema`), validated value out, one repair turn, typed fallback-recoverable failure; native constraint where the provider can (guided generation / JSON mode), prompted otherwise. *(26 impl)*
 
 ## 5. Roadmap (ordered)
@@ -450,7 +451,9 @@ available); D18's logging makes any further crossing visible.
     stay unlocked with the host app in the foreground (locked = every call
     rate-limited as a background request; xcodebuild itself stops on
     "Unlock iPhone to Continue"). NEXT: cloud tiers + live judge once keys are provided; the
-    real-iPhone row via `iOSDemoEvals`; the two SDK suites still owed —
+    real-iPhone row via `iOSDemoEvals`; ~~the SDK query on the map~~ ✅
+    D22 (Sep 16, my design call per the user: `TaskRequirement` + `capabilities`,
+    Raviolo is the first adopter); the two SDK suites still owed —
     parity on fallback (Q12/Q13) and the on-device long-context threshold
     (the D7-amendment belief); Part 4 article ("How Good Is Good Enough?
     Evaluating a Model You Can't Unit-Test", first version Sep 16) lives

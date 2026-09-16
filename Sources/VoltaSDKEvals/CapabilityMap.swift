@@ -28,6 +28,9 @@ public struct CapabilityMap: Codable {
         public var schemaVersion: String
         public var tier: String
         public var tierLabel: String
+        /// The provider identifier that answered (the runtime map keys by it;
+        /// older rows without it fall back to the tier name).
+        public var provider: String?
         public var mode: String
         /// Where the run happened (the Mac stands in for a device only when
         /// it says so here).
@@ -94,6 +97,7 @@ public struct CapabilityMap: Codable {
             schemaVersion: evaluation.task.schemaVersion,
             tier: evaluation.tier,
             tierLabel: evaluation.tierLabel,
+            provider: evaluation.provider.identifier.rawValue,
             mode: evaluation.mode.description,
             host: host,
             runAt: result.endTime,

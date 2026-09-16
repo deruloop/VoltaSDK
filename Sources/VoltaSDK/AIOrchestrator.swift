@@ -197,6 +197,12 @@ public struct AIConfiguration: Sendable {
     /// (e.g. on-device → OpenAI). See `PrivacyDisclosure`.
     public var privacyDisclosure: PrivacyDisclosure = .log
 
+    /// Pass rates measured by the evaluation engine (D22). With a map set,
+    /// a call that names its task (`task:`) skips any provider that
+    /// measured below the task's floor; unmeasured providers are still
+    /// tried. `nil` (default) = the chain is ordered by tier heuristics only.
+    public var capabilities: MeasuredCapabilities? = nil
+
     public init() {}
 }
 
@@ -253,6 +259,8 @@ public actor AIOrchestrator {
 
     let orderedProviders: [any ModelProvider]
     let privacyDisclosure: PrivacyDisclosure
+    /// The capability map (D22), if the app supplied one.
+    let capabilities: MeasuredCapabilities?
     /// Tokens reserved for the response during pre-flight (D13): a call that
     /// exactly fills the window would fail at generation anyway.
     let responseTokenReserve: Int
@@ -263,6 +271,7 @@ public actor AIOrchestrator {
         self.orderedProviders = Self.buildProviders(from: configuration)
         self.privacyDisclosure = configuration.privacyDisclosure
         self.responseTokenReserve = configuration.maxTokens
+        self.capabilities = configuration.capabilities
     }
 
     /// Direct init with pre-built providers — useful for tests or for
@@ -270,11 +279,13 @@ public actor AIOrchestrator {
     public init(
         providers: [any ModelProvider],
         privacyDisclosure: PrivacyDisclosure = .log,
-        responseTokenReserve: Int = 0
+        responseTokenReserve: Int = 0,
+        capabilities: MeasuredCapabilities? = nil
     ) {
         self.orderedProviders = providers
         self.privacyDisclosure = privacyDisclosure
         self.responseTokenReserve = responseTokenReserve
+        self.capabilities = capabilities
     }
 
     // MARK: Optional singleton for convenience
@@ -322,10 +333,11 @@ public actor AIOrchestrator {
         to prompt: String,
         instructions: String? = nil,
         history: [ChatTurn] = [],
-        need: ModelNeed? = nil
+        need: ModelNeed? = nil,
+        task: TaskRequirement? = nil
     ) async throws -> String {
         try await respondDetailed(
-            to: prompt, instructions: instructions, history: history, need: need
+            to: prompt, instructions: instructions, history: history, need: need, task: task
         ).text
     }
 
@@ -335,9 +347,10 @@ public actor AIOrchestrator {
         to prompt: String,
         instructions: String? = nil,
         history: [ChatTurn] = [],
-        need: ModelNeed? = nil
+        need: ModelNeed? = nil,
+        task: TaskRequirement? = nil
     ) async throws -> AIResponse {
-        let providers = orderedProviders(for: need)
+        let providers = orderedProviders(for: need, task: task, mode: .raw)
         guard let first = providers.first else {
             throw ProviderError.noProviderAvailable
         }
@@ -397,10 +410,11 @@ public actor AIOrchestrator {
         to prompt: String,
         instructions: String? = nil,
         history: [ChatTurn] = [],
-        need: ModelNeed? = nil
+        need: ModelNeed? = nil,
+        task: TaskRequirement? = nil
     ) -> AsyncThrowingStream<String, Error> {
         let events = streamDetailed(
-            to: prompt, instructions: instructions, history: history, need: need
+            to: prompt, instructions: instructions, history: history, need: need, task: task
         )
         return AsyncThrowingStream { continuation in
             let task = Task {
@@ -426,11 +440,12 @@ public actor AIOrchestrator {
         to prompt: String,
         instructions: String? = nil,
         history: [ChatTurn] = [],
-        need: ModelNeed? = nil
+        need: ModelNeed? = nil,
+        task: TaskRequirement? = nil
     ) -> AsyncThrowingStream<AIStreamEvent, Error> {
         // Snapshot the immutable actor state so the stream task never has to
         // hop back onto the actor.
-        let providers = orderedProviders(for: need)
+        let providers = orderedProviders(for: need, task: task, mode: .raw)
         let disclosure = privacyDisclosure
         let reserve = responseTokenReserve
 
@@ -590,8 +605,12 @@ public actor AIOrchestrator {
     /// Note: it applies availability only, not the interactive disclosure
     /// (.askOnPrivacyChange only makes sense inside the `respond` loop).
     /// With `.denyDowngrade`, providers below the threshold are excluded.
-    public func resolveProvider(for need: ModelNeed? = nil) async throws -> any ModelProvider {
-        let providers = orderedProviders(for: need)
+    public func resolveProvider(
+        for need: ModelNeed? = nil,
+        task: TaskRequirement? = nil,
+        mode: MeasuredCapabilities.Mode = .raw
+    ) async throws -> any ModelProvider {
+        let providers = orderedProviders(for: need, task: task, mode: mode)
         guard let first = providers.first else {
             throw ProviderError.noProviderAvailable
         }
@@ -629,8 +648,8 @@ public actor AIOrchestrator {
     /// `.model(orchestrator.preferred(.reasoning))` — the need reorders the
     /// chain for this one resolution, then the same walk applies.
     @available(iOS 27.0, macOS 27.0, *)
-    public func preferred(_ need: ModelNeed? = nil) async throws -> any LanguageModel {
-        let providers = orderedProviders(for: need)
+    public func preferred(_ need: ModelNeed? = nil, task: TaskRequirement? = nil) async throws -> any LanguageModel {
+        let providers = orderedProviders(for: need, task: task, mode: .raw)
         guard let first = providers.first else {
             throw ProviderError.noProviderAvailable
         }
@@ -691,9 +710,13 @@ public actor AIOrchestrator {
     /// ones, with the reason). Designed for picker/diagnostic UIs. Pass a
     /// `need` to see the chain in the order that need would walk it (D7) —
     /// the "what would happen" preview counterpart of `respond(need:)`.
-    public func providerStatuses(for need: ModelNeed? = nil) async -> [ProviderStatus] {
+    public func providerStatuses(
+        for need: ModelNeed? = nil,
+        task: TaskRequirement? = nil,
+        mode: MeasuredCapabilities.Mode = .raw
+    ) async -> [ProviderStatus] {
         var result: [ProviderStatus] = []
-        for provider in orderedProviders(for: need) {
+        for provider in orderedProviders(for: need, task: task, mode: mode) {
             result.append(ProviderStatus(
                 identifier: provider.identifier,
                 privacyLevel: provider.privacyLevel,
@@ -712,6 +735,27 @@ public actor AIOrchestrator {
     /// `.largeContext`, where a larger known context window ranks first
     /// within its tier (unknown windows rank last there: no pre-flight beats
     /// a wrong pre-flight, D13).
+    /// The chain for one call: reordered for the need (D7), then filtered by
+    /// the capability map for the task (D22). A provider that measured
+    /// below the task's floor is dropped for this call — and logged, so a
+    /// tier that never answers a feature is never a silent mystery.
+    func orderedProviders(for need: ModelNeed?, task: TaskRequirement?, mode: MeasuredCapabilities.Mode) -> [any ModelProvider] {
+        let ordered = orderedProviders(for: need)
+        guard let task, let capabilities else { return ordered }
+        return ordered.filter { provider in
+            let admitted = task.admits(provider, mode: mode, in: capabilities)
+            if !admitted { Self.logSkip(task: task, provider: provider, mode: mode, capabilities: capabilities) }
+            return admitted
+        }
+    }
+
+    /// Whether any provider in the chain may be tried for the task, given
+    /// the map — the app-level "can this feature exist here?" question.
+    /// Availability at the moment of the call is a separate matter.
+    public func canServe(_ task: TaskRequirement, need: ModelNeed? = nil, mode: MeasuredCapabilities.Mode = .raw) -> Bool {
+        !orderedProviders(for: need, task: task, mode: mode).isEmpty
+    }
+
     func orderedProviders(for need: ModelNeed?) -> [any ModelProvider] {
         guard let need else { return orderedProviders }
 
@@ -759,6 +803,14 @@ public actor AIOrchestrator {
     /// developer-visible trace in the unified log — never silent, never UI.
     static func logDowngrade(_ downgrade: PrivacyDowngrade) {
         privacyLog.notice("Privacy downgrade: \(String(describing: downgrade.from), privacy: .public) → \(String(describing: downgrade.to), privacy: .public) via \(downgrade.provider.rawValue, privacy: .public)")
+    }
+
+    private static let capabilityLog = Logger(subsystem: "VoltaSDK", category: "capabilities")
+
+    static func logSkip(task: TaskRequirement, provider: any ModelProvider, mode: MeasuredCapabilities.Mode, capabilities: MeasuredCapabilities) {
+        let row = capabilities.measurement(task: task.id, provider: provider.identifier, mode: mode)
+        let rate = row.map { String(format: "%.0f%%", $0.passRate * 100) } ?? "?"
+        capabilityLog.notice("Skipping \(provider.identifier.rawValue, privacy: .public) for task \(task.id, privacy: .public): measured \(rate, privacy: .public) < floor \(String(format: "%.0f%%", task.minimumPassRate * 100), privacy: .public)")
     }
 
     // MARK: Provider construction

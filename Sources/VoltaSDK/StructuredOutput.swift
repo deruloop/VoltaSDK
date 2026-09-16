@@ -129,9 +129,12 @@ extension AIOrchestrator {
         history: [ChatTurn] = [],
         schema: OutputSchema,
         need: ModelNeed? = nil,
-        repair: RepairPolicy = .once
+        repair: RepairPolicy = .once,
+        task: TaskRequirement? = nil
     ) async throws -> StructuredResponse {
-        let providers = orderedProviders(for: need)
+        let providers = orderedProviders(
+            for: need, task: task, mode: repair == .none ? .structured : .structuredWithRepair
+        )
         guard let first = providers.first else {
             throw ProviderError.noProviderAvailable
         }
@@ -170,11 +173,12 @@ extension AIOrchestrator {
         schema: OutputSchema,
         as type: T.Type = T.self,
         need: ModelNeed? = nil,
-        repair: RepairPolicy = .once
+        repair: RepairPolicy = .once,
+        task: TaskRequirement? = nil
     ) async throws -> T {
         try await respondStructured(
             to: prompt, instructions: instructions, history: history,
-            schema: schema, need: need, repair: repair
+            schema: schema, need: need, repair: repair, task: task
         ).decode(type)
     }
 
