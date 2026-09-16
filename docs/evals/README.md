@@ -68,6 +68,32 @@ Session 298 also shows the Swift Testing trait form,
 `@Test(.evaluates(TaskEvaluation(...)))`; it works the same way, since
 `TaskEvaluation` is a plain `Evaluation`.
 
+### From numbers to decisions (the pattern)
+
+The map is only useful if the app changes because of it. The loop that
+worked on the first client, and the one this library is built around:
+
+1. **Measure the prompt as it ships** (`raw` mode). The floor, with the
+   graders naming the cause of every failure.
+2. **Fix shape with the SDK, never with prompt edits.** When the failures
+   are structural (wrong enum values, missing fields, prose around the
+   JSON), switch that call to `respondStructured` with the task's schema
+   and re-run in `structured` mode. Shape failures should disappear; what
+   remains is content.
+3. **Split what a small model cannot do inside a big prompt.** When a
+   branch or a classification fails at 0% inside the assistant prompt, add
+   a task for the same decision as its own one-field call and measure it.
+   If it passes, the app makes two calls.
+4. **Gate by tier.** The map says which tier clears which feature. Offer a
+   feature on a tier only where its row clears the floor; keep the
+   deterministic path for the rest.
+5. **Keep the floors as tests.** One `@Test` per feature per shipped tier,
+   asserting the measured pass rate, so a prompt edit or an OS update that
+   regresses shows up with reasons attached.
+6. **Measure before wiring.** Every new prompt the app is about to ship gets
+   a task and a number first, even a small one. Twenty samples and two
+   minutes on-device are cheaper than a release.
+
 ### Where things live
 
 - Your tasks and your results: in **your** repo, next to your tests.
