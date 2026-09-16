@@ -92,7 +92,7 @@ answer; `retention` looks at the first and the last.
 | `required` | `paths` (array of strings, required) | Each path is present and non-blank. An array entry may carry bounds: `"items:1"` (min 1), `"completions:1:3"` (min 1, max 3). | `.required(paths:)` |
 | `forbidden-fields` | `paths` (required) | None of the paths is present or non-empty. | `.forbiddenFields(paths:)` |
 | `expect-fields` | | For samples with `expect.fields`: each path's value is one of the allowed values (case-insensitive). Other samples: ignored. | `.expectFields()` |
-| `expect-contains` | | For samples with `expect.contains`: the array at each path contains every listed element, after normalization (lowercased, accents folded, leading articles stripped, substring either way). | `.expectContains()` |
+| `expect-contains` | | For samples with `expect.contains`: the array at each path contains every listed element, after normalization (lowercased, accents folded, leading articles stripped, spaces ignored, substring either way). | `.expectContains()` |
 | `expect-shape` | | For samples with `expect.shape`: the answer carries the required properties of the named `anyOf` choice. | `.expectShape()` |
 | `language` | `path`, `language` (BCP-47), `minWords` (default 4) | The text at `path` (or the whole reply) is detected as `language` (default: the task's). Texts under `minWords` words are ignored. | `.language(path:)` |
 | `forbidden-patterns` | `path`, `patterns` (array of regex, required) | No pattern matches the text at `path` (or the whole reply). Case-insensitive. | `.forbiddenPatterns(path:patterns:)` |

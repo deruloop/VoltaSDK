@@ -234,7 +234,7 @@ public enum Graders {
                 .map { TextNormalizer.normalize(CarryTemplate.plain($0)) }
             for wanted in required {
                 let needle = TextNormalizer.normalize(wanted)
-                if !items.contains(where: { $0.contains(needle) || needle.contains($0) && !$0.isEmpty }) {
+                if !items.contains(where: { TextNormalizer.matches($0, needle) }) {
                     missing.append("\(path) lacks \"\(wanted)\" (has \(items))")
                 }
             }
@@ -359,7 +359,7 @@ public enum Graders {
         if let path = spec.string("keepItems") {
             let before = Set(JSONPath.collect(at: path, in: first).map { TextNormalizer.normalize(CarryTemplate.plain($0)) })
             let after = Set(JSONPath.collect(at: path, in: last).map { TextNormalizer.normalize(CarryTemplate.plain($0)) })
-            let lost = before.filter { item in !after.contains(where: { $0.contains(item) || item.contains($0) }) }
+            let lost = before.filter { item in !after.contains(where: { TextNormalizer.matches($0, item) }) }
             if !lost.isEmpty { problems.append("dropped \(lost.sorted())") }
         }
         if let statesPath = spec.string("keepStates"),
@@ -389,5 +389,14 @@ public enum TextNormalizer {
         var words = value.split(separator: " ").map(String.init).filter { !$0.isEmpty }
         while let first = words.first, articles.contains(first) { words.removeFirst() }
         return words.joined(separator: " ")
+    }
+
+    /// Whether two normalized strings name the same thing: one contains the
+    /// other, ignoring spaces ("lady fingers" ~ "ladyfingers", "peanut
+    /// butter" ~ "burro d'arachidi" is NOT matched — no translation here).
+    static func matches(_ a: String, _ b: String) -> Bool {
+        guard !a.isEmpty, !b.isEmpty else { return false }
+        let x = a.replacingOccurrences(of: " ", with: ""), y = b.replacingOccurrences(of: " ", with: "")
+        return x.contains(y) || y.contains(x)
     }
 }
