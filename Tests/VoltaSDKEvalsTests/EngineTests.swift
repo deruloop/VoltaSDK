@@ -493,3 +493,80 @@ struct ScriptedProvider: ModelProvider {
     }
 }
 
+
+// MARK: - Task format: typed graders, validation, loader errors
+
+@Suite("Task format")
+struct TaskFormatTests {
+
+    @Test("Typed grader constructors produce the documented JSON")
+    func typedGraders() throws {
+        let typed: [GraderSpec] = [
+            .jsonOnly(), .schema(), .required(paths: ["title", "items:1"]),
+            .forbiddenFields(paths: ["items"], name: "no-items"), .expectFields(), .expectContains(), .expectShape(),
+            .language(path: "note"), .forbiddenPatterns(path: "note", patterns: ["\\d"]),
+            .elementsMatch(path: "ingredients", pattern: "\\d", minFraction: 0.6),
+            .claimedAction(field: "add", patterns: ["added"]),
+            .retention(keepItems: "items[].name", keepStates: "states", from: "present", notTo: "missing"),
+        ]
+        #expect(typed.map(\.kind) == GraderSpec.knownKinds)
+        #expect(typed[2] == GraderSpec(kind: "required", params: ["paths": ["title", "items:1"]]))
+        #expect(typed[3] == GraderSpec(kind: "forbidden-fields", params: ["paths": ["items"], "name": "no-items"]))
+        #expect(typed[7] == GraderSpec(kind: "language", params: ["path": "note"]))
+        #expect(typed[9] == GraderSpec(kind: "elements-match", params: ["path": "ingredients", "pattern": "\\d", "minFraction": 0.6]))
+        // Round-trip through JSON: the typed form IS the file form.
+        let data = try JSONEncoder().encode(typed)
+        #expect(try JSONDecoder().decode([GraderSpec].self, from: data) == typed)
+    }
+
+    @Test("The example tasks validate clean")
+    func examplesValidate() throws {
+        for task in try EvalTask.examples {
+            #expect(task.validate().isEmpty, "\(task.id): \(task.validate())")
+        }
+    }
+
+    @Test("Validation names each problem with its path")
+    func validation() throws {
+        var task = try EvalTask.example("example.city-facts")
+        task.graders = [
+            GraderSpec(kind: "langauge"),
+            GraderSpec(kind: "required"),
+            .retention(keepStates: "states"),
+        ]
+        task.samples[1].id = task.samples[0].id
+        task.samples[2].turns = []
+        task.samples[3].expect = EvalExpectation(shape: "Record")
+        task.carry = CarryTemplate(template: "{{prompt}}")
+        let problems = task.validate().map(\.description)
+        #expect(problems.contains { $0.hasPrefix("graders[0].kind: unknown grader \"langauge\"") })
+        #expect(problems.contains("graders[1].params.paths: required needs \"paths\""))
+        #expect(problems.contains("graders[2].params: retention with \"keepStates\" needs \"from\" and \"notTo\""))
+        #expect(problems.contains("samples[1].id: duplicate id \"c-01\""))
+        #expect(problems.contains("samples[2].turns: needs one or more non-empty turns"))
+        #expect(problems.contains("samples[3].expect.shape: the task schema is not an anyOf, so a shape cannot be expected"))
+        #expect(problems.contains("carry: a carry template needs at least one multi-turn sample"))
+    }
+
+    @Test("A malformed file throws a readable error, never a DecodingError")
+    func loaderErrors() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("volta-evals-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let missingField = directory.appendingPathComponent("missing.json")
+        try Data(#"{"id":"t","title":"t","schemaVersion":"v1","graders":[],"samples":[]}"#.utf8).write(to: missingField)
+        #expect {
+            try EvalTask.load(from: missingField)
+        } throws: { error in
+            guard case EvalEngineError.invalidTask(let file, let problems) = error else { return false }
+            return file == "missing.json" && problems.first?.contains("missing required field \"instructions\"") == true
+        }
+        let wrongType = directory.appendingPathComponent("type.json")
+        try Data(#"{"id":"t","title":"t","schemaVersion":"v1","instructions":"x","graders":[{"kind":"schema"}],"samples":[{"id":"s","turns":"not an array"}]}"#.utf8).write(to: wrongType)
+        #expect {
+            try EvalTask.load(from: wrongType)
+        } throws: { error in
+            guard case EvalEngineError.invalidTask(_, let problems) = error else { return false }
+            return problems.first?.hasPrefix("samples[0].turns: expected") == true
+        }
+    }
+}

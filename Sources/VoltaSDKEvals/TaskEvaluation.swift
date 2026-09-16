@@ -213,11 +213,15 @@ public enum EvalEngineError: Error, CustomStringConvertible {
     case taskHasNoSchema(String)
     case taskNotFound(String)
     case tierUnreachable(EvalTier, String)
+    /// A task file that decodes or validates with problems; each entry is
+    /// "path: reason" (see docs/evals/TASK-FORMAT.md).
+    case invalidTask(file: String, problems: [String])
 
     public var description: String {
         switch self {
         case .taskHasNoSchema(let id): return "task \(id) has no schema; structured mode needs one"
         case .taskNotFound(let id): return "no example task named \(id)"
+        case .invalidTask(let file, let problems): return "invalid task \(file):\n  " + problems.joined(separator: "\n  ")
         case .tierUnreachable(let tier, let reason): return "\(tier.rawValue) unreachable: \(reason)"
         }
     }

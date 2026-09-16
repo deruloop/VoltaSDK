@@ -76,6 +76,13 @@ Session 298 also shows the Swift Testing trait form,
   described below): this package's `Tests/VoltaSDKEvalsTests`. It is how the
   SDK produces its capability map for the articles; adopters do not need it.
 
+## The task file
+
+The complete field-by-field reference is **[TASK-FORMAT.md](TASK-FORMAT.md)**,
+and `task.schema.json` next to it validates a task file in an editor or a
+script. Write a task from that document; the loader reports any problem
+as `path: reason`. What follows is the short form.
+
 ## The triple, as data
 
 A task file is JSON:

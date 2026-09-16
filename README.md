@@ -597,8 +597,12 @@ let result = try await evaluation.run()                        // Apple's framew
 #expect(result.passRate >= 0.6, "\(result.failureReasons)")
 ```
 
-Modes compare the raw prompt with Volta's structured path, so the same task
-also measures what structured output buys on each tier. Graders are
+A task is a JSON file (or the same `EvalTask` in Swift, with typed grader
+constructors such as `.language(path: "note")`); the loader validates it
+and names any problem by field. The full format reference is
+[docs/evals/TASK-FORMAT.md](docs/evals/TASK-FORMAT.md). Modes compare the
+raw prompt with Volta's structured path, so the same task also measures
+what structured output buys on each tier. Graders are
 deterministic rules from a fixed registry; for the rest, a cloud model from
 another vendor can judge, and its agreement with human ratings is measured
 before it is trusted. The flow, the grader registry, the task format, and

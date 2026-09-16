@@ -43,6 +43,16 @@ iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
   meal-assistant tasks on the Mac's on-device model): structured output
   takes schema validity from 0% to 100% and two-turn item retention from
   unmeasurable to 100%; the remaining failures are content, not shape.
+- **Task format, made authorable.** `docs/evals/TASK-FORMAT.md` is the
+  complete reference for task files (fields, schema form, every grader
+  with its parameters, carry grammar, expectations, loader errors,
+  checklist) and `docs/evals/task.schema.json` validates one. In Swift,
+  typed grader constructors (`.jsonOnly()`, `.required(paths:)`,
+  `.language(path:)`, `.retention(keepItems:…)`, …) replace stringly
+  `GraderSpec(kind:params:)`; `EvalTask.validate()` reports problems as
+  `path: reason`, and `EvalTask.load(from:)` throws
+  `EvalEngineError.invalidTask` with those lines instead of a
+  `DecodingError`.
 - **Fixed: the package did not compile for a physical iPhone** since the
   PCC provider shipped — its entitlement self-check used `SecTask`, which is
   macOS-only. On iOS the check now reads the embedded provisioning profile

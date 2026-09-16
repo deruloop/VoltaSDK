@@ -75,6 +75,7 @@ File map:
 ├── Sources/VoltaSDKEvals/                 // LIBRARY product for adopters' test targets (D20) — docs/evals/README.md
 │   ├── EvalTask.swift                     // the triple as data: task, samples, expectations, carry template, JSON paths
 │   ├── Graders.swift                      // the deterministic grader registry
+│   ├── GraderSpec+Typed.swift             // typed grader constructors; EvalTask.validate() (path: reason)
 │   ├── TaskEvaluation.swift               // Apple `Evaluation` conformance: (task, provider, mode) → result; passRate
 │   ├── CapabilityMap.swift                // task × tier × mode → pass rate, JSON + Markdown
 │   ├── Judge.swift                        // ModelJudgeEvaluator via CloudAccountLanguageModel; Cohen's kappa
@@ -84,7 +85,7 @@ File map:
 ├── Tests/VoltaSDKEvalsTests/
 │   ├── EngineTests.swift                  // mock-backed, CI-safe
 │   └── LiveEvaluations.swift              // VOLTA_EVAL_LIVE=1: Phase 0 + the capability map sweep
-├── docs/evals/                            // how to run; results/capability-map.{json,md}
+├── docs/evals/                            // README (flow), TASK-FORMAT.md (the file reference), task.schema.json, results/
 ├── scripts/evals-merge.py                 // fold a device run's [evals-entry] lines into the map
 └── Examples/patch-local-package.py        // re-apply the XCLocalSwiftPackageReference fix after xcodegen
 ```

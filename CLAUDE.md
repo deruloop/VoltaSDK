@@ -384,7 +384,11 @@ available); D18's logging makes any further crossing visible.
     `VoltaSDKEvals` LIBRARY product** (adopters import it from their test
     target: `EvalTask` JSON/Swift, `TaskEvaluation(task:provider:mode:)`,
     `result.passRate`/`failureReasons`; SDK tests in
-    `Tests/VoltaSDKEvalsTests`; demo bundles depend on the product). It runs a
+    `Tests/VoltaSDKEvalsTests`; demo bundles depend on the product). **Sep
+    16: the task format is documented for authors** — `docs/evals/TASK-FORMAT.md`
+    (the reference an assistant or a person follows to write a valid task)
+    + `task.schema.json`; typed `GraderSpec` constructors; `validate()` +
+    readable loader errors. It runs a
     generic triple (task JSON = `OutputSchema` + samples + graders) through
     one tier at a time (on-device, PCC, cloud per vendor) in three modes
     (raw / structured / structured+repair) and upserts

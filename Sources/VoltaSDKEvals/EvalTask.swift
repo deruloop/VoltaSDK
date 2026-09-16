@@ -68,9 +68,52 @@ public struct EvalTask: Codable, Sendable {
         self.samples = samples
     }
 
-    /// Loads a task file (JSON).
+    /// Loads a task file (JSON) and validates it. A malformed file throws
+    /// `EvalEngineError.invalidTask` naming the field and the reason, so a
+    /// task author never has to read a `DecodingError`.
     public static func load(from url: URL) throws -> EvalTask {
-        try JSONDecoder().decode(EvalTask.self, from: Data(contentsOf: url))
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch {
+            throw EvalEngineError.invalidTask(file: url.lastPathComponent, problems: ["cannot read the file: \(error.localizedDescription)"])
+        }
+        let task: EvalTask
+        do {
+            task = try JSONDecoder().decode(EvalTask.self, from: data)
+        } catch let error as DecodingError {
+            throw EvalEngineError.invalidTask(file: url.lastPathComponent, problems: [Self.describe(error)])
+        }
+        let problems = task.validate()
+        guard problems.isEmpty else {
+            throw EvalEngineError.invalidTask(file: url.lastPathComponent, problems: problems.map(\.description))
+        }
+        return task
+    }
+
+    /// A `DecodingError` as "path: what is wrong", the way a task author
+    /// reads it.
+    static func describe(_ error: DecodingError) -> String {
+        func path(_ context: DecodingError.Context) -> String {
+            let parts = context.codingPath.map { key -> String in
+                if let index = key.intValue { return "[\(index)]" }
+                return "." + key.stringValue
+            }
+            let joined = parts.joined()
+            return joined.hasPrefix(".") ? String(joined.dropFirst()) : (joined.isEmpty ? "(root)" : joined)
+        }
+        switch error {
+        case .keyNotFound(let key, let context):
+            return "\(path(context)): missing required field \"\(key.stringValue)\""
+        case .typeMismatch(let type, let context):
+            return "\(path(context)): expected \(type)"
+        case .valueNotFound(let type, let context):
+            return "\(path(context)): expected a \(type), found null"
+        case .dataCorrupted(let context):
+            return "\(path(context)): \(context.debugDescription)"
+        @unknown default:
+            return String(describing: error)
+        }
     }
 
     public init(contentsOf url: URL) throws {
