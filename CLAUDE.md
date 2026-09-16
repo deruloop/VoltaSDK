@@ -400,8 +400,9 @@ available); D18's logging makes any further crossing visible.
     (Sep 15):** tasks, experiments, handoff, and its rows of the map now
     live in `~/Desktop/RavioloApp/apple/RavioloEvals/` (a `RavioloEvals`
     unit-test target + scheme that sets `RAVIOLO_EVALS=1`; per-feature
-    tests assert measured floors; Raviolo's `project.yml` points VoltaSDK
-    at the local checkout until 1.2.0 ships). The SDK's committed map now
+    tests assert measured floors; Raviolo's `project.yml` references
+    VoltaSDK by URL on `branch: evaluation` (pushed Sep 16) until 1.2.0
+    is tagged). The SDK's committed map now
     holds only the generic example tasks.
     **Measured (Mac M2 on-device standing in for the iPhone, Sep 14):**
     Phase 0: Italian is declared supported and accepted 100% (0
