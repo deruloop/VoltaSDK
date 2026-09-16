@@ -8,20 +8,204 @@
     "type": "object",
     "name": "PackingList",
     "properties": [
-      { "name": "items", "schema": { "type": "array", "items": { "type": "string" }, "min": 1 } },
-      { "name": "note", "schema": { "type": "string" } }
+      {
+        "name": "items",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "min": 1
+        }
+      },
+      {
+        "name": "note",
+        "schema": {
+          "type": "string"
+        }
+      }
     ]
   },
-  "carry": { "template": "List so far: [{{previous.items|join:{value}|sep:, }}]. The person now says: {{prompt}}" },
+  "carry": {
+    "template": "List so far: [{{previous.items|join:{value}|sep:, }}]. The person now says: {{prompt}}"
+  },
   "graders": [
-    { "kind": "json-only" },
-    { "kind": "schema" },
-    { "kind": "retention", "params": { "keepItems": "items[]" } },
-    { "kind": "expect-contains" }
+    {
+      "kind": "json-only"
+    },
+    {
+      "kind": "schema"
+    },
+    {
+      "kind": "retention",
+      "params": {
+        "keepItems": "items[]"
+      }
+    },
+    {
+      "kind": "expect-contains"
+    }
   ],
   "samples": [
-    { "id": "p-01", "turns": ["I'm packing a towel", "and sunscreen"], "canonicalState": { "items": ["towel"] }, "expect": { "contains": { "items": ["towel", "sunscreen"] } } },
-    { "id": "p-02", "turns": ["Passport", "add the charger"], "canonicalState": { "items": ["passport"] }, "expect": { "contains": { "items": ["passport", "charger"] } } },
-    { "id": "p-03", "turns": ["Two books", "and my headphones"], "canonicalState": { "items": ["books"] }, "expect": { "contains": { "items": ["books", "headphones"] } } }
+    {
+      "id": "p-01",
+      "turns": [
+        "I'm packing a towel",
+        "and sunscreen"
+      ],
+      "canonicalState": {
+        "items": [
+          "towel"
+        ]
+      },
+      "expect": {
+        "contains": {
+          "items": [
+            "towel",
+            "sunscreen"
+          ]
+        }
+      }
+    },
+    {
+      "id": "p-02",
+      "turns": [
+        "Passport",
+        "add the charger"
+      ],
+      "canonicalState": {
+        "items": [
+          "passport"
+        ]
+      },
+      "expect": {
+        "contains": {
+          "items": [
+            "passport",
+            "charger"
+          ]
+        }
+      }
+    },
+    {
+      "id": "p-03",
+      "turns": [
+        "Two books",
+        "and my headphones"
+      ],
+      "canonicalState": {
+        "items": [
+          "books"
+        ]
+      },
+      "expect": {
+        "contains": {
+          "items": [
+            "books",
+            "headphones"
+          ]
+        }
+      }
+    },
+    {
+      "id": "p-04",
+      "turns": [
+        "A towel",
+        "and flip flops"
+      ],
+      "canonicalState": {
+        "items": [
+          "towel"
+        ]
+      },
+      "expect": {
+        "contains": {
+          "items": [
+            "towel",
+            "flip flops"
+          ]
+        }
+      }
+    },
+    {
+      "id": "p-05",
+      "turns": [
+        "My passport",
+        "plus the tickets"
+      ],
+      "canonicalState": {
+        "items": [
+          "passport"
+        ]
+      },
+      "expect": {
+        "contains": {
+          "items": [
+            "passport",
+            "tickets"
+          ]
+        }
+      }
+    },
+    {
+      "id": "p-06",
+      "turns": [
+        "Sunglasses",
+        "and a hat"
+      ],
+      "canonicalState": {
+        "items": [
+          "sunglasses"
+        ]
+      },
+      "expect": {
+        "contains": {
+          "items": [
+            "sunglasses",
+            "hat"
+          ]
+        }
+      }
+    },
+    {
+      "id": "p-07",
+      "turns": [
+        "A raincoat",
+        "then boots"
+      ],
+      "canonicalState": {
+        "items": [
+          "raincoat"
+        ]
+      },
+      "expect": {
+        "contains": {
+          "items": [
+            "raincoat",
+            "boots"
+          ]
+        }
+      }
+    },
+    {
+      "id": "p-08",
+      "turns": [
+        "The camera",
+        "add the tripod"
+      ],
+      "canonicalState": {
+        "items": [
+          "camera"
+        ]
+      },
+      "expect": {
+        "contains": {
+          "items": [
+            "camera",
+            "tripod"
+          ]
+        }
+      }
+    }
   ]
 }

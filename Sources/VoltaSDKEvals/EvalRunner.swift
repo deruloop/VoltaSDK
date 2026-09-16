@@ -13,6 +13,7 @@
 //    VOLTA_EVAL_TIERS=on-device,pcc,cloud-gemini   (default: all reachable)
 //    VOLTA_EVAL_MODES=raw,structured,structured+repair   (default: raw)
 //    VOLTA_EVAL_LIMIT=<n>           samples per task (quick runs)
+//    VOLTA_EVAL_HANDOFF_TO=<tier>   also run multi-turn tasks with later turns on that tier (Q12/Q13)
 //    VOLTA_EVAL_RESULTS=<dir>       where the map + run files go
 //    VOLTA_EVAL_HOST=<label>        how this machine is named in the map
 //    VOLTA_EVAL_<VENDOR>_KEY/_MODEL cloud tiers; VOLTA_EVAL_JUDGE_* the judge
@@ -191,12 +192,33 @@ public struct EvalRunner {
         let judge = JudgeConfiguration.fromEnvironment(environment)
         var map = CapabilityMap.load(from: capabilityMapURL)
 
+        // Handoff sweep (Q12/Q13): with VOLTA_EVAL_HANDOFF_TO=<tier>, every
+        // multi-turn task also runs with later turns on that tier.
+        let handoff: (EvalTier, any ModelProvider)? = {
+            guard let name = environment["VOLTA_EVAL_HANDOFF_TO"], let tier = EvalTier(rawValue: name) else { return nil }
+            guard let pair = tiers.first(where: { $0.0 == tier }) else {
+                report.log.append("handoff tier \(name) unreachable in this process")
+                return nil
+            }
+            return pair
+        }()
+
         for task in tasks {
             for (tier, provider) in tiers {
                 for mode in modes() {
                     if case .structured = mode, task.schema == nil {
                         report.log.append("skip \(task.id) @ \(tier.rawValue) [\(mode)]: no schema")
                         continue
+                    }
+                    if let handoff, handoff.0 != tier, task.samples.contains(where: { $0.turns.count > 1 }) {
+                        let entry = try await run(task: task, tier: tier, provider: provider, mode: mode, judge: judge, handoff: handoff)
+                        map.upsert(entry)
+                        try map.save(to: capabilityMapURL)
+                        report.entries.append(entry)
+                        report.log.append("\(task.id) @ \(entry.tier) [\(mode)]: \(entry.passed)/\(entry.scored) pass (handoff after turn 1)")
+                        if let data = try? CapabilityMap.lineEncoder.encode(entry), let line = String(data: data, encoding: .utf8) {
+                            print("[evals-entry] \(line)")
+                        }
                     }
                     let entry = try await run(task: task, tier: tier, provider: provider, mode: mode, judge: judge)
                     map.upsert(entry)
@@ -220,13 +242,24 @@ public struct EvalRunner {
         tier: EvalTier,
         provider: any ModelProvider,
         mode: EvalMode,
-        judge: JudgeConfiguration?
+        judge: JudgeConfiguration?,
+        handoff: (EvalTier, any ModelProvider)? = nil
     ) async throws -> CapabilityMap.Entry {
-        let evaluation = TaskEvaluation(
-            task: task, tier: tier, mode: mode, provider: provider,
-            judgeEvaluator: judge?.makeEvaluator(for: task, tier: tier),
-            limit: limit
-        )
+        let evaluation: TaskEvaluation
+        if let handoff {
+            evaluation = TaskEvaluation(
+                task: task, tier: tier, mode: mode, provider: provider,
+                handoffTier: handoff.0, handoffProvider: handoff.1,
+                judgeEvaluator: judge?.makeEvaluator(for: task, tier: tier),
+                limit: limit
+            )
+        } else {
+            evaluation = TaskEvaluation(
+                task: task, tier: tier, mode: mode, provider: provider,
+                judgeEvaluator: judge?.makeEvaluator(for: task, tier: tier),
+                limit: limit
+            )
+        }
         let result = try await evaluation.run(info: [
             "task": task.id, "schemaVersion": task.schemaVersion,
             "tier": tier.rawValue, "mode": mode.description, "host": host

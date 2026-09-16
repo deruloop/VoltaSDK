@@ -1,0 +1,160 @@
+{
+ "id": "example.long-context-4k",
+ "title": "Example: find one recipe inside ~4k characters of others",
+ "schemaVersion": "v1",
+ "language": "en",
+ "instructions": "Several recipes follow, one after another. Extract ONLY the recipe named in the request, as a JSON object with \"title\", \"ingredients\" (one string each, quantity and name), and \"steps\" (real cooking instructions only). Reply with ONLY the JSON object, no prose.",
+ "schema": {
+  "type": "object",
+  "name": "Recipe",
+  "properties": [
+   {
+    "name": "title",
+    "schema": {
+     "type": "string"
+    }
+   },
+   {
+    "name": "ingredients",
+    "schema": {
+     "type": "array",
+     "min": 1,
+     "items": {
+      "type": "string"
+     }
+    }
+   },
+   {
+    "name": "steps",
+    "schema": {
+     "type": "array",
+     "min": 1,
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  ]
+ },
+ "graders": [
+  {
+   "kind": "json-only"
+  },
+  {
+   "kind": "schema"
+  },
+  {
+   "kind": "required",
+   "params": {
+    "paths": [
+     "title",
+     "ingredients:1",
+     "steps:1"
+    ]
+   }
+  },
+  {
+   "kind": "expect-contains"
+  }
+ ],
+ "samples": [
+  {
+   "id": "lc-4k-01",
+   "turns": [
+    "Request: the recipe for Guacamole I.\n\nPage text:\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages\nThere are multiple recipes for banana bread at Wikibooks Cookbook:\nBanana Bread I\nBanana Bread II\nBanana Bread with Walnuts\nRetrieved from \" https://en.wikibooks.org/w/index.php?title=Cookbook:Banana_Bread&oldid=4336199 \"\n<div id=\"catlinks\" \nFrench Onion Soup Servings 3–6 persons Time Prep: 10 minutes prep Cooking: 35 minutes Difficulty\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookboo\nGuacamole I Time 10 minutes Difficulty\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Recipes | Mexican | Tex-Mex cuisine | Appetizers\nGuacamole is a Mexican paste made from crushed avocado and various seasonings , usually including onions , peppers , garlic and tomatoes . Guacamole is used as a condiment, an ingredient, and as an appetizer when served with tortilla chips .\nIngredients\n4 avocados\n2 tablespoons pico de gallo\nJuice of ½ lime\n2 chopped Jalapeño OR 2 tablespoons of crushed red pepper OR 1 tablespoon of cayenne pepper\n1 teaspoon salt\n4 teaspoons olive oil\n1 ½ teaspoon minced garlic\n½ teaspoon of ground black pepper\n1 minced jalapeño OR 2 minced serrano chiles OR 2 tablespoon minced of any chile pepper like (adjust for spiciness)\nProcedure\nHalve and pit the avocados.\nScore the avocado flesh in a criss-cross pattern without cutting through the skin.\nScoop out the flesh of one half with a large spoon and place in mixing bowl.\nAdd the lime juice and stir to evenly coat the avocados.\nStir in the pico de gallo, garlic, oil, jalapeño, salt, red pepper, and black pepper, mashing and tossing the avocado pieces until thoroughly mixed.\nScoop out the remaining avocado chunks and gently mix and toss in the larger pieces. The guacamole is the right consistency when more large pieces than mashed parts remain.\nGarnish with a sprig of cilantro.\nNotes, tips, and variations\nGuacamole is a dip originally made to be consumed almost instantly, meaning there is no intention to store it at all, so you can omit the use of any kind of oil or lime juice for these recipes. However, both oil and lime juice can be added so that the guacamole keeps for longer.\nA dollop of Greek yogurt or mashed black beans can add richness and protein.\nTo prevent browning, cover the surface with plastic wrap so no air is in contact with the guacamole. Lime juice can also help prevent such oxidation.\nA young chef from El Paso, Texas, has developed a much more effective approach to keep guacamole fresh for up to three times longer than traditional methods. Through trial and error, Alfred M. Gladstein found that the use of a various vegetable oils blended in to the concoction would keep it fresh longer and significantly increase the amount of time before the guacamole browns and spoils. In his studies Gladstein found that mixing olive oil in guacamole worked best when serving the dish independently or with warm foods, while vegetable oil (corn or canola) worked best when the guacamole is served with cold foods and salads. When these techniques are employed, Gladstein, who is also known as Chef Jamir, found that the refrigerated guacamole would stay fresh and green for three days or more. He also notes that when serving the guacamole at room temperature, the oil-treated dish will last up to six to eight hours before starting to brown.\nRetrieved from \" https://en.wikibooks.org/w/index.php?title=Cookbook:Guacamole_I&oldid=4636788 \"\n<div id=\"catlinks\"\nPesto Category Condiments\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Ingredients\nPesto alla genovese , commonly abbreviated to pesto in English, is an aromatic green condiment made from basil. It is traditionally made using a mortar and pestle to achieve a creamier end result, though it is now often made in a food processor as a shortcut. It is frequently used as a pasta sauce.\nComposition\nIn its most traditional formulation, pesto is made fr"
+   ],
+   "expect": {
+    "contains": {
+     "ingredients": [
+      "avocado"
+     ]
+    }
+   },
+   "notes": "target Guacamole inside ~4000 chars of other recipes"
+  },
+  {
+   "id": "lc-4k-02",
+   "turns": [
+    "Request: the recipe for Hummus.\n\nPage text:\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages\nThere are multiple recipes for banana bread at Wikibooks Cookbook:\nBanana Bread I\nBanana Bread II\nBanana Bread with Walnuts\nRetrieved from \" https://en.wikibooks.org/w/index.php?title=Cookbook:Banana_Bread&oldid=4336199 \"\n<div id=\"catlinks\" \nFrench Onion Soup Servings 3–6 persons Time Prep: 10 minutes prep Cooking: 35 minutes Difficulty\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Recipes | French Cuisine | Soup\nFrench onion soup is a classic French soup prepared, in its most fundamental form, by boiling sliced onions in water. More complex varieties involve bouillon, wine, and spices. An ordinary food for family meals, it is served as a simple entr\nHummus Category Condiments\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Ingredients\nHummus , also hoummus , hommus , hommous , etc, as used in English, is a Levantine blend of sesame seed paste and chickpeas. [ 1 ] It may also be extended to cover similar products made using other pulses.\nCharacteristics\nWhile hummus technically takes many forms, the term in English generally refers to \"hummus b’tahini\". [ 2 ] In this form, chickpeas are puréed with tahini until smooth [ 2 ] , and the mixture is usually flavored with lemon and garlic. [ 3 ] [ 4 ]\nSelection and storage\nDepending on your location, hummus may be sold commercially. Whether purchased or homemade, it should be stored in the fridge to prevent spoilage.\nTechniques\nIf trying to make very smooth hummus, the following steps may be taken:\nUse a high-powered blender instead of a food processor; [ 1 ]\nBlend the chickpeas while hot, as they get more viscous and difficult to work with once cooled; [ 1 ]\nPeel off or otherwise remove and discard the chickpea skins. [ 5 ]\nHummus made with canned chickpeas can taste metallic, but rinsing well and simmering for additional time can temper this flavor. [ 1 ] Processing the garlic with the lemon juice allows for garlic flavor while reducing its pungency. [ 1 ]\nUse\nHummus may be used either as a dip or a spread. [ 4 ]\nRecipes\nFor hummus\nRecipes for hummus Cookbook:Hummus (Greek) Cookbook:Hummus I Cookbook:Hummus III Cookbook:Hummus with Sprouted Chickpea\nUsing hummus\nRecipes using hummus Cookbook:Breakfast Dürüm Cookbook:Sabich (Vegetable and Pita Sandwich)\nReferences\n↑ a b c d e \"The Science of Great Hummus According to the Food Lab\" . Serious Eats . Retrieved 2024-11-21 .\n↑ a b \"A Guide to the Wide World of Hummus\" . Serious Eats . Retrieved 2024-11-21 .\n↑ McGee, Harold (2007-03-20). On Food and Cooking: The Science and Lore of the Kitchen . Simon and Schuster. ISBN   978-1-4165-5637-4 .\n↑ a b Kipfer, Barbara Ann (2012-04-11). The Culinarian: A Kitchen Desk Reference . Houghton Mifflin Harcourt. ISBN   978-0-544-18603-3 .\n↑ https://www.washingtonpost.com/lifestyle/food/what-people-get-wrong-about-making-hummus/2015/09/04/72c7c844-4dc5-11e5-902f-39e9219e574b_story.html . {{ cite web }} : Missing or empty |title= ( help )\nRetrieved from \" https://en.wikibooks.org/w/index.php?title=Cookbook:Hummus&oldid=4446354 \"\n<div id=\"catlinks\"\nPesto Category Condiments\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Ingredients\nPesto alla genovese , commonly abbreviated to pesto in English, is an aromatic green condiment made from basil. It is traditionally made using a mortar and pestle to achieve a creamier end result, though it is now often made in a food processor as a shortcut. It is frequently used as a pasta sauce.\nComposition\nIn its most traditional formulation, pesto is made from basil, garlic, parmesan or pecorino cheese, pine nuts, and olive oil. Variations, however, may substitute other leafy greens for the basil and cheaper nuts for the pine nuts.\nRecipes\nPesto I\nPesto II\nNettle Pesto\nSting'in Nettle Pesto\nCookbook:Spinach Pesto Linguine\nExternal links\nhttps://www.s"
+   ],
+   "expect": {
+    "contains": {
+     "ingredients": [
+      "chickpea"
+     ]
+    }
+   },
+   "notes": "target Hummus inside ~4000 chars of other recipes"
+  },
+  {
+   "id": "lc-4k-03",
+   "turns": [
+    "Request: the recipe for Greek Salad.\n\nPage text:\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages\nThere are multiple recipes for banana bread at Wikibooks Cookbook:\nBanana Bread I\nBanana Bread II\nBanana Bread with Walnuts\nRetrieved from \" https://en.wikibooks.org/w/index.php?title=Cookbook:Banana_Bread&oldid=4336199 \"\n<div id=\"catlinks\" \nFrench Onion Soup Servings 3–6 persons Time Prep: 10 minutes prep Cooking: 35 minutes Difficulty\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Recipes | French Cuisine | Soup\nFrench onion soup is a classic French soup prepared, in its most fundamental form, by boiling sliced onions in water. More complex varieties involve bouillon, wine, and spices. An ordinary food for family meals, it is served as a simple entrée, garnished with grated Gruyére cheese and croutons (or stale French bread) added just before serving. It can also be consumed at the end of the evening, unadorned, in a mug. Every locale in France has its own variation on the idea of onion soup, but this recipe contains many of the fundamental building blocks.\nHistory\nOnion soups have been popular in France since Roman times; traditionally regarded as food for people of humble means, due to the abundance of onions and the ease with which they can be grown. The modern version of this soup emerged in France around the 17th century and features dry bread (or croutons), beef bouillon, and caramelized onions.\nLegend would have it that the soup was invented by Louis XV of France—\"who, as it were, had returned late one night to his hunting lodge, to find n\nGreek Salad Difficulty\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Recipes\nIngredients\nRed tomatoes , chopped\nCucumber , sliced into rounds\nRed or white onions , sliced into half-moons\nGreen bell peppers , cut into small pieces\nGreek olives\nExtra-virgin or virgin olive oil\nVinegar or lemon juice\nSalt\nFeta cheese\nOregano\nProcedure\nCombine tomatoes, cucumbers, onions, peppers, and olives in a deep bowl.\nAdd enough olive oil, vinegar or lemon juice, and salt to taste. Toss the ingredients for half a minute.\nPlace a feta cheese slice on top and season with a splash of olive oil.\nTop with a sprig of oregano if desired.\nRetrieved from \" https://en.wikibooks.org/w/index.php?title=Cookbook:Greek_Salad&oldid=4518144 \"\n<div id=\"catlinks\"\nPesto Category Condiments\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Ingredients\nPesto alla genovese , commonly abbreviated to pesto in English, is an aromatic green condiment made from basil. It is traditionally made using a mortar and pestle to achieve a creamier end result, though it is now often made in a food processor as a shortcut. It is frequently used as a pasta sauce.\nComposition\nIn its most traditional formulation, pesto is made from basil, garlic, parmesan or pecorino cheese, pine nuts, and olive oil. Variations, however, may substitute other leafy greens for the basil and cheaper nuts for the pine nuts.\nRecipes\nPesto I\nPesto II\nNettle Pesto\nSting'in Nettle Pesto\nCookbook:Spinach Pesto Linguine\nExternal links\nhttps://www.seriouseats.com/best-pesto-recipe\nhttps://www.foodnetwork.com/how-to/packages/food-network-essentials/what-is-pesto\nhttps://www.allrecipes.com/article/what-is-pesto/\nRetrieved from \" https://en.wikibooks.org/w/index.php?title=Cookbook:Pesto&oldid=4340920 \"\n<div id=\"catlinks\" \nHummus Category Condiments\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Ingredients\nHummus , also hoummus , hommus , hommous , etc, as used in English, is a Levantine blend of sesame seed paste and chickpeas. [ 1 ] It may also be extended to cover similar products made using other pulses.\nCharacteristics\nWhile hummus technically takes many forms, the term in English generally refers to \"hummus b’tahini\". [ 2 ] In this form, chickpeas are puréed with tahini until smooth [ 2 ] , and the "
+   ],
+   "expect": {
+    "contains": {
+     "ingredients": [
+      "feta"
+     ]
+    }
+   },
+   "notes": "target Greek_Salad inside ~4000 chars of other recipes"
+  },
+  {
+   "id": "lc-4k-04",
+   "turns": [
+    "Request: the recipe for Pesto.\n\nPage text:\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages\nThere are multiple recipes for banana bread at Wikibooks Cookbook:\nBanana Bread I\nBanana Bread II\nBanana Bread with Walnuts\nRetrieved from \" https://en.wikibooks.org/w/index.php?title=Cookbook:Banana_Bread&oldid=4336199 \"\n<div id=\"catlinks\" \nFrench Onion Soup Servings 3–6 persons Time Prep: 10 minutes prep Cooking: 35 minutes Difficulty\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Recipes | French Cuisine | Soup\nFrench onion soup is a classic French soup prepared, in its most fundamental form, by boiling sliced onions in water. More complex varieties involve bouillon, wine, and spices. An ordinary food for family meals, it is served as a simple entrée, garnished with grated Gruyére cheese and croutons (or stale French bread) added just before serving. It can also be consumed at the end of the evening, unadorned, in a mug. Every locale in France has its own variation on the idea of onion soup, but this recipe contains many of the fundamental building blocks.\nHistory\nOnion soups have been popular in France since Roman times; traditionally regarded as food for people of humble means, due to the abundance of onions and the ease with which they can be grown. The modern version of this soup emerged in France around the 17th century and features dry bread (or croutons), beef bouillon, and caramelized onions.\nLegend\nPesto Category Condiments\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Ingredients\nPesto alla genovese , commonly abbreviated to pesto in English, is an aromatic green condiment made from basil. It is traditionally made using a mortar and pestle to achieve a creamier end result, though it is now often made in a food processor as a shortcut. It is frequently used as a pasta sauce.\nComposition\nIn its most traditional formulation, pesto is made from basil, garlic, parmesan or pecorino cheese, pine nuts, and olive oil. Variations, however, may substitute other leafy greens for the basil and cheaper nuts for the pine nuts.\nRecipes\nPesto I\nPesto II\nNettle Pesto\nSting'in Nettle Pesto\nCookbook:Spinach Pesto Linguine\nExternal links\nhttps://www.seriouseats.com/best-pesto-recipe\nhttps://www.foodnetwork.com/how-to/packages/food-network-essentials/what-is-pesto\nhttps://www.allrecipes.com/article/what-is-pesto/\nRetrieved from \" https://en.wikibooks.org/w/index.php?title=Cookbook:Pesto&oldid=4340920 \"\n<div id=\"catlinks\"\nGreek Salad Difficulty\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Recipes\nIngredients\nRed tomatoes , chopped\nCucumber , sliced into rounds\nRed or white onions , sliced into half-moons\nGreen bell peppers , cut into small pieces\nGreek olives\nExtra-virgin or virgin olive oil\nVinegar or lemon juice\nSalt\nFeta cheese\nOregano\nProcedure\nCombine tomatoes, cucumbers, onions, peppers, and olives in a deep bowl.\nAdd enough olive oil, vinegar or lemon juice, and salt to taste. Toss the ingredients for half a minute.\nPlace a feta cheese slice on top and season with a splash of olive oil.\nTop with a sprig of oregano if desired.\nRetrieved from \" https://en.wikibooks.org/w/index.php?title=Cookbook:Greek_Salad&oldid=4518144 \"\n<div id=\"catlinks\" \nHummus Category Condiments\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Ingredients\nHummus , also hoummus , hommus , hommous , etc, as used in English, is a Levantine blend of sesame seed paste and chickpeas. [ 1 ] It may also be extended to cover similar products made using other pulses.\nCharacteristics\nWhile hummus technically takes many forms, the term in English generally refers to \"hummus b’tahini\". [ 2 ] In this form, chickpeas are puréed with tahini until smooth [ 2 ] , and the mixture is usually flavored with lemon and garlic. [ 3 ] [ 4 ]\nSelection and storage\nDepending on your location, hummus may be sold commercia"
+   ],
+   "expect": {
+    "contains": {
+     "ingredients": [
+      "basil"
+     ]
+    }
+   },
+   "notes": "target Pesto inside ~4000 chars of other recipes"
+  },
+  {
+   "id": "lc-4k-05",
+   "turns": [
+    "Request: the recipe for Tiramisù.\n\nPage text:\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages\nThere are multiple recipes for banana bread at Wikibooks Cookbook:\nBanana Bread I\nBanana Bread II\nBanana Bread with Walnuts\nRetrieved from \" https://en.wikibooks.org/w/index.php?title=Cookbook:Banana_Bread&oldid=4336199 \"\n<div id=\"catlinks\" \nFrench Onion Soup Servings 3–6 persons Time Prep: 10 minutes prep Cooking: 35 minutes Difficulty\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Recipes | French Cuisine | Soup\nFrench onion soup is a classic French soup prepared, in its most fundamental form, by boiling sliced onions in water. More complex varieties involve bouillon, wine, and spices. An ordinary food f\nTiramisù Servings 6–8 Energy 200 Cal (800 kJ) Time 15 minutes + 1 hour refrigeration Difficulty\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Recipes | Desserts | Italian Cuisine\nTiramisù means \"cheer me up\" in Italian and aptly describes this dessert traditionally made from savoiardi or ladyfingers or sponge cake, espresso coffee, mascarpone cheese, egg whites, yolk and sugar. The biscuits are sprinkled with strong coffee, and then embedded in a thick rich custard.\nIngredients\n4 egg whites\n2 egg yolks\n100 g (½ cup) white granulated sugar\n500 g (2 ½ cups) mascarpone cheese\n4 small coffee cups espresso coffee\n400 g of lady fingers (savoiardi) (or sponge cake)\nUnsweetened cocoa powder\nProcedure\nMake espresso coffee, and let it cool a bit.\nSeparate the egg yolks and the whites of two eggs in two bowls.\nBeat sugar into the egg yolks.\nBeat the mascarpone into the sweetened yolks.\nAdd two more egg whites to the other two and whip until they form stiff peaks.\nGently fold egg whites into mascarpone mixture.\nQuickly dip both sides of the ladyfingers in the espresso.\nLayer soaked ladyfingers and mascarpone in a large bowl or pan (start with fingers, finish with mascarpone).\nRefrigerate for one hour or two.\nSprinkle unsweetened cocoa powder on top just before to serve.\nNotes, tips, and variations\nSavoiardi are the traditional biscuits used with this recipe, rather than ladyfingers . Sponge cake can also be used.\nIt is common, but not in the original recipe, to use marsala wine (or brandy or cognac ) or Amaretto di sarono with the coffee.\nCream can be used as an alternative to Mascarpone cheese. Whip 375–500 ml (¾–1 pint) of double cream (heavy cream) until stiff peaks form, then add the sugar and continue from step 2.\nFull-fat cream cheese can be used as an alternative to mascarpone; add some cream to taste.\nAn Atkins friendly version of this recipe is also available.\nWarnings\nThe raw eggs in this recipe are not heated as part of the recipe. Using already pasteurized eggs, or pasteurizing the eggs while following the recipe, may help avoid health hazards like salmonella.\nIn this recipe the term \"ladyfingers\" refers to a kind of biscuit or cake, not to okra .\nWhether thickening with egg whites or cream, ensure it is stiff before adding to the other ingredients; if it is not stiff, the tiramisu will not set properly.\nRetrieved from \" https://en.wikibooks.org/w/index.php?title=Cookbook:Tiramisù&oldid=4608624 \"\n<div id=\"catlinks\"\nPesto Category Condiments\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Ingredients\nPesto alla genovese , commonly abbreviated to pesto in English, is an aromatic green condiment made from basil. It is traditionally made using a mortar and pestle to achieve a creamier end result, though it is now often made in a food processor as a shortcut. It is frequently used as a pasta sauce.\nComposition\nIn its most traditional formulation, pesto is made from basil, garlic, parmesan or pecorino cheese, pine nuts, and olive oil. Variations, however, may substitute other leafy greens for the basil and cheaper nuts for the pine nuts.\nRecipes\nPesto I\nPesto II\nNettle Pesto\nSting'in Nettle Pesto\nCookbook:Spin"
+   ],
+   "expect": {
+    "contains": {
+     "ingredients": [
+      "mascarpone"
+     ]
+    }
+   },
+   "notes": "target Tiramisu inside ~4000 chars of other recipes"
+  },
+  {
+   "id": "lc-4k-06",
+   "turns": [
+    "Request: the recipe for Risotto alla Milanese.\n\nPage text:\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages\nThere are multiple recipes for banana bread at Wikibooks Cookbook:\nBanana Bread I\nBanana Bread II\nBanana Bread with Walnuts\nRetrieved from \" https://en.wikibooks.org/w/index.php?title=Cookbook:Banana_Bread&oldid=4336199 \"\n<div id=\"catlinks\" \nFrench Onion Soup Servings 3–6 persons Time Prep: 10 minutes prep Cooking: 35 minutes Difficulty\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Recipes | French Cuisine | Soup\nFrench onion soup is a classic French soup prepared, in its most fundamental form, by boiling sliced onions in water. More complex varieties involve bouillon, wine, and spices. An ordinary food for family meals, it is served as a simple entrée, garnished with grated Gruyére cheese and croutons (or stale French bread) added just before serving. It can also be \nRisotto alla Milanese Servings 6–8 Time 1 hour Difficulty\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Recipes | Italian cuisine\nIngredients\n¼ tsp saffron threads\n3½–4 cups chicken broth\n7 tbsp butter or margarine , divided\n1 large onion , chopped\n1½ cups uncooked risotto rice\n½ cup dry white wine\n½ tsp salt\nDash pepper\n¼ cup freshly-grated Parmesan cheese\nChopped fresh parsley , fresh parsley sprig, and tomato slices for garnish (optional)\nProcedure\nCrush saffron in mortar with pestle to a powder. Place saffron in glass measuring cup.\nBring broth to a boil in small saucepan over medium heat; reduce heat to low.\nStir ½ cup broth into saffron to dissolve; set aside. Keep remaining broth hot.\nHeat 6 tablespoons butter in large, heavy skillet or 2½- quart saucepan over medium heat until melted and bubbly.\nCook and stir onion 5 minutes or until onion is soft.\nStir in rice; cook and stir 2 minutes.\nStir in wine, salt and pepper.\nCook, uncovered, over medium-high heat 3–5 minutes until wine has evaporated, stirring occasionally.\nMeasure ½ cup hot broth; stir into rice mixture. Reduce heat to medium-low, maintaining a simmer throughout adding broth.\nCook and stir until broth has absorbed. Repeat, adding ½ cup broth 3 more times, cooking and stirring until broth has absorbed.\nAdd saffron-flavored broth to rice and cook until absorbed.\nContinue to add remaining broth, ½ cup at a time, cooking and stirring until rice is tender but firm and mixture has slight creamy consistency. Not all broth may be necessary. Total cooking time of rice will be about 20 minutes.\nRemove risotto from heat.\nStir in remaining 1 tablespoon butter and cheese.\nGarnish, if desired.\nServe immediately.\nNotes, tips, and variations\nPlump, medium grain rice that contains a lot of starch is required. Arborio, Carnaroli, or Vialone Nano are traditionally best. Other rices that work well are Maratelli and Roma.\nYou may substitute vegetable broth for chicken broth.\nThis recipe is often served with Osso Buco .\nRetrieved from \" https://en.wikibooks.org/w/index.php?title=Cookbook:Risotto_alla_Milanese&oldid=4517968 \"\n<div id=\"catlinks\"\nPesto Category Condiments\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Ingredients\nPesto alla genovese , commonly abbreviated to pesto in English, is an aromatic green condiment made from basil. It is traditionally made using a mortar and pestle to achieve a creamier end result, though it is now often made in a food processor as a shortcut. It is frequently used as a pasta sauce.\nComposition\nIn its most traditional formulation, pesto is made from basil, garlic, parmesan or pecorino cheese, pine nuts, and olive oil. Variations, however, may substitute other leafy greens for the basil and cheaper nuts for the pine nuts.\nRecipes\nPesto I\nPesto II\nNettle Pesto\nSting'in Nettle Pesto\nCookbook:Spinach Pesto Linguine\nExternal links\nhttps://www.seriouseats.com/best-pesto-recipe\nhttps://www.foodnetwork.com/how-to/packages/food-network-essentials/what-is-pesto\nhttp"
+   ],
+   "expect": {
+    "contains": {
+     "ingredients": [
+      "saffron"
+     ]
+    }
+   },
+   "notes": "target Risotto_alla_Milanese inside ~4000 chars of other recipes"
+  },
+  {
+   "id": "lc-4k-07",
+   "turns": [
+    "Request: the recipe for Spaghetti alla Carbonara.\n\nPage text:\n\nSpaghetti alla Carbonara Servings 6 Time 1 hour Difficulty\nCookbook | Recipes | Ingredients | Equipment | Techniques | Cookbook Disambiguation Pages | Recipes | Pasta | Cuisine of Italy\nSpaghetti alla carbonara (literally \"charcoal burners' spaghetti\" in Italian) is an Italian pasta dish made with eggs, pecorino romano, guanciale and black pepper . It was created in the middle of the 20th century. [ 1 ] Like most recipes, the origins of the dish are obscure but there are many legends. As 'carbonara' literally means 'coal miner's wife', some believe that the dish was first made as a hearty meal for Italian coal miners. Others say that it was originally made over charcoal grills, or that it was made with squid ink, giving it the color of coal. It has even been suggested that it was created by, or as a tribute to, the \"charcoalmen\", a secret society prominent in the unification of Italy. Also, the name may be from a Roman restaurant named Carbonara. [ 2 ] [ 3 ]\nRecipes vary, though all agree that pecorino romano, eggs, cured fatty pork, and black pepper are the basics. The pork is fried in fat ( olive oil or lard). Then, a mixture of eggs, cheese and olive oil is combined with the hot pasta, thereby cooking the eggs. All of the ingredients are then mixed together. [ 1 ] [ 4 ] [ 5 ] Guanciale is the most traditional cured pork cut for this recipe, but pancetta is a popular substitute. [ 6 ] [ 7 ] In the US, it is often made with American bacon.\nCream is not common in traditional Italian recipes, but is common in carbonara recipes from other countries such as the United States, [ 8 ] [ 9 ] France, the United Kingdom, [ 10 ] Australia, [ 11 ] and Russia (especially Moscow). Italian Chef Luigi Carnacina, however, used cream in his recipe. [ 12 ] Other Anglo/Franco variations on carbonara may include peas, broccoli or other vegetables added for colour. [ 9 ] Yet another American version includes mushrooms . Many of these preparations have more sauce than the Italian versions. [ 13 ] In all versions of the recipe, raw eggs are added to the sauce and cook with the heat of the pasta.\nIngredients\n450 g (1 pound ) spaghetti\n225–500 g (½–1 pound) guanciale or pancetta\n5 egg yolks\n178 ml (¾ cup ) grated Pecorino Romano cheese\n178 ml (¾ cup) grated Parmigiano-Reggiano cheese\n3–4 tablespoons extra-virgin olive oil\n½ tablespoon freshly-ground pepper\nSalt\nEquipment\nLarge pot\nLarge skillet\nBowl\nMeasuring cups and spoons\nFork\nProcedure\nDice the guanciale or pancetta into 2.5 cm (1- inch ) pieces.\nBring a big pot of water to a boil and add salt to taste when it begins to simmer .\nCook the spaghetti until it is al dente and drain it, reserving 1 cup of water.\nWhile spaghetti is cooking, heat the olive oil in a large skillet over a medium-high heat. When the oil is hot, add the pancetta and cook for about 10 minutes over a low flame until the pancetta has rendered most of its fat but is still chewy and barely browned.\nIn a bowl, slowly whisk about ½ cup of the pasta water into the egg yolks. Add the grated cheese and mix thoroughly with a fork.\nStrain the spaghetti and transfer it immediately to the skillet with the pancetta. Toss it and turn off the heat.\nAdd the egg and cheese mixture to the pasta while stirring in the remaining pasta water to help thin the sauce and create an emulsion.\nAdd the pepper and toss all the ingredients to coat the pasta.\nNotes, tips, and variations\nIdeally this dish is served with a red wine (Merlot, Chianti, Montepulciano d’Abruzzo), allowed to decant for several hours, and served at 65°F (18°C).\nSee also\nCarbonara pasta\nReferences\n↑ a b Alberini, Massimo; Mistretta, Giorgio (1984). Guida all'Italia gastronomica . Touring Club Italiano. p. 286.\n↑ Mariani, Galina; Mariani, Galina; Tedeschi, Laura (2000). The Italian-American cookbook: a feast of food from a great American cooking tradition . Harvard Common. pp. 140–41. ISBN   9781558321663 .\n↑ Davidson, Alan (1999). Oxford Companion to Food . Oxford: Oxford UP. p. 740. "
+   ],
+   "expect": {
+    "contains": {
+     "ingredients": [
+      "guanciale"
+     ]
+    }
+   },
+   "notes": "target Spaghetti_alla_Carbonara inside ~4000 chars of other recipes"
+  }
+ ]
+}

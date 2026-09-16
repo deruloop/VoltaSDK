@@ -9,7 +9,9 @@ field and the reason using the terms below.
 
 A task is a JSON file (`task.schema.json` next to this document validates
 one) or, in Swift, an `EvalTask` built with typed initializers; the two are
-the same data. `EvalTask.examples` returns two small ones to copy.
+the same data. `EvalTask.examples` returns the shipped examples to copy:
+two small ones (city facts, a packing list kept across turns) and five
+long-context ones at growing page lengths.
 
 ## 1. Top level
 

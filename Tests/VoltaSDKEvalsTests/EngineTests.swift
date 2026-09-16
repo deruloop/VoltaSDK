@@ -570,3 +570,42 @@ struct TaskFormatTests {
         }
     }
 }
+
+// MARK: - Mid-conversation handoff (Q12/Q13)
+
+@Suite("Handoff between providers mid-conversation")
+struct HandoffTests {
+    @Test("Turns after the handoff go to the second provider with the history carried over")
+    func handoff() async throws {
+        guard #available(iOS 27.0, macOS 27.0, *) else { return }
+        let task = try EvalTask.example("example.packing-list")
+        let seenByB = Mutex<[(prompt: String, historyCount: Int)]>([])
+        let a = ScriptedProvider { prompt in
+            let word = prompt.split(separator: " ").last!.lowercased()
+            return "{\"items\":[\"\(word)\"],\"note\":\"Noted.\"}"
+        }
+        let b = MockProvider(identifier: .privateCloudCompute, privacyLevel: .appleCloud,
+                             outcome: .success("{\"items\":[\"towel\",\"sunscreen\",\"passport\",\"charger\",\"books\",\"headphones\",\"flip flops\",\"tickets\",\"sunglasses\",\"hat\",\"raincoat\",\"boots\",\"camera\",\"tripod\"],\"note\":\"Kept.\"}")) { prompt, _, history in
+            seenByB.withLock { $0.append((prompt, history.count)) }
+        }
+        let evaluation = TaskEvaluation(task: task, provider: a, mode: .raw, handoff: .init(afterTurn: 1, to: b))
+        #expect(evaluation.tier == "on-device>private-cloud-compute")
+        let result = try await evaluation.run()
+        let calls = seenByB.withLock { $0 }
+        #expect(calls.count == task.samples.count)                       // every second turn went to B
+        #expect(calls.allSatisfy { $0.historyCount == 2 })               // with turn 1 as history
+        #expect(calls.first?.prompt.hasPrefix("List so far: [") == true) // and the carry template applied
+        #expect(result.aggregateValue(.mean(of: Metric("retention"))) == 1.0)
+        let outcome = try #require(result.detailed[evaluation.responseColumn.name, ModelSubject<EvalOutcome>.self].first??.value)
+        #expect(outcome.turns.map(\.provider) == ["on-device", "private-cloud-compute"])
+    }
+
+    @Test("The long-context examples validate and grow as intended")
+    func longContextExamples() throws {
+        let tasks = try EvalTask.examples.filter { $0.id.hasPrefix("example.long-context") }
+        #expect(tasks.count == 5)
+        for task in tasks { #expect(task.validate().isEmpty, "\(task.id): \(task.validate())") }
+        let lengths = tasks.map { $0.samples[0].turns[0].count }.sorted()
+        #expect(lengths.first! < 2100 && lengths.last! > 16000)
+    }
+}

@@ -424,6 +424,25 @@ exercised by a working harness.
   through the shared `ProviderError(LanguageModelError)` now. Operational
   rule for device runs: keep the iPhone unlocked with the host app in the
   foreground; the on-device model rate-limits background callers.
+- **The two chain questions, measured (Sep 16, 2026).** *Parity on
+  fallback (Q12/Q13):* the engine reproduces the chain's mid-conversation
+  handoff (`TaskEvaluation(handoff:)`, sweep `VOLTA_EVAL_HANDOFF_TO`) — turn
+  1 on one tier, later turns on another with the app-owned history carried
+  (D12). Structured mode, three two-turn tasks (8 samples each): on-device →
+  PCC 24/24; PCC → on-device 22/24, the two misses being one real small-model
+  slip (a new item dropped, an old one duplicated) and one grader spelling
+  strictness ("burro di arachidi" vs "d'arachidi"). Quality holds across the
+  handoff; the D12 discipline is what makes it hold. *Long context (the D7
+  amendment):* five example tasks hide one recipe among others at 2k–16k
+  characters. On-device, STRUCTURED: 7/7 at 2k, 4k, 8k, and 12k; at 16k the
+  window closes (availability 0%, no answers). RAW: 5/7 at 2k, 1/7 at 4k
+  and 8k, 0/7 at 12k — long input wrecks the JSON shape, not the reading.
+  So the belief behind the Sep 2026 amendment ("on-device isn't trusted for
+  long-context work") is a shape failure that structured output removes;
+  the real limit is the 4096-token window. **The `.largeContext` ordering
+  (on-device last) is therefore a user decision to revisit**, not changed
+  here: with structured output on-device is reliable up to its window, and
+  the D13 pre-flight already skips it beyond.
 - **The engine (built Sep 14, 2026; `docs/evals/README.md` is the manual).**
   A generic triple — task = schema (`OutputSchema`, D21) + dataset + graders,
   as JSON — run through one tier at a time (`EvalTier`: on-device, PCC,

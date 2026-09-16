@@ -43,6 +43,14 @@ iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
   meal-assistant tasks on the Mac's on-device model): structured output
   takes schema validity from 0% to 100% and two-turn item retention from
   unmeasurable to 100%; the remaining failures are content, not shape.
+- **The two suites the chain owed itself.** A mid-conversation handoff in
+  the engine (`TaskEvaluation(…, handoff:)`, sweep variable
+  `VOLTA_EVAL_HANDOFF_TO`): later turns go to another provider with the
+  history carried across, measuring parity on fallback (Q12/Q13). Five
+  long-context example tasks (`example.long-context-2k` … `-16k`) that hide
+  one recipe among others, measuring where a tier stops finding it and
+  where its window closes (the D7-amendment belief). The multi-turn example
+  grew to eight samples.
 - **The capability map gates the chain at runtime (D22).**
   `AIConfiguration.capabilities` takes the evaluation engine's
   `capability-map.json` (`MeasuredCapabilities`), and every entry point

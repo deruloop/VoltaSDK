@@ -453,9 +453,12 @@ available); D18's logging makes any further crossing visible.
     "Unlock iPhone to Continue"). NEXT: cloud tiers + live judge once keys are provided; the
     real-iPhone row via `iOSDemoEvals`; ~~the SDK query on the map~~ ✅
     D22 (Sep 16, my design call per the user: `TaskRequirement` + `capabilities`,
-    Raviolo is the first adopter); the two SDK suites still owed —
-    parity on fallback (Q12/Q13) and the on-device long-context threshold
-    (the D7-amendment belief); Part 4 article ("How Good Is Good Enough?
+    Raviolo is the first adopter); ~~the two SDK suites still owed~~ ✅
+    (Sep 16: handoff parity on-device→PCC 24/24, PCC→on-device 22/24;
+    long context on-device structured 7/7 up to 12k chars, window closes at
+    16k, raw collapses after 2k — **the D7-amendment belief is a shape
+    failure, not a reading failure; revisiting `.largeContext` ordering is
+    the user's call**, see design doc §8); Part 4 article ("How Good Is Good Enough?
     Evaluating a Model You Can't Unit-Test", first version Sep 16) lives
     OUTSIDE the repo at `~/Documents/Articles/voltasdk-part4/` by the
     user's decision — nothing article-related under this checkout.

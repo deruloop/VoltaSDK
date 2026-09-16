@@ -173,6 +173,19 @@ Modes (`VOLTA_EVAL_MODES`): `raw` (the app's prompt, verbatim: the raw
 ceiling), `structured` (the SDK's `respondStructured` with the task schema,
 no repair), `structured+repair` (one repair turn).
 
+**Handoff (parity on fallback).** `VOLTA_EVAL_HANDOFF_TO=<tier>` also runs
+every multi-turn task with turns after the first on that tier, the
+app-owned history carried across, exactly what the chain does when it falls
+back mid-conversation. The row is keyed `<tier>><handoff tier>` (for
+example `on-device>pcc`), so the map shows whether quality holds when the
+answer silently moves providers. In code: `TaskEvaluation(task:provider:
+mode:handoff: .init(afterTurn: 1, to: otherProvider))`.
+
+**Long context.** The engine ships five example tasks,
+`example.long-context-2k` … `-16k`, that hide one recipe among others at
+growing page lengths; run against a tier they show where it stops finding
+the target and where the context window closes (reported as availability).
+
 ## VoltaSDK's own sweep (the environment-variable runner)
 
 `EvalRunner` runs every task in a directory against every tier this process

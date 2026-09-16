@@ -31,6 +31,20 @@ public struct TaskEvaluation: Evaluation {
     public let judgeEvaluator: (any EvaluatorProtocol<FrameworkSample, ModelSubject<EvalOutcome>>)?
     /// Cap on samples per run (quick iterations); nil = the whole dataset.
     public let limit: Int?
+    /// Mid-conversation handoff (the chain's fallback, reproduced on purpose):
+    /// turns after `afterTurn` go to `to` instead of `provider`, with the
+    /// app-owned history carried across (D12). Measures whether quality
+    /// holds when the answer silently moves providers — open question
+    /// Q12/Q13 of the iOS 27 design.
+    public struct Handoff: Sendable {
+        public let afterTurn: Int
+        public let to: any ModelProvider
+        public init(afterTurn: Int = 1, to: any ModelProvider) {
+            self.afterTurn = afterTurn
+            self.to = to
+        }
+    }
+    public let handoff: Handoff?
 
     /// The adopter's entry point: a task against one provider, in one mode.
     ///
@@ -45,15 +59,18 @@ public struct TaskEvaluation: Evaluation {
         mode: EvalMode = .raw,
         tierLabel: String? = nil,
         judge: JudgeConfiguration? = nil,
-        limit: Int? = nil
+        limit: Int? = nil,
+        handoff: Handoff? = nil
     ) {
         self.task = task
         self.provider = provider
         self.mode = mode
-        self.tier = tierLabel ?? provider.identifier.rawValue
+        let base = tierLabel ?? provider.identifier.rawValue
+        self.tier = handoff.map { base + ">" + $0.to.identifier.rawValue } ?? base
         self.tierLabel = self.tier
         self.judgeEvaluator = judge?.makeEvaluator(for: task, vendorUnderTest: (provider as? CloudVendorIdentifying)?.cloudVendor)
         self.limit = limit
+        self.handoff = handoff
     }
 
     /// The sweep's entry point: a named tier (see `EvalTier`).
@@ -72,6 +89,29 @@ public struct TaskEvaluation: Evaluation {
         self.tierLabel = tier.label()
         self.judgeEvaluator = judgeEvaluator
         self.limit = limit
+        self.handoff = nil
+    }
+
+    /// The sweep's entry point with a handoff: turns after the first go to
+    /// another tier.
+    public init(
+        task: EvalTask,
+        tier: EvalTier,
+        mode: EvalMode,
+        provider: any ModelProvider,
+        handoffTier: EvalTier,
+        handoffProvider: any ModelProvider,
+        judgeEvaluator: (any EvaluatorProtocol<FrameworkSample, ModelSubject<EvalOutcome>>)? = nil,
+        limit: Int? = nil
+    ) {
+        self.task = task
+        self.provider = provider
+        self.mode = mode
+        self.tier = tier.rawValue + ">" + handoffTier.rawValue
+        self.tierLabel = tier.label() + " → " + handoffTier.label()
+        self.judgeEvaluator = judgeEvaluator
+        self.limit = limit
+        self.handoff = Handoff(afterTurn: 1, to: handoffProvider)
     }
 
     public var name: String { "\(task.id) @ \(tierLabel) [\(mode)]" }
@@ -87,6 +127,10 @@ public struct TaskEvaluation: Evaluation {
     public func subject(from framework: FrameworkSample) async throws -> ModelSubject<EvalOutcome> {
         let sample = framework.sample
         let kit = AIOrchestrator(providers: [provider])
+        // With a handoff, later turns run on a second one-provider chain; the
+        // history built so far is what crosses over (D12: every call is
+        // self-contained, so the second provider sees the conversation as its own).
+        let handoffKit = handoff.map { AIOrchestrator(providers: [$0.to]) }
         var turns: [EvalOutcome.TurnOutcome] = []
         var history: [ChatTurn] = []
         var previousValue: JSONValue? = nil
@@ -108,6 +152,7 @@ public struct TaskEvaluation: Evaluation {
 
             var turn = EvalOutcome.TurnOutcome(prompt: prompt, carriedFromCanonicalState: carriedFromCanonical)
             let started = Date()
+            let kit = (handoff.map { index >= $0.afterTurn } ?? false) ? handoffKit! : kit
             do {
                 switch mode {
                 case .raw:
@@ -138,7 +183,7 @@ public struct TaskEvaluation: Evaluation {
                     // Model output, just not conforming: keep it for the graders.
                     turn.text = raw
                     turn.value = (try? JSONValue.extractObject(from: raw))?.value
-                    turn.provider = provider.identifier.rawValue
+                    turn.provider = ((handoff.map { index >= $0.afterTurn } ?? false) ? handoff!.to : provider).identifier.rawValue
                 }
             } catch {
                 turn.error = String(describing: error)
