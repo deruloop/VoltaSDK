@@ -84,7 +84,11 @@ Example with two shapes:
 A grader is `{ "kind": "<kind>", "params": { … } }`. `params` may be
 omitted when the grader takes none. Every grader accepts an optional
 `params.name` that renames its metric column (default: the kind, plus
-`:<path>` when a path is given). All graders look at the last turn's
+`:<path>` when a path is given), and an optional `params.whenPrompt`, a
+case-insensitive regex: the grader applies only to samples whose typed
+input matches it and is ignored for the others (a recipe page with no
+amounts cannot yield amount-like quantities). In Swift,
+`.elementsMatch(...).when(promptMatches: "\\d")`. All graders look at the last turn's
 answer; `retention` looks at the first and the last.
 
 | kind | params | Passes when | Swift |

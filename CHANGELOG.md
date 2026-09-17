@@ -31,7 +31,10 @@ iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
   (2k–16k characters); rate-limited turns are retried after the provider's
   `retryAfter` (`rateLimitRetries`, default 4) so a free-tier key still
   yields a full row; a hosted bundle without a task folder of its own
-  measures the shipped examples.
+  measures the shipped examples. Any grader takes `whenPrompt`, a regex on
+  the typed input: the rule applies only where the input makes it
+  answerable (a recipe page without amounts cannot yield amount-like
+  quantities; the first PCC rows were penalised for leaving them empty).
 - **Evaluation engine (D20), as a library.** The new `VoltaSDKEvals`
   product is added to an app's test target: `EvalTask` (JSON or Swift),
   `TaskEvaluation(task:provider:mode:)` conforming to Apple's `Evaluation`,

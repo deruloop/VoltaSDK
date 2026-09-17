@@ -520,6 +520,37 @@ struct ScriptedProvider: ModelProvider {
 }
 
 
+@Suite("Input-conditioned graders")
+struct WhenPromptTests {
+    @Test("A grader with whenPrompt is ignored when the input does not match")
+    func whenPrompt() throws {
+        guard #available(iOS 27.0, macOS 27.0, *) else { return }
+        let task = EvalTask(
+            id: "t", title: "t", instructions: "i",
+            schema: .object(name: "R", properties: [.init("quantities", .array(of: .string()))]),
+            graders: [.elementsMatch(path: "quantities", pattern: "\\d").when(promptMatches: "\\d")],
+            samples: [
+                EvalSample(id: "with", turns: ["200 g flour and 2 eggs"]),
+                EvalSample(id: "without", turns: ["a pinch of everything"]),
+            ]
+        )
+        let answer = EvalOutcome(
+            turns: [.init(prompt: "", text: "{\"quantities\":[\"some\"]}", value: .object(["quantities": .array([.string("some")])]))],
+            tier: "t", mode: "raw"
+        )
+        func failing(_ metrics: [Metric], _ name: String) -> Bool {
+            guard let metric = metrics.first(where: { $0.name == name }) else { return false }
+            if case .failing = metric.value { return true }
+            return false
+        }
+        let with = Graders.grade(task: task, sample: task.samples[0], outcome: answer)
+        let without = Graders.grade(task: task, sample: task.samples[1], outcome: answer)
+        #expect(failing(with, "pass"))
+        #expect(!failing(without, "pass"))
+        #expect(without.first { $0.name == "elements-match:quantities" }?.rationale?.contains("whenPrompt") == true)
+    }
+}
+
 /// A provider whose answer closure may throw, for infrastructure failures.
 struct FlakyProvider: ModelProvider {
     let identifier = ProviderIdentifier.onDevice

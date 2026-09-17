@@ -109,6 +109,19 @@ public enum Graders {
         let text = turn.text ?? ""
         let value = turn.value
 
+        // A grader conditioned on the input: when no typed turn matches the
+        // pattern, the rule does not apply to this sample (a page with no
+        // quantities cannot yield shopping-friendly quantities).
+        if let condition = spec.string("whenPrompt") {
+            guard let regex = try? NSRegularExpression(pattern: condition, options: [.caseInsensitive]) else {
+                return metric.ignore(rationale: "invalid whenPrompt pattern")
+            }
+            let applies = sample.turns.contains { typed in
+                regex.firstMatch(in: typed, range: NSRange(typed.startIndex..., in: typed)) != nil
+            }
+            if !applies { return metric.ignore(rationale: "input does not match whenPrompt") }
+        }
+
         switch spec.kind {
         case "json-only":
             return jsonOnly(metric, text: text, allowFences: spec.bool("allowFences") ?? true)

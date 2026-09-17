@@ -1,175 +1,527 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/deruloop/VoltaSDK/docs/evals/task.schema.json",
-  "title": "VoltaSDKEvals task",
-  "description": "One model feature of an app, described so VoltaSDKEvals can measure it. See TASK-FORMAT.md.",
-  "type": "object",
-  "required": ["id", "title", "schemaVersion", "instructions", "graders", "samples"],
-  "additionalProperties": false,
-  "properties": {
-    "id": { "type": "string", "minLength": 1, "description": "Stable identifier, e.g. myapp.meal-record" },
-    "title": { "type": "string", "minLength": 1 },
-    "schemaVersion": { "type": "string", "minLength": 1 },
-    "instructions": { "type": "string", "minLength": 1, "description": "The system instructions verbatim, as the app sends them" },
-    "language": { "type": "string", "description": "BCP-47 language of the prose fields (it, en, …)" },
-    "schema": { "$ref": "#/$defs/outputSchema" },
-    "carry": {
-      "type": "object",
-      "required": ["template"],
-      "additionalProperties": false,
-      "properties": { "template": { "type": "string", "minLength": 1 } }
-    },
-    "graders": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/grader" } },
-    "judge": {
-      "type": "object",
-      "required": ["dimensions"],
-      "additionalProperties": false,
-      "properties": {
-        "instructions": { "type": "string" },
-        "dimensions": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "object",
-            "required": ["name"],
-            "additionalProperties": false,
-            "properties": {
-              "name": { "type": "string", "minLength": 1 },
-              "description": { "type": "string" },
-              "scale": { "type": "object", "additionalProperties": { "type": "string" } }
-            }
-          }
-        }
-      }
-    },
-    "samples": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/sample" } }
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://github.com/deruloop/VoltaSDK/docs/evals/task.schema.json",
+ "title": "VoltaSDKEvals task",
+ "description": "One model feature of an app, described so VoltaSDKEvals can measure it. See TASK-FORMAT.md.",
+ "type": "object",
+ "required": [
+  "id",
+  "title",
+  "schemaVersion",
+  "instructions",
+  "graders",
+  "samples"
+ ],
+ "additionalProperties": false,
+ "properties": {
+  "id": {
+   "type": "string",
+   "minLength": 1,
+   "description": "Stable identifier, e.g. myapp.meal-record"
   },
-  "$defs": {
-    "outputSchema": {
-      "type": "object",
-      "required": ["type"],
-      "properties": {
-        "type": { "enum": ["object", "string", "number", "integer", "boolean", "array", "anyOf"] },
-        "description": { "type": "string" }
-      },
-      "allOf": [
-        {
-          "if": { "properties": { "type": { "const": "object" } } },
-          "then": {
-            "required": ["name", "properties"],
-            "properties": {
-              "name": { "type": "string", "minLength": 1 },
-              "properties": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": ["name", "schema"],
-                  "additionalProperties": false,
-                  "properties": {
-                    "name": { "type": "string", "minLength": 1 },
-                    "description": { "type": "string" },
-                    "optional": { "type": "boolean" },
-                    "schema": { "$ref": "#/$defs/outputSchema" }
-                  }
-                }
-              }
-            }
-          }
-        },
-        {
-          "if": { "properties": { "type": { "const": "string" } } },
-          "then": {
-            "properties": {
-              "enum": { "type": "array", "minItems": 1, "items": { "type": "string" } },
-              "pattern": { "type": "string" }
-            }
-          }
-        },
-        {
-          "if": { "properties": { "type": { "const": "array" } } },
-          "then": {
-            "required": ["items"],
-            "properties": {
-              "items": { "$ref": "#/$defs/outputSchema" },
-              "min": { "type": "integer", "minimum": 0 },
-              "max": { "type": "integer", "minimum": 0 }
-            }
-          }
-        },
-        {
-          "if": { "properties": { "type": { "const": "anyOf" } } },
-          "then": {
-            "required": ["name", "choices"],
-            "properties": {
-              "name": { "type": "string", "minLength": 1 },
-              "choices": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/outputSchema" } }
-            }
-          }
-        }
-      ]
-    },
-    "grader": {
-      "type": "object",
-      "required": ["kind"],
-      "additionalProperties": false,
-      "properties": {
-        "kind": {
-          "enum": ["json-only", "schema", "required", "forbidden-fields", "expect-fields", "expect-contains",
-                   "expect-shape", "language", "forbidden-patterns", "elements-match", "claimed-action", "retention"]
-        },
-        "params": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "name": { "type": "string", "description": "Custom metric name" },
-            "allowFences": { "type": "boolean" },
-            "paths": { "type": "array", "minItems": 1, "items": { "type": "string" } },
-            "path": { "type": "string" },
-            "language": { "type": "string" },
-            "minWords": { "type": "integer", "minimum": 1 },
-            "patterns": { "type": "array", "minItems": 1, "items": { "type": "string" } },
-            "pattern": { "type": "string" },
-            "minFraction": { "type": "number", "minimum": 0, "maximum": 1 },
-            "field": { "type": "string" },
-            "keepItems": { "type": "string" },
-            "keepStates": { "type": "string" },
-            "from": { "type": "string" },
-            "notTo": { "type": "string" }
-          }
-        }
-      },
-      "allOf": [
-        { "if": { "properties": { "kind": { "enum": ["required", "forbidden-fields"] } } },
-          "then": { "required": ["params"], "properties": { "params": { "required": ["paths"] } } } },
-        { "if": { "properties": { "kind": { "const": "forbidden-patterns" } } },
-          "then": { "required": ["params"], "properties": { "params": { "required": ["patterns"] } } } },
-        { "if": { "properties": { "kind": { "const": "elements-match" } } },
-          "then": { "required": ["params"], "properties": { "params": { "required": ["path", "pattern"] } } } },
-        { "if": { "properties": { "kind": { "const": "claimed-action" } } },
-          "then": { "required": ["params"], "properties": { "params": { "required": ["field", "patterns"] } } } },
-        { "if": { "properties": { "kind": { "const": "retention" } } },
-          "then": { "required": ["params"], "properties": { "params": { "anyOf": [ { "required": ["keepItems"] }, { "required": ["keepStates", "from", "notTo"] } ] } } } }
-      ]
-    },
-    "sample": {
-      "type": "object",
-      "required": ["id", "turns"],
-      "additionalProperties": false,
-      "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "turns": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
-        "expect": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "fields": { "type": "object", "additionalProperties": { "type": "array", "minItems": 1, "items": { "type": "string" } } },
-            "contains": { "type": "object", "additionalProperties": { "type": "array", "minItems": 1, "items": { "type": "string" } } },
-            "shape": { "type": "string", "minLength": 1 }
-          }
-        },
-        "canonicalState": {},
-        "notes": { "type": "string" }
-      }
+  "title": {
+   "type": "string",
+   "minLength": 1
+  },
+  "schemaVersion": {
+   "type": "string",
+   "minLength": 1
+  },
+  "instructions": {
+   "type": "string",
+   "minLength": 1,
+   "description": "The system instructions verbatim, as the app sends them"
+  },
+  "language": {
+   "type": "string",
+   "description": "BCP-47 language of the prose fields (it, en, …)"
+  },
+  "schema": {
+   "$ref": "#/$defs/outputSchema"
+  },
+  "carry": {
+   "type": "object",
+   "required": [
+    "template"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "template": {
+     "type": "string",
+     "minLength": 1
     }
+   }
+  },
+  "graders": {
+   "type": "array",
+   "minItems": 1,
+   "items": {
+    "$ref": "#/$defs/grader"
+   }
+  },
+  "judge": {
+   "type": "object",
+   "required": [
+    "dimensions"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "instructions": {
+     "type": "string"
+    },
+    "dimensions": {
+     "type": "array",
+     "minItems": 1,
+     "items": {
+      "type": "object",
+      "required": [
+       "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+       "name": {
+        "type": "string",
+        "minLength": 1
+       },
+       "description": {
+        "type": "string"
+       },
+       "scale": {
+        "type": "object",
+        "additionalProperties": {
+         "type": "string"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "samples": {
+   "type": "array",
+   "minItems": 1,
+   "items": {
+    "$ref": "#/$defs/sample"
+   }
   }
+ },
+ "$defs": {
+  "outputSchema": {
+   "type": "object",
+   "required": [
+    "type"
+   ],
+   "properties": {
+    "type": {
+     "enum": [
+      "object",
+      "string",
+      "number",
+      "integer",
+      "boolean",
+      "array",
+      "anyOf"
+     ]
+    },
+    "description": {
+     "type": "string"
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "type": {
+        "const": "object"
+       }
+      }
+     },
+     "then": {
+      "required": [
+       "name",
+       "properties"
+      ],
+      "properties": {
+       "name": {
+        "type": "string",
+        "minLength": 1
+       },
+       "properties": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "required": [
+          "name",
+          "schema"
+         ],
+         "additionalProperties": false,
+         "properties": {
+          "name": {
+           "type": "string",
+           "minLength": 1
+          },
+          "description": {
+           "type": "string"
+          },
+          "optional": {
+           "type": "boolean"
+          },
+          "schema": {
+           "$ref": "#/$defs/outputSchema"
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "type": {
+        "const": "string"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "enum": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+         "type": "string"
+        }
+       },
+       "pattern": {
+        "type": "string"
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "type": {
+        "const": "array"
+       }
+      }
+     },
+     "then": {
+      "required": [
+       "items"
+      ],
+      "properties": {
+       "items": {
+        "$ref": "#/$defs/outputSchema"
+       },
+       "min": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "max": {
+        "type": "integer",
+        "minimum": 0
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "type": {
+        "const": "anyOf"
+       }
+      }
+     },
+     "then": {
+      "required": [
+       "name",
+       "choices"
+      ],
+      "properties": {
+       "name": {
+        "type": "string",
+        "minLength": 1
+       },
+       "choices": {
+        "type": "array",
+        "minItems": 2,
+        "items": {
+         "$ref": "#/$defs/outputSchema"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "grader": {
+   "type": "object",
+   "required": [
+    "kind"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "kind": {
+     "enum": [
+      "json-only",
+      "schema",
+      "required",
+      "forbidden-fields",
+      "expect-fields",
+      "expect-contains",
+      "expect-shape",
+      "language",
+      "forbidden-patterns",
+      "elements-match",
+      "claimed-action",
+      "retention"
+     ]
+    },
+    "params": {
+     "type": "object",
+     "additionalProperties": false,
+     "properties": {
+      "name": {
+       "type": "string",
+       "description": "Custom metric name"
+      },
+      "allowFences": {
+       "type": "boolean"
+      },
+      "paths": {
+       "type": "array",
+       "minItems": 1,
+       "items": {
+        "type": "string"
+       }
+      },
+      "path": {
+       "type": "string"
+      },
+      "language": {
+       "type": "string"
+      },
+      "minWords": {
+       "type": "integer",
+       "minimum": 1
+      },
+      "patterns": {
+       "type": "array",
+       "minItems": 1,
+       "items": {
+        "type": "string"
+       }
+      },
+      "pattern": {
+       "type": "string"
+      },
+      "minFraction": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1
+      },
+      "field": {
+       "type": "string"
+      },
+      "keepItems": {
+       "type": "string"
+      },
+      "keepStates": {
+       "type": "string"
+      },
+      "from": {
+       "type": "string"
+      },
+      "notTo": {
+       "type": "string"
+      },
+      "whenPrompt": {
+       "type": "string",
+       "description": "Regex (case-insensitive); the grader applies only to samples whose typed input matches it"
+      }
+     }
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "kind": {
+        "enum": [
+         "required",
+         "forbidden-fields"
+        ]
+       }
+      }
+     },
+     "then": {
+      "required": [
+       "params"
+      ],
+      "properties": {
+       "params": {
+        "required": [
+         "paths"
+        ]
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "kind": {
+        "const": "forbidden-patterns"
+       }
+      }
+     },
+     "then": {
+      "required": [
+       "params"
+      ],
+      "properties": {
+       "params": {
+        "required": [
+         "patterns"
+        ]
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "kind": {
+        "const": "elements-match"
+       }
+      }
+     },
+     "then": {
+      "required": [
+       "params"
+      ],
+      "properties": {
+       "params": {
+        "required": [
+         "path",
+         "pattern"
+        ]
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "kind": {
+        "const": "claimed-action"
+       }
+      }
+     },
+     "then": {
+      "required": [
+       "params"
+      ],
+      "properties": {
+       "params": {
+        "required": [
+         "field",
+         "patterns"
+        ]
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "kind": {
+        "const": "retention"
+       }
+      }
+     },
+     "then": {
+      "required": [
+       "params"
+      ],
+      "properties": {
+       "params": {
+        "anyOf": [
+         {
+          "required": [
+           "keepItems"
+          ]
+         },
+         {
+          "required": [
+           "keepStates",
+           "from",
+           "notTo"
+          ]
+         }
+        ]
+       }
+      }
+     }
+    }
+   ]
+  },
+  "sample": {
+   "type": "object",
+   "required": [
+    "id",
+    "turns"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "turns": {
+     "type": "array",
+     "minItems": 1,
+     "items": {
+      "type": "string",
+      "minLength": 1
+     }
+    },
+    "expect": {
+     "type": "object",
+     "additionalProperties": false,
+     "properties": {
+      "fields": {
+       "type": "object",
+       "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "contains": {
+       "type": "object",
+       "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "shape": {
+       "type": "string",
+       "minLength": 1
+      }
+     }
+    },
+    "canonicalState": {},
+    "notes": {
+     "type": "string"
+    }
+   }
+  }
+ }
 }

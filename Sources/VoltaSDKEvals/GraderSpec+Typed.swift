@@ -106,6 +106,14 @@ extension GraderSpec {
         return make("retention", params, name: name)
     }
 
+    /// The same grader, applied only to samples whose typed input matches
+    /// the pattern (case-insensitive); other samples ignore it.
+    public func when(promptMatches pattern: String) -> GraderSpec {
+        var params = self.params ?? [:]
+        params["whenPrompt"] = .string(pattern)
+        return GraderSpec(kind: kind, params: params)
+    }
+
     private static func make(_ kind: String, _ params: [String: JSONValue], name: String?) -> GraderSpec {
         var params = params
         if let name { params["name"] = .string(name) }
