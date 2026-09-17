@@ -520,6 +520,27 @@ struct ScriptedProvider: ModelProvider {
 }
 
 
+@Suite("Cross-field mention")
+struct MentionsTests {
+    @Test("The note must name one of the suggested additions")
+    func mentions() throws {
+        guard #available(iOS 27.0, macOS 27.0, *) else { return }
+        let spec = GraderSpec.mentions(path: "note", of: "completions[].text")
+        func grade(_ note: String) -> Bool {
+            let value: JSONValue = .object([
+                "note": .string(note),
+                "completions": .array([.object(["text": .string("a handful of berries")]), .object(["text": .string("some nuts")])]),
+            ])
+            let metric = Graders.mentions(Metric("m"), spec: spec, value: value)
+            if case .failing = metric.value { return false }
+            return true
+        }
+        #expect(grade("Add a few berries for fiber, or nuts for healthy fats."))
+        #expect(grade("Una manciata di frutti di bosco ci sta bene.") == false)
+        #expect(grade("A creamy base, now sweetened with promise. What next?") == false)
+    }
+}
+
 @Suite("Input-conditioned graders")
 struct WhenPromptTests {
     @Test("A grader with whenPrompt is ignored when the input does not match")
@@ -577,6 +598,7 @@ struct TaskFormatTests {
             .forbiddenFields(paths: ["items"], name: "no-items"), .expectFields(), .expectContains(), .expectShape(),
             .language(path: "note"), .forbiddenPatterns(path: "note", patterns: ["\\d"]),
             .elementsMatch(path: "ingredients", pattern: "\\d", minFraction: 0.6),
+            .mentions(path: "note", of: "completions[].text"),
             .claimedAction(field: "add", patterns: ["added"]),
             .retention(keepItems: "items[].name", keepStates: "states", from: "present", notTo: "missing"),
         ]

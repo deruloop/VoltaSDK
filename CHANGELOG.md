@@ -35,6 +35,9 @@ iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
   the typed input: the rule applies only where the input makes it
   answerable (a recipe page without amounts cannot yield amount-like
   quantities; the first PCC rows were penalised for leaving them empty).
+  A `mentions` grader checks that the text at one path names an element
+  of an array at another (the note names one of the suggested additions),
+  the first rule about whether a reply says anything useful.
 - **Evaluation engine (D20), as a library.** The new `VoltaSDKEvals`
   product is added to an app's test target: `EvalTask` (JSON or Swift),
   `TaskEvaluation(task:provider:mode:)` conforming to Apple's `Evaluation`,

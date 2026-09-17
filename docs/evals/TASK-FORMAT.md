@@ -106,6 +106,7 @@ answer; `retention` looks at the first and the last.
 | `language` | `path`, `language` (BCP-47), `minWords` (default 4) | The text at `path` (or the whole reply) is detected as `language` (default: the task's). Texts under `minWords` words are ignored. | `.language(path:)` |
 | `forbidden-patterns` | `path`, `patterns` (array of regex, required) | No pattern matches the text at `path` (or the whole reply). Case-insensitive. | `.forbiddenPatterns(path:patterns:)` |
 | `elements-match` | `path` (required), `pattern` (required), `minFraction` (default 1.0) | At least that fraction of the array's elements match the regex. | `.elementsMatch(path:pattern:minFraction:)` |
+| `mentions` | `path` (required), `of` (required, an array path) | The text at `path` names at least one element of the array at `of`, by normalized containment or the element's longest word of four letters or more. A note that says "add berries" when the additions include "a handful of berries". | `.mentions(path:of:)` |
 | `claimed-action` | `field` (required), `patterns` (required) | Fails when a pattern matches the reply's text while `field` is absent or an empty array: the model *said* it did something it did not encode. | `.claimedAction(field:patterns:)` |
 | `retention` | `keepItems` (a `[]` path), `keepStates` (object path), `from`, `notTo` | The last turn keeps every `keepItems` value from the first turn; no `keepStates` member drops from `from` to `notTo`. Needs two-turn samples. | `.retention(keepItems:keepStates:from:notTo:)` |
 

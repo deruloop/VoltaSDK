@@ -143,6 +143,8 @@ public enum Graders {
             return forbiddenPatterns(metric, spec: spec, value: value, text: text)
         case "elements-match":
             return elementsMatch(metric, spec: spec, value: value)
+        case "mentions":
+            return mentions(metric, spec: spec, value: value)
         case "claimed-action":
             return claimedAction(metric, spec: spec, value: value, text: text)
         case "retention":
@@ -321,6 +323,29 @@ public enum Graders {
             (try? Regex(pattern).ignoresCase().firstMatch(in: target)) != nil
         }
         return hits.isEmpty ? metric.passing() : metric.failing(rationale: "matched \(hits)")
+    }
+
+    /// The text at `path` names at least one element of the array at `of`
+    /// (normalized containment, or the element's longest word of four or
+    /// more letters): a note that says "add berries" when the suggested
+    /// additions include "a handful of berries".
+    public static func mentions(_ metric: Metric, spec: GraderSpec, value: JSONValue?) -> Metric {
+        guard let path = spec.string("path"), let of = spec.string("of") else {
+            return metric.ignore(rationale: "mentions needs path + of")
+        }
+        guard let value, let field = JSONPath.value(at: path, in: value) else {
+            return metric.failing(rationale: "\(path) missing")
+        }
+        let text = TextNormalizer.normalize(CarryTemplate.plain(field))
+        let elements = (JSONPath.value(at: of, in: value)?.arrayValue ?? []).map { CarryTemplate.plain($0) }
+        if elements.isEmpty { return metric.ignore(rationale: "\(of) is empty") }
+        for element in elements {
+            let whole = TextNormalizer.normalize(element)
+            if !whole.isEmpty, text.contains(whole) { return metric.passing() }
+            let longest = whole.split(separator: " ").map(String.init).filter { $0.count >= 4 }.max { $0.count < $1.count }
+            if let longest, text.contains(longest) { return metric.passing() }
+        }
+        return metric.failing(rationale: "\(path) names none of \(of) (\(elements))")
     }
 
     /// At least `minFraction` (default 1.0) of the array's string elements

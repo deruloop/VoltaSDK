@@ -19,7 +19,7 @@ extension GraderSpec {
     public static let knownKinds: [String] = [
         "json-only", "schema", "required", "forbidden-fields", "expect-fields",
         "expect-contains", "expect-shape", "language", "forbidden-patterns",
-        "elements-match", "claimed-action", "retention",
+        "elements-match", "mentions", "claimed-action", "retention",
     ]
 
     /// The reply is one JSON object with nothing around it. A bare code
@@ -97,6 +97,11 @@ extension GraderSpec {
     /// Multi-turn retention: the values at `keepItems` (a `[]` path) on the
     /// last turn include every value from the first turn; and no member of
     /// the object at `keepStates` drops from `from` to `notTo`.
+    /// The text at `path` names at least one element of the array at `of`.
+    public static func mentions(path: String, of: String, name: String? = nil) -> GraderSpec {
+        make("mentions", ["path": .string(path), "of": .string(of)], name: name)
+    }
+
     public static func retention(keepItems: String? = nil, keepStates: String? = nil, from: String? = nil, notTo: String? = nil, name: String? = nil) -> GraderSpec {
         var params: [String: JSONValue] = [:]
         if let keepItems { params["keepItems"] = .string(keepItems) }

@@ -274,6 +274,7 @@
       "language",
       "forbidden-patterns",
       "elements-match",
+      "mentions",
       "claimed-action",
       "retention"
      ]
@@ -339,6 +340,10 @@
       "whenPrompt": {
        "type": "string",
        "description": "Regex (case-insensitive); the grader applies only to samples whose typed input matches it"
+      },
+      "of": {
+       "type": "string",
+       "description": "Array path whose elements the text at `path` must name (mentions)"
       }
      }
     }
