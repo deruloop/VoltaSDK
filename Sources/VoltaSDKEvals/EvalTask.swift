@@ -238,6 +238,8 @@ public struct EvalOutcome: Codable, Sendable, Equatable {
         public var nativeSchema: Bool?
         public var carriedFromCanonicalState: Bool?
         public var latencySeconds: Double?
+        /// How many rate-limit waits preceded the answer (nil: none).
+        public var rateLimitRetries: Int?
 
         public init(
             prompt: String, text: String? = nil, value: JSONValue? = nil, provider: String? = nil,

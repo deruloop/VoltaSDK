@@ -471,8 +471,11 @@ public struct GeminiProvider: ModelProvider {
             }
             return .unauthorized
         case 429:
-            let retryAfter = RetryAfterParser.parse(http.value(forHTTPHeaderField: "retry-after"))
-            return .rateLimited(retryAfter: retryAfter)
+            // Google rarely sends a Retry-After header; the JSON body carries
+            // a `RetryInfo.retryDelay` ("24s") that says the same thing.
+            let header = RetryAfterParser.parse(http.value(forHTTPHeaderField: "retry-after"))
+            let body = (try? JSONDecoder().decode(GeminiErrorEnvelope.self, from: data))?.error.retryDelay
+            return .rateLimited(retryAfter: header ?? body)
         case 500...599:
             return .network(code: http.statusCode)
         default:
@@ -607,6 +610,17 @@ private struct GeminiErrorEnvelope: Decodable {
         let code: Int
         let message: String
         let status: String?
+        let details: [Detail]?
+
+        struct Detail: Decodable {
+            let retryDelay: String?
+        }
+
+        /// `details[].retryDelay` as seconds ("24s", "1.5s").
+        var retryDelay: TimeInterval? {
+            guard let text = details?.compactMap(\.retryDelay).first, text.hasSuffix("s") else { return nil }
+            return TimeInterval(text.dropLast())
+        }
     }
 }
 

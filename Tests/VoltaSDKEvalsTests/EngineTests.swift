@@ -420,6 +420,32 @@ struct TaskEvaluationTests {
         #expect(result.aggregateValue(.mean(of: Graders.passMetric)) == 1.0)
     }
 
+    @Test("A rate limit is waited out and the sample is still measured")
+    func rateLimitRetry() async throws {
+        guard #available(iOS 27.0, macOS 27.0, *) else { return }
+        let task = try Fixtures.task("example-task.json")
+        // Every call fails twice with a 429 before the model answers, as a
+        // free-tier cloud key does; the row must measure the answer.
+        let calls = Mutex(0)
+        let provider = FlakyProvider { _ in
+            let n = calls.withLock { value -> Int in defer { value += 1 }; return value }
+            if n % 3 < 2 { throw ProviderError.rateLimited(retryAfter: 0.01) }
+            return "{\"city\":\"Rome\",\"country\":\"Italy\",\"continent\":\"Europe\",\"note\":\"Rome wears its centuries lightly and feeds you well.\"}"
+        }
+        var evaluation = TaskEvaluation(task: task, provider: provider, mode: .raw, limit: 1)
+        evaluation.rateLimitRetries = 3
+        let result = try await evaluation.run()
+        #expect(result.aggregateValue(.mean(of: Metric("model-available"))) == 1.0)
+        #expect(calls.withLock { $0 } == 3)
+
+        // Fewer retries than failures: the sample is unavailable, not failed.
+        calls.withLock { $0 = 0 }
+        evaluation.rateLimitRetries = 1
+        let starved = try await evaluation.run()
+        #expect(starved.aggregateValue(.mean(of: Metric("model-available"))) == 0.0)
+        #expect(starved.passRate == 0 && starved.failureReasons.isEmpty)
+    }
+
     @Test("Structured mode runs the SDK path and records native/repaired flags")
     func structuredMode() async throws {
         guard #available(iOS 27.0, macOS 27.0, *) else { return }
@@ -493,6 +519,20 @@ struct ScriptedProvider: ModelProvider {
     }
 }
 
+
+/// A provider whose answer closure may throw, for infrastructure failures.
+struct FlakyProvider: ModelProvider {
+    let identifier = ProviderIdentifier.onDevice
+    let privacyLevel = PrivacyLevel.onDevice
+    let answer: @Sendable (String) throws -> String
+
+    init(answer: @escaping @Sendable (String) throws -> String) { self.answer = answer }
+
+    func availability() async -> ProviderAvailability { .available }
+    func respond(to prompt: String, instructions: String?, history: [ChatTurn]) async throws -> String {
+        try answer(prompt)
+    }
+}
 
 // MARK: - Task format: typed graders, validation, loader errors
 

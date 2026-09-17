@@ -26,6 +26,19 @@ import FoundationModels
 import Testing
 import VoltaSDK
 import VoltaSDKEvals
+#if canImport(UIKit)
+import UIKit
+#endif
+
+/// A hosted run on a phone must keep the screen on: once the display sleeps
+/// the host app is a background process and the system model rate-limits
+/// every call (measured Sep 17, 2026: a whole sweep of `rateLimited`).
+@MainActor
+private func keepDeviceAwake() {
+    #if canImport(UIKit) && !os(watchOS)
+    UIApplication.shared.isIdleTimerDisabled = true
+    #endif
+}
 
 /// Anchors `Bundle(for:)` to THIS test bundle, so a hosted run finds the
 /// task files copied into it.
@@ -69,6 +82,7 @@ struct LiveEvaluations {
 
     @Test("Capability map: every task × reachable tier × mode")
     func capabilityMap() async throws {
+        await keepDeviceAwake()
         guard runner.isLive else {
             let visible = ProcessInfo.processInfo.environment.keys.filter { $0.contains("VOLTA") }.sorted()
             print("[evals] not live (VOLTA_EVAL_LIVE != 1); VOLTA* variables visible to this process: \(visible)")

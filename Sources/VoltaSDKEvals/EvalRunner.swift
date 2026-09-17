@@ -76,7 +76,9 @@ public struct EvalRunner {
                 if FileManager.default.fileExists(atPath: candidate.path) { return candidate }
             }
         }
-        return nil
+        // No task folder of its own: a hosted bundle (a device run of the
+        // demo, say) still measures the engine's shipped examples.
+        return Bundle.module.url(forResource: "Examples", withExtension: nil)
     }
 
     /// Whether the engine runs inside a hosted bundle (an .app host) rather

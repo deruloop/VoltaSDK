@@ -45,6 +45,11 @@ public struct TaskEvaluation: Evaluation {
         }
     }
     public let handoff: Handoff?
+    /// How many times a turn is retried after the provider reports a rate
+    /// limit, waiting `retryAfter` (or 20 s) between attempts. A free-tier
+    /// cloud key allows a handful of requests a minute; without this the
+    /// rows would measure the quota instead of the model.
+    public var rateLimitRetries: Int = 4
 
     /// The adopter's entry point: a task against one provider, in one mode.
     ///
@@ -153,6 +158,8 @@ public struct TaskEvaluation: Evaluation {
             var turn = EvalOutcome.TurnOutcome(prompt: prompt, carriedFromCanonicalState: carriedFromCanonical)
             let started = Date()
             let kit = (handoff.map { index >= $0.afterTurn } ?? false) ? handoffKit! : kit
+            var attempt = 0
+            while true {
             do {
                 switch mode {
                 case .raw:
@@ -176,6 +183,15 @@ public struct TaskEvaluation: Evaluation {
                     turn.repaired = response.repaired
                     turn.nativeSchema = response.nativeSchema
                 }
+                break
+            } catch ProviderError.rateLimited(let retryAfter) where attempt < rateLimitRetries {
+                // Wait the quota out and ask again; the sample is measured
+                // once the model actually answers.
+                attempt += 1
+                turn.rateLimitRetries = attempt
+                let delay = min(max(retryAfter ?? 20, 1), 120)
+                try? await Task.sleep(for: .seconds(delay))
+                continue
             } catch let error as ProviderError {
                 turn.error = String(describing: error)
                 turn.errorKind = Self.kind(of: error)
@@ -185,9 +201,12 @@ public struct TaskEvaluation: Evaluation {
                     turn.value = (try? JSONValue.extractObject(from: raw))?.value
                     turn.provider = ((handoff.map { index >= $0.afterTurn } ?? false) ? handoff!.to : provider).identifier.rawValue
                 }
+                break
             } catch {
                 turn.error = String(describing: error)
                 turn.errorKind = "other"
+                break
+            }
             }
             turn.latencySeconds = Date().timeIntervalSince(started)
             turns.append(turn)

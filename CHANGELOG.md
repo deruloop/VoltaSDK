@@ -24,6 +24,14 @@ iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
   `respondStructured`). Patterns and array bounds are enforced by the SDK
   validator after the call (Apple's dynamic schemas reject a pattern guide
   at generation time). `MockProvider` gains scripted `structuredAnswers`.
+- **Evaluation engine: the chain's own suites and cloud pacing.**
+  `TaskEvaluation(handoff:)` / `VOLTA_EVAL_HANDOFF_TO` reproduce a
+  mid-conversation provider switch (later turns on another provider, the
+  app-owned history carried across); five long-context example tasks
+  (2k–16k characters); rate-limited turns are retried after the provider's
+  `retryAfter` (`rateLimitRetries`, default 4) so a free-tier key still
+  yields a full row; a hosted bundle without a task folder of its own
+  measures the shipped examples.
 - **Evaluation engine (D20), as a library.** The new `VoltaSDKEvals`
   product is added to an app's test target: `EvalTask` (JSON or Swift),
   `TaskEvaluation(task:provider:mode:)` conforming to Apple's `Evaluation`,

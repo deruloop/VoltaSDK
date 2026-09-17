@@ -161,7 +161,11 @@ Infrastructure failures (unsupported language, unavailability, rate limits,
 network, context window) make every grader `ignore` the sample; they are
 reported as `model-available` / `language-accepted` rates instead, so pass
 rates measure the model, never the plumbing. A model-side failure (no JSON,
-malformed after repair, guardrail) is a FAIL.
+malformed after repair, guardrail) is a FAIL. A rate limit is waited out
+first: the turn is retried up to `rateLimitRetries` times (default 4),
+pausing for the provider's `retryAfter` or 20 s, so a free-tier cloud key
+(five requests a minute on Gemini) measures the model, slowly, instead of
+the quota. The outcome records how many waits an answer needed.
 
 ## Tiers and modes
 
@@ -252,6 +256,14 @@ DEVELOPER_DIR=… xcodebuild test -scheme iOSDemoEvals -destination 'id=<udid>' 
   "-only-testing:iOSDemoEvals/LiveEvaluations/capabilityMap()" 2>&1 | tee run.log
 python3 ../../scripts/evals-merge.py run.log ../../docs/evals/results/capability-map.json
 ```
+
+A hosted sweep on a phone keeps the screen on (`isIdleTimerDisabled`)
+for its whole duration: once the display sleeps the host app is a
+background process and the system model answers `rateLimited` to every
+call, which the engine records as unavailability, not failure. Run files
+land in the host app's Documents; pull them with
+`xcrun devicectl device copy from --domain-type appDataContainer
+--domain-identifier <host bundle id> --source Documents/VoltaSDKEvals/results`.
 
 ## Output
 
