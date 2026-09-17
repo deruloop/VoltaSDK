@@ -98,8 +98,10 @@ extension GraderSpec {
     /// last turn include every value from the first turn; and no member of
     /// the object at `keepStates` drops from `from` to `notTo`.
     /// The text at `path` names at least one element of the array at `of`.
-    public static func mentions(path: String, of: String, name: String? = nil) -> GraderSpec {
-        make("mentions", ["path": .string(path), "of": .string(of)], name: name)
+    public static func mentions(path: String, of: String, all: Bool = false, name: String? = nil) -> GraderSpec {
+        var params: [String: JSONValue] = ["path": .string(path), "of": .string(of)]
+        if all { params["all"] = .bool(true) }
+        return make("mentions", params, name: name)
     }
 
     public static func retention(keepItems: String? = nil, keepStates: String? = nil, from: String? = nil, notTo: String? = nil, name: String? = nil) -> GraderSpec {

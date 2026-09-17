@@ -340,13 +340,20 @@ public enum Graders {
         let text = TextNormalizer.normalize(CarryTemplate.plain(field))
         let elements = (JSONPath.value(at: of, in: value)?.arrayValue ?? []).map { CarryTemplate.plain($0) }
         if elements.isEmpty { return metric.ignore(rationale: "\(of) is empty") }
-        for element in elements {
+        func named(_ element: String) -> Bool {
             let whole = TextNormalizer.normalize(element)
-            if !whole.isEmpty, text.contains(whole) { return metric.passing() }
+            if !whole.isEmpty, text.contains(whole) { return true }
             let words = whole.split(separator: " ").map(String.init)
                 .filter { $0.count >= 4 && !TextNormalizer.functionWords.contains($0) }
-            if words.contains(where: { text.contains($0) }) { return metric.passing() }
+            return words.contains(where: { text.contains($0) })
         }
+        // `all`: every element must be named (a list that claims to be "the foods in the
+        // answer" may not invent one); default: at least one.
+        if spec.bool("all") ?? false {
+            let missing = elements.filter { !named($0) }
+            return missing.isEmpty ? metric.passing() : metric.failing(rationale: "\(path) does not name \(missing)")
+        }
+        if elements.contains(where: named) { return metric.passing() }
         return metric.failing(rationale: "\(path) names none of \(of) (\(elements))")
     }
 

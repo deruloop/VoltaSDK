@@ -344,6 +344,10 @@
       "of": {
        "type": "string",
        "description": "Array path whose elements the text at `path` must name (mentions)"
+      },
+      "all": {
+       "type": "boolean",
+       "description": "mentions: every element must be named, not just one"
       }
      }
     }
