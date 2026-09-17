@@ -88,7 +88,10 @@ omitted when the grader takes none. Every grader accepts an optional
 case-insensitive regex: the grader applies only to samples whose typed
 input matches it and is ignored for the others (a recipe page with no
 amounts cannot yield amount-like quantities). In Swift,
-`.elementsMatch(...).when(promptMatches: "\\d")`. All graders look at the last turn's
+`.elementsMatch(...).when(promptMatches: "\\d")`. The negative form is a
+lookahead, `(?s)^(?!.*\\d)`, for a rule that applies only when the input
+lacks something (quantities must be EMPTY when the page gives none, so an
+invented amount is a miss). All graders look at the last turn's
 answer; `retention` looks at the first and the last.
 
 | kind | params | Passes when | Swift |
