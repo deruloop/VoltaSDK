@@ -424,6 +424,16 @@ exercised by a working harness.
   through the shared `ProviderError(LanguageModelError)` now. Operational
   rule for device runs: keep the iPhone unlocked with the host app in the
   foreground; the on-device model rate-limits background callers.
+- **PCC quota exhaustion, observed (Sep 17, 2026, Q15).** After roughly
+  four hundred PCC calls in one day from the entitled macOS host (the
+  Raviolo English and shopping datasets, then repeated recipe runs), every
+  further call failed with `LanguageModelError` mapped to
+  `.rateLimited(retryAfter: nil)`: no retry hint, availability still
+  reported as available beforehand. D6 in practice: the quota is real,
+  runtime-exhaustible, and only visible by calling. The chain's fallback
+  handled it (the eval engine records it as unavailability, the app would
+  move to the next provider). What remains unknown is the exact ceiling
+  and its reset period, both to be read off `quotaUsage` on a future run.
 - **The two chain questions, measured (Sep 16, 2026).** *Parity on
   fallback (Q12/Q13):* the engine reproduces the chain's mid-conversation
   handoff (`TaskEvaluation(handoff:)`, sweep `VOLTA_EVAL_HANDOFF_TO`) — turn

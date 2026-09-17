@@ -264,8 +264,10 @@ Next steps, in order:
    proactive token pre-flight (today PCC opts out → reactive only).
 5. **Deeper PCC runtime validation:** live answering is confirmed (via
    `Examples/macOSDemo`, signed with the granted entitlement). Still to observe
-   on a device: real quota-exhaustion (`.quotaLimitReached` → `.rateLimited`
-   mapping) and `serviceUnavailable`, then fold Q15 (dev vs prod quotas) and
+   on a device: ~~real quota-exhaustion~~ ✅ observed Sep 17, 2026 (after
+   ~400 calls in a day every PCC call came back `.rateLimited(retryAfter:
+   nil)`; ceiling and reset period still unread, see design doc §8) and
+   `serviceUnavailable`, then fold Q15 (dev vs prod quotas) and
    any Q12/Q13 findings into the design doc. Confirmed so far: `availability`/
    `quotaUsage` read fine *without* the entitlement, but the first `respond`
    traps if it's absent — hence the provider's `SecTask` self-gate.
