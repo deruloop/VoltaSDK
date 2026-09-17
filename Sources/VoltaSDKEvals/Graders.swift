@@ -325,10 +325,11 @@ public enum Graders {
         return hits.isEmpty ? metric.passing() : metric.failing(rationale: "matched \(hits)")
     }
 
-    /// The text at `path` names at least one element of the array at `of`
-    /// (normalized containment, or the element's longest word of four or
-    /// more letters): a note that says "add berries" when the suggested
-    /// additions include "a handful of berries".
+    /// The text at `path` names at least one element of the array at `of`:
+    /// normalized containment, or any content word of the element (four or
+    /// more letters, not a function word) appearing in the text. A note that
+    /// says "add berries" names "a handful of berries"; "un filo d'olio"
+    /// names "olio extravergine".
     public static func mentions(_ metric: Metric, spec: GraderSpec, value: JSONValue?) -> Metric {
         guard let path = spec.string("path"), let of = spec.string("of") else {
             return metric.ignore(rationale: "mentions needs path + of")
@@ -342,8 +343,9 @@ public enum Graders {
         for element in elements {
             let whole = TextNormalizer.normalize(element)
             if !whole.isEmpty, text.contains(whole) { return metric.passing() }
-            let longest = whole.split(separator: " ").map(String.init).filter { $0.count >= 4 }.max { $0.count < $1.count }
-            if let longest, text.contains(longest) { return metric.passing() }
+            let words = whole.split(separator: " ").map(String.init)
+                .filter { $0.count >= 4 && !TextNormalizer.functionWords.contains($0) }
+            if words.contains(where: { text.contains($0) }) { return metric.passing() }
         }
         return metric.failing(rationale: "\(path) names none of \(of) (\(elements))")
     }
@@ -417,6 +419,15 @@ public enum Graders {
 // MARK: - Normalization for item matching
 
 public enum TextNormalizer {
+    /// Words that name nothing on their own (English and Italian), skipped
+    /// when a match on a single word would otherwise count.
+    static let functionWords: Set<String> = [
+        "some", "with", "your", "more", "into", "also", "from", "this", "that", "them", "than", "then",
+        "over", "just", "only", "little", "few", "handful", "piece", "slice", "bit",
+        "della", "delle", "dello", "degli", "alla", "alle", "allo", "agli", "dalla", "come", "anche",
+        "poco", "molto", "qualche", "alcuni", "alcune", "tanto", "tanta", "manciata", "pezzo", "fetta", "filo",
+    ]
+
     /// Lowercased, diacritics folded, leading articles/partitives stripped,
     /// punctuation removed — enough to match "il latte" against "latte".
     public static func normalize(_ text: String) -> String {

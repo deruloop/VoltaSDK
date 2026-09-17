@@ -536,7 +536,8 @@ struct MentionsTests {
             return true
         }
         #expect(grade("Add a few berries for fiber, or nuts for healthy fats."))
-        #expect(grade("Una manciata di frutti di bosco ci sta bene.") == false)
+        #expect(grade("A few nuts would round it off.") == true)
+        #expect(grade("Something with a little more crunch.") == false)
         #expect(grade("A creamy base, now sweetened with promise. What next?") == false)
     }
 }
