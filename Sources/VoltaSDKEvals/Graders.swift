@@ -245,7 +245,7 @@ public enum Graders {
         guard let value else { return metric.failing(rationale: "no parsed JSON") }
         var missing: [String] = []
         for (path, required) in contains.sorted(by: { $0.key < $1.key }) {
-            let items = (JSONPath.value(at: path, in: value)?.arrayValue ?? [])
+            let items = (JSONPath.value(at: path, in: value).map { $0.arrayValue ?? [$0] } ?? [])
                 .map { TextNormalizer.normalize(CarryTemplate.plain($0)) }
             for wanted in required {
                 let needle = TextNormalizer.normalize(wanted)
