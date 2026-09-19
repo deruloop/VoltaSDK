@@ -18,7 +18,7 @@ extension GraderSpec {
     /// Every grader kind the engine knows, in registry order.
     public static let knownKinds: [String] = [
         "json-only", "schema", "required", "forbidden-fields", "expect-fields",
-        "expect-contains", "expect-shape", "language", "forbidden-patterns",
+        "expect-contains", "expect-forbids", "expect-shape", "language", "forbidden-patterns",
         "elements-match", "mentions", "claimed-action", "retention",
     ]
 
@@ -54,6 +54,12 @@ extension GraderSpec {
     /// element (normalized: case-insensitive, articles stripped).
     public static func expectContains(name: String? = nil) -> GraderSpec {
         make("expect-contains", [:], name: name)
+    }
+
+    /// Per-sample `expect.forbids`: nothing at each path matches a listed
+    /// element (same normalization as `expectContains`).
+    public static func expectForbids(name: String? = nil) -> GraderSpec {
+        make("expect-forbids", [:], name: name)
     }
 
     /// Per-sample `expect.shape`: the answer takes the named `anyOf` choice.

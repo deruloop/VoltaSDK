@@ -206,12 +206,17 @@ public struct EvalExpectation: Codable, Sendable, Equatable {
     /// element (normalized: case-insensitive, articles stripped, substring
     /// match either way).
     public var contains: [String: [String]]?
+    /// `path → forbidden elements` — nothing at the path may match any of
+    /// them (same normalization as `contains`). The per-sample complement
+    /// of `contains`: what this sample's answer must leave out.
+    public var forbids: [String: [String]]?
     /// Which `anyOf` choice (by object name) the answer should take.
     public var shape: String?
 
-    public init(fields: [String: [String]]? = nil, contains: [String: [String]]? = nil, shape: String? = nil) {
+    public init(fields: [String: [String]]? = nil, contains: [String: [String]]? = nil, forbids: [String: [String]]? = nil, shape: String? = nil) {
         self.fields = fields
         self.contains = contains
+        self.forbids = forbids
         self.shape = shape
     }
 }

@@ -231,6 +231,7 @@ struct GraderTests {
                 GraderSpec(kind: "required", params: ["paths": ["items:1", "note"]]),
                 GraderSpec(kind: "expect-fields"),
                 GraderSpec(kind: "expect-contains"),
+                GraderSpec(kind: "expect-forbids"),
                 GraderSpec(kind: "expect-shape"),
                 GraderSpec(kind: "forbidden-fields", params: ["paths": ["items"], "name": "no-record-fields"]),
                 GraderSpec(kind: "language", params: ["path": "note"]),
@@ -306,7 +307,20 @@ struct GraderTests {
         }
         #expect(metric("no-record-fields", in: metrics)?.value == .failing)   // by construction: a record HAS items
         #expect(metric("expect-contains", in: metrics)?.value == .ignore)
+        #expect(metric("expect-forbids", in: metrics)?.value == .ignore)
         #expect(metric("retention", in: metrics)?.value == .failing)         // single turn
+    }
+
+    @Test("expect.forbids: the sample's own exclusion, normalized like contains")
+    func expectForbids() {
+        guard #available(iOS 27.0, macOS 27.0, *) else { return }
+        let text = "{\"title\":\"x\",\"items\":[{\"name\":\"Salmone\",\"kind\":\"a\",\"color\":\"#000000\"},{\"name\":\"gli avocado\",\"kind\":\"b\",\"color\":\"#000000\"}],\"states\":{\"a\":\"present\",\"b\":\"light\"},\"note\":\"Un piatto semplice e caldo che sa di casa.\"}"
+        let kept = EvalSample(id: "s", turns: ["x"], expect: EvalExpectation(forbids: ["items[].name": ["noci"], "missing[].name": ["avocado"]]))
+        #expect(metric("expect-forbids", in: Graders.grade(task: task, sample: kept, outcome: outcome([text])))?.value == .passing)
+        let hit = EvalSample(id: "s", turns: ["x"], expect: EvalExpectation(forbids: ["items[].name": ["avocado"]]))
+        let failed = metric("expect-forbids", in: Graders.grade(task: task, sample: hit, outcome: outcome([text])))
+        #expect(failed?.value == .failing)
+        #expect(failed?.rationale?.contains("avocado") == true)
     }
 
     @Test("Numbers and diet words in the note are caught")
@@ -596,7 +610,7 @@ struct TaskFormatTests {
     func typedGraders() throws {
         let typed: [GraderSpec] = [
             .jsonOnly(), .schema(), .required(paths: ["title", "items:1"]),
-            .forbiddenFields(paths: ["items"], name: "no-items"), .expectFields(), .expectContains(), .expectShape(),
+            .forbiddenFields(paths: ["items"], name: "no-items"), .expectFields(), .expectContains(), .expectForbids(), .expectShape(),
             .language(path: "note"), .forbiddenPatterns(path: "note", patterns: ["\\d"]),
             .elementsMatch(path: "ingredients", pattern: "\\d", minFraction: 0.6),
             .mentions(path: "note", of: "completions[].text"),
@@ -606,8 +620,8 @@ struct TaskFormatTests {
         #expect(typed.map(\.kind) == GraderSpec.knownKinds)
         #expect(typed[2] == GraderSpec(kind: "required", params: ["paths": ["title", "items:1"]]))
         #expect(typed[3] == GraderSpec(kind: "forbidden-fields", params: ["paths": ["items"], "name": "no-items"]))
-        #expect(typed[7] == GraderSpec(kind: "language", params: ["path": "note"]))
-        #expect(typed[9] == GraderSpec(kind: "elements-match", params: ["path": "ingredients", "pattern": "\\d", "minFraction": 0.6]))
+        #expect(typed[8] == GraderSpec(kind: "language", params: ["path": "note"]))
+        #expect(typed[10] == GraderSpec(kind: "elements-match", params: ["path": "ingredients", "pattern": "\\d", "minFraction": 0.6]))
         // Round-trip through JSON: the typed form IS the file form.
         let data = try JSONEncoder().encode(typed)
         #expect(try JSONDecoder().decode([GraderSpec].self, from: data) == typed)

@@ -270,6 +270,7 @@
       "forbidden-fields",
       "expect-fields",
       "expect-contains",
+      "expect-forbids",
       "expect-shape",
       "language",
       "forbidden-patterns",
@@ -511,6 +512,16 @@
        }
       },
       "contains": {
+       "type": "object",
+       "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "forbids": {
        "type": "object",
        "additionalProperties": {
         "type": "array",

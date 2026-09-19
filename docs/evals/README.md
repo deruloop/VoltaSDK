@@ -150,6 +150,7 @@ A task file is JSON:
 | `forbidden-fields` | `paths` | none of the paths is present / non-empty |
 | `expect-fields` | (per-sample `expect.fields`) | each path's value is one of the allowed values |
 | `expect-contains` | (per-sample `expect.contains`) | each array contains every required element |
+| `expect-forbids` | (per-sample `expect.forbids`) | nothing at each path matches a listed element; the sample's own exclusion |
 | `expect-shape` | (per-sample `expect.shape`) | the answer takes the named `anyOf` choice |
 | `language` | `path`, `language`, `minWords` | the prose at the path is in the task's language (NLLanguageRecognizer) |
 | `forbidden-patterns` | `path`, `patterns` | no regex matches (case-insensitive) |

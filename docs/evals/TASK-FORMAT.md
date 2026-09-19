@@ -102,6 +102,7 @@ answer; `retention` looks at the first and the last.
 | `forbidden-fields` | `paths` (required) | None of the paths is present or non-empty. | `.forbiddenFields(paths:)` |
 | `expect-fields` | | For samples with `expect.fields`: each path's value is one of the allowed values (case-insensitive). Other samples: ignored. | `.expectFields()` |
 | `expect-contains` | | For samples with `expect.contains`: the array at each path (a string field counts as one element, so a name can be required in an answer) contains every listed element, after normalization (lowercased, accents folded, leading articles stripped, spaces ignored, substring either way). | `.expectContains()` |
+| `expect-forbids` | | For samples with `expect.forbids`: nothing at each path (array elements, or a string field as one element) matches any listed element, same normalization as `expect-contains`. A missing path passes. Other samples: ignored. | `.expectForbids()` |
 | `expect-shape` | | For samples with `expect.shape`: the answer carries the required properties of the named `anyOf` choice. | `.expectShape()` |
 | `language` | `path`, `language` (BCP-47), `minWords` (default 4) | The text at `path` (or the whole reply) is detected as `language` (default: the task's). Texts under `minWords` words are ignored. | `.language(path:)` |
 | `forbidden-patterns` | `path`, `patterns` (array of regex, required) | No pattern matches the text at `path` (or the whole reply). Case-insensitive. | `.forbiddenPatterns(path:patterns:)` |
@@ -186,6 +187,7 @@ is measured before it is trusted; see the README.
 | `turns` | yes | The user's text, one string per turn, as typed in the app. One turn for single-shot tasks. |
 | `expect.fields` | no | path → allowed values. Read by `expect-fields`. |
 | `expect.contains` | no | array path → required elements. Read by `expect-contains`. |
+| `expect.forbids` | no | array path → elements that must not appear. Read by `expect-forbids`. The per-sample complement of `contains`: the food this sample's answer must leave out, when it changes from sample to sample. |
 | `expect.shape` | no | The `anyOf` choice name the answer must take. Read by `expect-shape`. |
 | `canonicalState` | no | Fallback previous answer for the carry template when turn N-1 failed. |
 | `notes` | no | Free text; shown to the judge as context. |

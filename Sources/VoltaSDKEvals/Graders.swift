@@ -135,6 +135,8 @@ public enum Graders {
             return expectFields(metric, sample: sample, value: value)
         case "expect-contains":
             return expectContains(metric, sample: sample, value: value)
+        case "expect-forbids":
+            return expectForbids(metric, sample: sample, value: value)
         case "expect-shape":
             return expectShape(metric, sample: sample, task: task, value: value)
         case "language":
@@ -255,6 +257,28 @@ public enum Graders {
             }
         }
         return missing.isEmpty ? metric.passing() : metric.failing(rationale: missing.joined(separator: "; "))
+    }
+
+    /// Per-sample `expect.forbids`: nothing at each path may match any of
+    /// the listed elements (normalized). A missing path passes: there is
+    /// nothing there to forbid.
+    public static func expectForbids(_ metric: Metric, sample: EvalSample, value: JSONValue?) -> Metric {
+        guard let forbids = sample.expect?.forbids, !forbids.isEmpty else {
+            return metric.ignore(rationale: "no exclusion expectations")
+        }
+        guard let value else { return metric.failing(rationale: "no parsed JSON") }
+        var found: [String] = []
+        for (path, banned) in forbids.sorted(by: { $0.key < $1.key }) {
+            let items = (JSONPath.value(at: path, in: value).map { $0.arrayValue ?? [$0] } ?? [])
+                .map { TextNormalizer.normalize(CarryTemplate.plain($0)) }
+            for unwanted in banned {
+                let needle = TextNormalizer.normalize(unwanted)
+                if let hit = items.first(where: { TextNormalizer.matches($0, needle) }) {
+                    found.append("\(path) has \"\(hit)\" (forbidden: \(unwanted))")
+                }
+            }
+        }
+        return found.isEmpty ? metric.passing() : metric.failing(rationale: found.joined(separator: "; "))
     }
 
     /// Per-sample `expect.shape`: which `anyOf` choice (object name) the
