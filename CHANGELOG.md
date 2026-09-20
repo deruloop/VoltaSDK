@@ -24,6 +24,9 @@ iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
   `respondStructured`). Patterns and array bounds are enforced by the SDK
   validator after the call (Apple's dynamic schemas reject a pattern guide
   at generation time). `MockProvider` gains scripted `structuredAnswers`.
+- **`expect-contains-any` grader** (Sep 20): a sample's `expect.containsAny`
+  maps a path to candidates, one of which must appear, for an answer that may
+  pick any of several right things (one of the foods just named).
 - **`expect-forbids` grader** (Sep 19): the per-sample complement of
   `expect.contains`. A sample's `expect.forbids` maps a path to elements
   that must not appear there (same normalization as `contains`), for

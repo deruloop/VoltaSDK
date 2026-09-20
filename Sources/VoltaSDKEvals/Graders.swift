@@ -137,6 +137,8 @@ public enum Graders {
             return expectContains(metric, sample: sample, value: value)
         case "expect-forbids":
             return expectForbids(metric, sample: sample, value: value)
+        case "expect-contains-any":
+            return expectContainsAny(metric, sample: sample, value: value)
         case "expect-shape":
             return expectShape(metric, sample: sample, task: task, value: value)
         case "language":
@@ -255,6 +257,26 @@ public enum Graders {
                     missing.append("\(path) lacks \"\(wanted)\" (has \(items))")
                 }
             }
+        }
+        return missing.isEmpty ? metric.passing() : metric.failing(rationale: missing.joined(separator: "; "))
+    }
+
+    /// Per-sample `expect.containsAny`: at each path, at least one of the
+    /// listed elements is present (normalized).
+    public static func expectContainsAny(_ metric: Metric, sample: EvalSample, value: JSONValue?) -> Metric {
+        guard let any = sample.expect?.containsAny, !any.isEmpty else {
+            return metric.ignore(rationale: "no any-of expectations")
+        }
+        guard let value else { return metric.failing(rationale: "no parsed JSON") }
+        var missing: [String] = []
+        for (path, candidates) in any.sorted(by: { $0.key < $1.key }) {
+            let items = (JSONPath.value(at: path, in: value).map { $0.arrayValue ?? [$0] } ?? [])
+                .map { TextNormalizer.normalize(CarryTemplate.plain($0)) }
+            let hit = candidates.contains { wanted in
+                let needle = TextNormalizer.normalize(wanted)
+                return items.contains { TextNormalizer.matches($0, needle) }
+            }
+            if !hit { missing.append("\(path) has none of \(candidates) (has \(items))") }
         }
         return missing.isEmpty ? metric.passing() : metric.failing(rationale: missing.joined(separator: "; "))
     }

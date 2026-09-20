@@ -210,13 +210,18 @@ public struct EvalExpectation: Codable, Sendable, Equatable {
     /// them (same normalization as `contains`). The per-sample complement
     /// of `contains`: what this sample's answer must leave out.
     public var forbids: [String: [String]]?
+    /// `path → candidate elements` — at least one of them must appear at the
+    /// path (same normalization as `contains`). For an answer that may pick
+    /// any of several right things (one of the foods just named).
+    public var containsAny: [String: [String]]?
     /// Which `anyOf` choice (by object name) the answer should take.
     public var shape: String?
 
-    public init(fields: [String: [String]]? = nil, contains: [String: [String]]? = nil, forbids: [String: [String]]? = nil, shape: String? = nil) {
+    public init(fields: [String: [String]]? = nil, contains: [String: [String]]? = nil, forbids: [String: [String]]? = nil, containsAny: [String: [String]]? = nil, shape: String? = nil) {
         self.fields = fields
         self.contains = contains
         self.forbids = forbids
+        self.containsAny = containsAny
         self.shape = shape
     }
 }
