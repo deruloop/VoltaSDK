@@ -502,21 +502,36 @@ additive and optional by definition.
 
 ### ModelSelector contract (VoltaSDKUI)
 
+- Two shapes, chosen at init (Sep 2026, user decision: a fallback chain
+  usually has more than one model in play, so the picker must be able to
+  say so): **multiple** (`selections: Binding<Set<ProviderIdentifier>>`,
+  the user switches providers on and off; the set feeds
+  `AIConfiguration.enabledProviders`, which resolution honours and
+  `providerStatuses` deliberately ignores, so a switched-off provider stays
+  listed and can be switched back) and **single**
+  (`selection: Binding<ProviderIdentifier?>`, the original shape). Internally
+  one `Choice` enum carries the binding; rows, header, auto-select and the
+  handler read the committed set through it, so the two shapes never
+  diverge in behaviour.
 - Collapsed-by-default disclosure: resting footprint is one row regardless of
-  provider count. External commits (setting the `selection` binding) collapse
-  and refresh it.
-- **Gate invariant (June 2026 fix):** nothing is ever committed without
-  passing through `onSelection` — including the selector's own initial
-  state. With a nil binding it auto-selects on-device iff available (the
-  only gate-free provider: free, private, no account), running even that
-  through the handler; `.deny`/`.deferred` leave it unselected with no
-  failure message (not a user action). Cloud providers are **never
+  provider count (one name, two names joined, or "N models"). In single mode
+  external commits (setting the binding) collapse and refresh it; in
+  multiple mode the list stays open while the user toggles.
+- **Gate invariant (June 2026 fix, extended Sep 2026):** nothing is ever
+  committed without passing through `onSelection` — including the
+  selector's own initial state. With an empty binding it auto-selects the
+  available gate-free providers (on-device, PCC: free, private, no account),
+  the first one in single mode and all of them in multiple mode, running
+  even that through the handler; `.deny`/`.deferred` leave that provider off
+  with no failure message (not a user action). Cloud providers are **never
   preselected** — a developer preference must not masquerade as a user
-  activation when a subscription/OAuth gate sits behind it. A non-nil
-  initial binding (persisted user choice) is never overridden.
-  `selection == nil` means "no model committed": the app must gate its chat
-  on it or keep gated providers out of the config — the selector cannot
-  stop the orchestrator from resolving them.
+  activation when a subscription/OAuth gate sits behind it. A non-empty
+  initial binding (persisted user choice) is never overridden. Switching a
+  provider off never asks the handler: the gate guards activation, not
+  withdrawal. An empty binding means "no model committed": in multiple mode
+  the chain enforces it (`enabledProviders = []` answers nothing); in single
+  mode the app must gate its chat on it or keep gated providers out of the
+  config — the selector cannot stop the orchestrator from resolving them.
 - `onSelection: (ProviderIdentifier) async -> ModelSelectionResponse` with
   `.activate` / `.deny(message:)` / `.deferred`. `.deferred` is the
   extensibility point: the app presents its own view (paywall, settings,
@@ -569,8 +584,10 @@ macOS (developer | user), tabs (Developer / User) on iOS.
   vendor), shows the vendor's default as a placeholder, and a disclosure
   links to each vendor's model documentation (D15). Keyboard dismisses
   interactively by scrolling everywhere (form and chat).
-- **User side:** the chat on top, the `ModelSelector` below. The chat is
-  **disabled until a model is committed** (the `selection == nil` contract:
+- **User side:** the chat on top, the `ModelSelector` below, in multiple
+  mode by default (a "One model at a time" switch on the developer side
+  flips it to single). The chat is
+  **disabled until a model is committed** (the empty-binding contract:
   without the gate, a fallback preference would let the cloud provider
   answer before ever passing the activation gate). With on-device available
   the selector auto-commits it through the handler, so the chat starts

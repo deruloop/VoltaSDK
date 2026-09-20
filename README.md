@@ -301,36 +301,51 @@ AIPlaygroundView(orchestrator: kit, instructions: "Be concise.")
 
 ### User-side model selector
 
-`ModelSelector` is a drop-in view that lets **your users** choose which model
-to use. Collapsed, it occupies a single row showing the active choice; tapping
-it expands the list of options (it stays compact however many providers
-exist). Options derive from the orchestrator's real state: providers you
-didn't configure never appear; unavailable ones show their reason.
+`ModelSelector` is a drop-in view that lets **your users** decide which
+models may answer. Collapsed, it occupies a single row showing the active
+choice; tapping it expands the list of options (it stays compact however many
+providers exist). Options derive from the orchestrator's real state: providers
+you didn't configure never appear; unavailable ones show their reason.
+
+It comes in two shapes, and you choose at init:
+
+- **Multiple** (`selections: Binding<Set<ProviderIdentifier>>`): the user
+  switches providers on and off, and the set is what the chain may use. This
+  is the shape that matches a fallback chain, where more than one model is
+  in play most of the time: on-device and Private Cloud Compute both on, the
+  cloud model on once the subscription is active. Hand the set to
+  `AIConfiguration.enabledProviders`; resolution then walks only those, in
+  the chain's order, and the others stay listed but never answer.
+- **Single** (`selection: Binding<ProviderIdentifier?>`): one active model,
+  for apps that route everything to the user's pick.
 
 **Initial state — the gate invariant.** Nothing is ever committed without
-passing through `onSelection`. When the `selection` binding starts `nil`, the
-selector auto-selects the best available **gate-free** provider — on-device,
-or **Private Cloud Compute** when on-device is off/unavailable (both free,
-private, no account) — in the chain's preference order, and even that attempt
-runs through your handler. Gated providers (developer-key and user-account
-vendors) are **never preselected**: your configuration preference must not look
-like a user activation when a subscription or OAuth gate sits behind it. When
-no gate-free provider is available, nothing is selected and the row shows
-"Choose a model". A non-`nil` initial binding (e.g. a persisted user choice) is
-never overridden.
+passing through `onSelection`. When the binding starts empty, the selector
+auto-selects the available **gate-free** providers, on-device and **Private
+Cloud Compute** (both free, private, no account): the first one in the
+chain's preference order in single mode, every one of them in multiple mode.
+Even that attempt runs through your handler. Gated providers (developer-key
+and user-account vendors) are **never preselected**: your configuration
+preference must not look like a user activation when a subscription or OAuth
+gate sits behind it. When no gate-free provider is available, nothing is
+selected and the row shows "Choose a model" (or "Choose your models"). A
+non-empty initial binding (e.g. a persisted user choice) is never overridden.
+Switching a provider **off** never asks the handler: the gate guards
+activation, not withdrawal.
 
 The default labels make **no business assumptions** — only you know whether
 the cloud model is "included with Pro", metered, or free. Brand the rows via
 `labels:`.
 
-Selection is a conversation with your app through `onSelection`:
+Activation is a conversation with your app through `onSelection`, the same
+in both shapes:
 
 ```swift
-@State private var userChoice: ProviderIdentifier?
+@State private var enabled: Set<ProviderIdentifier> = []
 
 ModelSelector(
     orchestrator: kit,
-    selection: $userChoice,
+    selections: $enabled,                                   // multiple mode
     labels: [
         .openAI: ModelSelectorLabel(
             title: "Premium cloud model",
@@ -339,29 +354,42 @@ ModelSelector(
         )
     ],
     onSelection: { provider in
-        guard provider != .onDevice else { return .activate }   // immediate
-        if await entitlements.hasActiveSubscription() {
-            return .activate                                    // commit now
+        guard provider != .onDevice, provider != .privateCloudCompute else {
+            return .activate                                // free: immediate
         }
-        showPaywall = true                                      // your own view
-        return .deferred                                        // app takes over
+        if await entitlements.hasActiveSubscription() {
+            return .activate                                // commit now
+        }
+        showPaywall = true                                  // your own view
+        return .deferred                                    // app takes over
     }
 )
+
+// The chain honours the set:
+var config = AIConfiguration()
+config.enabledProviders = enabled     // nil = every configured provider
 ```
+
+For one active model, pass `selection: $userChoice` (a
+`Binding<ProviderIdentifier?>`) instead and lead the chain with the pick
+(`preference`).
 
 - **`.activate`** commits the selection immediately.
 - **`.deny(message:)`** refuses it, with an optional message under the selector.
 - **`.deferred`** hands control to *your* flow — a paywall, a settings screen,
   or any view that gates the choice. When your flow succeeds, commit the
-  choice by setting the `selection` binding; the selector reflects it
-  instantly. Nothing about the gate lives inside the component — it only
-  reacts.
+  choice by setting the binding (insert into the set, or assign the
+  identifier); the selector reflects it instantly. Nothing about the gate
+  lives inside the component — it only reacts.
 
-`selection == nil` therefore means **no model committed yet**. The selector
-can't stop the orchestrator from answering — if your fallback chain contains
-a gated provider, it will serve calls regardless of any UI. Close the loop on
-your side: gate the chat until something is committed (what the demo does),
-or keep the developer key out of the configuration for unentitled users.
+An empty binding therefore means **no model committed yet**. In multiple
+mode the chain closes the loop by itself: an empty `enabledProviders` set
+answers nothing (`noProviderAvailable`), and a switched-off provider never
+serves a call however the fallback is ordered. In single mode the selector
+can't stop the orchestrator: if your fallback chain contains a gated
+provider, it will serve calls regardless of any UI. Close the loop on your
+side: gate the chat until something is committed (what the demo does), or
+keep the developer key out of the configuration for unentitled users.
 
 Design customization: per-provider `labels`, `hidesUnavailable`, standard
 SwiftUI modifiers — and `ModelSelectorRow` is public, so you can rebuild the

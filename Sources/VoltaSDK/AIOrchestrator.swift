@@ -203,6 +203,13 @@ public struct AIConfiguration: Sendable {
     /// tried. `nil` (default) = the chain is ordered by tier heuristics only.
     public var capabilities: MeasuredCapabilities? = nil
 
+    /// The providers the user has switched on, typically the `ModelSelector`'s
+    /// multiple selection. Resolution walks only these, in the chain's order;
+    /// the others stay configured and listed (`providerStatuses`) but never
+    /// answer. `nil` (default) = every configured provider. An empty set means
+    /// nothing may answer: every call fails with `noProviderAvailable`.
+    public var enabledProviders: Set<ProviderIdentifier>? = nil
+
     public init() {}
 }
 
@@ -261,6 +268,8 @@ public actor AIOrchestrator {
     let privacyDisclosure: PrivacyDisclosure
     /// The capability map (D22), if the app supplied one.
     let capabilities: MeasuredCapabilities?
+    /// The user's switched-on providers (`AIConfiguration.enabledProviders`); nil = all.
+    let enabledProviders: Set<ProviderIdentifier>?
     /// Tokens reserved for the response during pre-flight (D13): a call that
     /// exactly fills the window would fail at generation anyway.
     let responseTokenReserve: Int
@@ -272,6 +281,7 @@ public actor AIOrchestrator {
         self.privacyDisclosure = configuration.privacyDisclosure
         self.responseTokenReserve = configuration.maxTokens
         self.capabilities = configuration.capabilities
+        self.enabledProviders = configuration.enabledProviders
     }
 
     /// Direct init with pre-built providers — useful for tests or for
@@ -280,12 +290,14 @@ public actor AIOrchestrator {
         providers: [any ModelProvider],
         privacyDisclosure: PrivacyDisclosure = .log,
         responseTokenReserve: Int = 0,
-        capabilities: MeasuredCapabilities? = nil
+        capabilities: MeasuredCapabilities? = nil,
+        enabledProviders: Set<ProviderIdentifier>? = nil
     ) {
         self.orderedProviders = providers
         self.privacyDisclosure = privacyDisclosure
         self.responseTokenReserve = responseTokenReserve
         self.capabilities = capabilities
+        self.enabledProviders = enabledProviders
     }
 
     // MARK: Optional singleton for convenience
@@ -716,7 +728,7 @@ public actor AIOrchestrator {
         mode: MeasuredCapabilities.Mode = .raw
     ) async -> [ProviderStatus] {
         var result: [ProviderStatus] = []
-        for provider in orderedProviders(for: need, task: task, mode: mode) {
+        for provider in orderedProviders(for: need, task: task, mode: mode, honoringSelection: false) {
             result.append(ProviderStatus(
                 identifier: provider.identifier,
                 privacyLevel: provider.privacyLevel,
@@ -735,12 +747,18 @@ public actor AIOrchestrator {
     /// `.largeContext`, where a larger known context window ranks first
     /// within its tier (unknown windows rank last there: no pre-flight beats
     /// a wrong pre-flight, D13).
-    /// The chain for one call: reordered for the need (D7), then filtered by
-    /// the capability map for the task (D22). A provider that measured
-    /// below the task's floor is dropped for this call — and logged, so a
-    /// tier that never answers a feature is never a silent mystery.
-    func orderedProviders(for need: ModelNeed?, task: TaskRequirement?, mode: MeasuredCapabilities.Mode) -> [any ModelProvider] {
-        let ordered = orderedProviders(for: need)
+    /// The chain for one call: the user's switched-on providers
+    /// (`enabledProviders`, when set), reordered for the need (D7), then
+    /// filtered by the capability map for the task (D22). A provider that
+    /// measured below the task's floor is dropped for this call — and logged,
+    /// so a tier that never answers a feature is never a silent mystery.
+    /// `providerStatuses` passes `honoringSelection: false`: a switched-off
+    /// provider stays listed, so a picker can offer it back.
+    func orderedProviders(for need: ModelNeed?, task: TaskRequirement?, mode: MeasuredCapabilities.Mode, honoringSelection: Bool = true) -> [any ModelProvider] {
+        var ordered = orderedProviders(for: need)
+        if honoringSelection, let enabledProviders {
+            ordered = ordered.filter { enabledProviders.contains($0.identifier) }
+        }
         guard let task, let capabilities else { return ordered }
         return ordered.filter { provider in
             let admitted = task.admits(provider, mode: mode, in: capabilities)

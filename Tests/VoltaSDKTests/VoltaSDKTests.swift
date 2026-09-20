@@ -162,6 +162,34 @@ struct ResolutionTests {
         }
     }
 
+    @Test("enabledProviders: only the user's picks answer; the others stay listed")
+    func enabledProvidersGateResolution() async throws {
+        let providers: [any ModelProvider] = [
+            MockProvider(identifier: .onDevice, outcome: .success("on-device")),
+            MockProvider(identifier: .privateCloudCompute, privacyLevel: .appleCloud, outcome: .success("pcc")),
+            MockProvider(identifier: .openAI, privacyLevel: .external, outcome: .success("openai")),
+        ]
+        // PCC and the developer key switched on, on-device off: PCC answers.
+        let picked = AIOrchestrator(providers: providers, enabledProviders: [.privateCloudCompute, .openAI])
+        #expect(try await picked.respond(to: "hello") == "pcc")
+        #expect(try await picked.resolveProvider().identifier == .privateCloudCompute)
+        // The list still shows all three, so a picker can offer on-device back.
+        #expect(await picked.providerStatuses().map(\.identifier) == [.onDevice, .privateCloudCompute, .openAI])
+        // canServe honours the picks: the on-device-only floor is out of reach.
+        let map = MeasuredCapabilities(measurements: [
+            .init(task: "t", provider: .onDevice, mode: .raw, passRate: 1, samples: 10),
+            .init(task: "t", provider: .privateCloudCompute, mode: .raw, passRate: 0, samples: 10),
+            .init(task: "t", provider: .openAI, mode: .raw, passRate: 0, samples: 10),
+        ])
+        let gated = AIOrchestrator(providers: providers, capabilities: map, enabledProviders: [.privateCloudCompute, .openAI])
+        #expect(await gated.canServe(TaskRequirement("t")) == false)
+        // Nothing switched on: nothing answers. nil: everything does, in order.
+        await #expect(throws: ProviderError.noProviderAvailable) {
+            _ = try await AIOrchestrator(providers: providers, enabledProviders: []).respond(to: "hello")
+        }
+        #expect(try await AIOrchestrator(providers: providers).respond(to: "hello") == "on-device")
+    }
+
     @Test("providerStatuses reports the whole chain in order, with reasons")
     func statusesReportWholeChain() async {
         let kit = AIOrchestrator(providers: [

@@ -370,7 +370,11 @@ available); D18's logging makes any further crossing visible.
    `LanguageModelConvertible` capability (all five built-ins adopt it);
    feedable to `.model(_:)` / `LanguageModelSession(model:)`. Per-need
    overload lands with 7; live Dynamic-Profile validation = Part 3's build.
-9. ~~Model picker component~~ ✅ (June 2026): `ModelSelector` in VoltaSDKUI —
+9. ~~Model picker component~~ ✅ (June 2026; **two shapes Sep 20, 2026**:
+   a multiple mode, `selections: Binding<Set<ProviderIdentifier>>`, whose
+   set feeds the new `AIConfiguration.enabledProviders` and gates
+   resolution but not `providerStatuses`; the single mode stays, the
+   developer chooses): `ModelSelector` in VoltaSDKUI —
    collapsed user-side picker; selection answered by the app with
    `.activate`/`.deny`/`.deferred` (deferred = app-owned flow commits later
    via the binding — the iOS 27 OAuth-page pattern). Gate invariant: nothing

@@ -7,6 +7,19 @@ iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
 
 ## [Unreleased] — quality evaluations (`evaluation` branch)
 
+- **`ModelSelector` in two shapes; `AIConfiguration.enabledProviders`**
+  (Sep 20): the picker now has a **multiple** mode
+  (`selections: Binding<Set<ProviderIdentifier>>`) where the user switches
+  providers on and off, because a fallback chain has more than one model in
+  play most of the time and "on-device or PCC" misstated it. The set feeds
+  the new `enabledProviders`: resolution, `canServe` and `preferred()` walk
+  only the switched-on providers, in the chain's order; `providerStatuses`
+  still lists every configured one, so a switched-off provider can be
+  switched back. The original **single** mode (`selection:`) is unchanged
+  and stays the developer's choice. Auto-select in multiple mode switches on
+  every available gate-free provider (on-device and PCC), each through
+  `onSelection`; switching off never asks the handler. Demo: multiple by
+  default, a "One model at a time" developer switch.
 - **Structured output (D21).** `respondStructured(to:instructions:history:
   schema:need:repair:)` and the typed `respond(to:…schema:as:)` on the
   orchestrator: a vendor-neutral `OutputSchema` (ordered object properties,

@@ -9,9 +9,11 @@
 //     developer key, which user-account vendors to offer, privacy policy).
 //     Nothing takes effect until "Apply configuration" is pressed.
 //   - USER side: the chat on top and the ModelSelector below it — the user
-//     picks a model; free providers activate immediately, gated ones defer to
-//     the app's own flow (a paywall for the developer-key cloud model; a
-//     connect flow for a user-account vendor).
+//     switches models on and off (multiple mode, the default: the switched-on
+//     set is what the chain may use) or picks one (single mode, a developer
+//     switch); free providers activate immediately, gated ones defer to the
+//     app's own flow (a paywall for the developer-key cloud model; a connect
+//     flow for a user-account vendor).
 //
 //  Why the connect flow is key-only (verified live + against vendor policy,
 //  2026): none of the big three permits third-party apps to run
@@ -56,8 +58,21 @@ public struct DemoRootView: View {
     // MARK: User runtime state
     /// Simulated entitlement for the developer-key cloud model (StoreKit stand-in).
     @State private var userHasSubscription = true
-    /// What the end user committed in the ModelSelector.
+    /// The selector's shape: several switches (the chain's reality) or one pick.
+    @State private var singleChoice = false
+    /// What the end user committed in the ModelSelector, per shape.
     @State private var userSelection: ProviderIdentifier?
+    @State private var userSelections: Set<ProviderIdentifier> = []
+
+    /// Whether the user has committed anything, whichever shape is on.
+    private var hasCommittedModel: Bool {
+        singleChoice ? userSelection != nil : !userSelections.isEmpty
+    }
+
+    /// An app flow (paywall, connect) succeeded: commit into the live shape.
+    private func commitFromFlow(_ provider: ProviderIdentifier) {
+        if singleChoice { userSelection = provider } else { userSelections.insert(provider) }
+    }
     /// Keys the user pasted in the connect flow.
     @State private var connectedTokens: [CloudVendor: String] = [:]
 
@@ -137,6 +152,8 @@ public struct DemoRootView: View {
             // The user's committed choice re-leads the chain — a runtime action,
             // built from the last-applied config (not un-applied edits).
             .onChange(of: userSelection) { rebuild() }
+            .onChange(of: userSelections) { rebuild() }
+            .onChange(of: singleChoice) { rebuild() }
     }
 
     // MARK: Per-platform layout
@@ -277,6 +294,14 @@ public struct DemoRootView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section("Model selector") {
+                Toggle("One model at a time", isOn: $singleChoice)
+                Text(singleChoice
+                     ? "Single mode: the user picks one model and the chain leads with it."
+                     : "Multiple mode: the user switches models on and off; only the switched-on ones may answer (AIConfiguration.enabledProviders), in the chain's order.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Section {
                 ProviderStatusList(orchestrator: orchestrator)
             }
@@ -314,11 +339,12 @@ public struct DemoRootView: View {
                 placeholder: "Try a prompt (e.g. \"Plan a weekend in Rome\")",
                 alternateEngine: profileEngine
             )
-            .disabled(userSelection == nil)
-            .opacity(userSelection == nil ? 0.5 : 1)
+            .disabled(!hasCommittedModel)
+            .opacity(hasCommittedModel ? 1 : 0.5)
 
-            if userSelection == nil {
-                Label("Choose a model below to start the conversation",
+            if !hasCommittedModel {
+                Label(singleChoice ? "Choose a model below to start the conversation"
+                                   : "Switch on at least one model below to start the conversation",
                       systemImage: "arrow.down")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -326,42 +352,48 @@ public struct DemoRootView: View {
 
             Divider()
 
-            // The user-side selector. The handler decides per tap: activate,
-            // deny, or defer to a flow the app owns (paywall / connect).
-            ModelSelector(
-                orchestrator: orchestrator,
-                selection: $userSelection,
-                onSelection: { provider in
-                    // On-device and Private Cloud Compute are free — immediate.
-                    guard provider != .onDevice, provider != .privateCloudCompute else {
-                        return .activate
-                    }
-                    // A user account: if the user has already connected it, use
-                    // it; otherwise run the connect flow (their API key) and
-                    // commit when it succeeds.
-                    if provider.rawValue.hasPrefix("user-") {
-                        guard let vendor = CloudVendor.allCases.first(where: {
-                            provider == .userAccount($0)
-                        }) else {
-                            return .deny(message: "Unknown account vendor")
-                        }
-                        if connectedTokens[vendor] != nil { return .activate }
-                        pendingConnectVendor = vendor   // presents the connect sheet
-                        return .deferred
-                    }
-                    // Developer-key cloud model — subscription check (StoreKit
-                    // stand-in). Not entitled → defer to the paywall sheet.
-                    try? await Task.sleep(for: .milliseconds(400))
-                    if userHasSubscription { return .activate }
-                    pendingProvider = provider
-                    showsPaywall = true
-                    return .deferred
-                }
-            )
+            // The user-side selector, in the shape the developer chose. The
+            // handler decides per activation: activate, deny, or defer to a
+            // flow the app owns (paywall / connect).
+            if singleChoice {
+                ModelSelector(orchestrator: orchestrator, selection: $userSelection, onSelection: selectionHandler)
+            } else {
+                ModelSelector(orchestrator: orchestrator, selections: $userSelections, onSelection: selectionHandler)
+            }
         }
         .padding()
         .sheet(isPresented: $showsPaywall) { paywallSheet }
         .sheet(item: $pendingConnectVendor) { vendor in connectSheet(vendor) }
+    }
+
+    /// The activation gate, shared by both shapes of the selector.
+    private var selectionHandler: ModelSelector.SelectionHandler {
+        { provider in
+            // On-device and Private Cloud Compute are free — immediate.
+            guard provider != .onDevice, provider != .privateCloudCompute else {
+                return .activate
+            }
+            // A user account: if the user has already connected it, use
+            // it; otherwise run the connect flow (their API key) and
+            // commit when it succeeds.
+            if provider.rawValue.hasPrefix("user-") {
+                guard let vendor = CloudVendor.allCases.first(where: {
+                    provider == .userAccount($0)
+                }) else {
+                    return .deny(message: "Unknown account vendor")
+                }
+                if connectedTokens[vendor] != nil { return .activate }
+                pendingConnectVendor = vendor   // presents the connect sheet
+                return .deferred
+            }
+            // Developer-key cloud model — subscription check (StoreKit
+            // stand-in). Not entitled → defer to the paywall sheet.
+            try? await Task.sleep(for: .milliseconds(400))
+            if userHasSubscription { return .activate }
+            pendingProvider = provider
+            showsPaywall = true
+            return .deferred
+        }
     }
 
     /// Stand-in for the app's own subscription gate (StoreKit / a paywall).
@@ -380,7 +412,7 @@ public struct DemoRootView: View {
                 .foregroundStyle(.secondary)
             Button("Subscribe") {
                 userHasSubscription = true
-                userSelection = pendingProvider
+                if let pendingProvider { commitFromFlow(pendingProvider) }
                 pendingProvider = nil
                 showsPaywall = false
             }
@@ -424,7 +456,7 @@ public struct DemoRootView: View {
                 guard !token.isEmpty else { return }
                 connectedTokens[vendor] = token
                 rebuild()
-                userSelection = .userAccount(vendor)     // commit the choice
+                commitFromFlow(.userAccount(vendor))     // commit the choice
                 connectKey = ""
                 pendingConnectVendor = nil                // dismisses the sheet
             }
@@ -478,6 +510,9 @@ public struct DemoRootView: View {
             config.customModels = factory(applied.vendorPackageKey)
         }
         config.preference = effectivePreference
+        // Multiple mode: the switched-on set is the chain; the others stay
+        // listed in the selector but never answer.
+        if !singleChoice { config.enabledProviders = userSelections }
         if applied.notifyDowngrades {
             config.privacyDisclosure = .notify { downgrade in
                 Task { @MainActor in
@@ -490,10 +525,11 @@ public struct DemoRootView: View {
         orchestrator = AIOrchestrator(configuration: config)
     }
 
-    /// The user's committed selection leads the chain; on-device order is the
-    /// default until they pick. (Per-provider routing gets richer with the
-    /// per-need chains in the iOS 27 work.)
+    /// Single mode: the user's committed selection leads the chain; on-device
+    /// order is the default until they pick. Multiple mode: the chain keeps
+    /// its configured order and `enabledProviders` does the gating.
     private var effectivePreference: ModelPreference {
+        guard singleChoice else { return .preferOnDevice }
         switch userSelection {
         case .onDevice:
             return .preferOnDevice
