@@ -103,6 +103,10 @@
    "items": {
     "$ref": "#/$defs/sample"
    }
+  },
+  "notes": {
+   "type": "string",
+   "description": "Free-form notes on the dataset as a whole (why it exists, what changed between versions)."
   }
  },
  "$defs": {

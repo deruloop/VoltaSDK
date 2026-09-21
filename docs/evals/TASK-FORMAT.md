@@ -27,6 +27,7 @@ long-context ones at growing page lengths.
 | `graders` | array of grader objects | yes | The rules (section 3). A sample passes only if every grader passes. |
 | `judge` | object | no | Dimensions for a model judge (section 5). |
 | `samples` | array of sample objects | yes | The dataset (section 6). |
+| `notes` | string | no | Free text on the dataset as a whole: why it exists, what changed between versions. Not sent to the model. |
 
 Minimal valid task:
 

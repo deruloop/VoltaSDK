@@ -43,6 +43,8 @@ public struct EvalTask: Codable, Sendable {
     /// measured before it is trusted.
     public var judge: JudgeSpec?
     public var samples: [EvalSample]
+    /// Free-form notes on the dataset as a whole: why it exists, what changed between versions.
+    public var notes: String?
 
     public init(
         id: String,
@@ -54,7 +56,8 @@ public struct EvalTask: Codable, Sendable {
         carry: CarryTemplate? = nil,
         graders: [GraderSpec],
         judge: JudgeSpec? = nil,
-        samples: [EvalSample]
+        samples: [EvalSample],
+        notes: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -66,6 +69,7 @@ public struct EvalTask: Codable, Sendable {
         self.graders = graders
         self.judge = judge
         self.samples = samples
+        self.notes = notes
     }
 
     /// Loads a task file (JSON) and validates it. A malformed file throws
