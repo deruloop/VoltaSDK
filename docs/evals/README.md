@@ -34,22 +34,40 @@ writes the row.
 
 ## Your flow as an adopter
 
+Apple's Evaluations framework needs iOS 27 or macOS 27 and the Xcode 27
+toolchain; on a Mac the on-device tier is the Mac's own Apple Intelligence,
+which stands in for the phone's model until a device run.
+
 1. **Add the product** to your app's test target (`VoltaSDKEvals`, from the
-   same package as `VoltaSDK`).
-2. **Write a task** for each model feature: a JSON file next to your tests
-   (or the same thing in Swift). Copy `EvalTask.examples` to start.
+   same package as `VoltaSDK`). A first run needs no task of your own:
+   `EvalTask.examples` returns the shipped tasks (the files are in
+   `Sources/VoltaSDKEvals/Examples`); run `example.city-facts` against
+   `OnDeviceProvider()` once to see a pass rate and a failure reason come
+   back before writing anything.
+2. **Write a task** for each model feature, and for each language the
+   feature supports (`myapp.meal-record.it`, `myapp.meal-record.en`: the
+   inputs users type in that language, and a `language` grader on the
+   prose fields; a small model answers Italian input in English often
+   enough that one dataset per language is the only way to see it). A JSON
+   file next to your tests, or the same thing in Swift. Copy an example to
+   start.
 3. **Write a test** that runs it against the provider you ship with, in the
-   mode you ship with, and asserts on the pass rate:
+   mode you ship with, and asserts on the pass rate. The task files go into
+   the test target as resources; an Xcode test bundle reads them with
+   `Bundle(for:)` (`Bundle.module` is the SwiftPM form):
 
 ```swift
 import Testing
 import VoltaSDK
 import VoltaSDKEvals
 
-@Suite struct MealRecordEvals {
-    let task = try! EvalTask(contentsOf: Bundle.module.url(forResource: "meal-record", withExtension: "json")!)
+private final class Marker {}
 
-    @Test func onDeviceStructured() async throws {
+@Suite struct MealRecordEvals {
+    let task = try! EvalTask(contentsOf: Bundle(for: Marker.self).url(forResource: "meal-record.it", withExtension: "json")!)
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["MYAPP_EVALS"] == "1"))
+    func onDeviceStructured() async throws {
         guard #available(iOS 27, macOS 27, *) else { return }   // the framework is OS 27+
         let result = try await TaskEvaluation(task: task, provider: OnDeviceProvider(), mode: .structured).run()
         #expect(result.passRate >= 0.6, "\(result.failureReasons)")
@@ -57,12 +75,24 @@ import VoltaSDKEvals
 }
 ```
 
-4. **Run it with Cmd-U** (or `swift test`). A failing test prints the
-   reasons the graders recorded, one per failed sample.
+   These tests call real models, so keep them behind an environment
+   variable that only a dedicated scheme sets (`MYAPP_EVALS=1` above): a
+   plain Cmd-U on the app scheme then never spends a model call or a PCC
+   quota.
+4. **Run it with Cmd-U** on that scheme (or `swift test`). A failing test
+   prints the reasons the graders recorded, one per failed sample.
 5. **Decide from the numbers.** Where the shape fails, switch that call to
    `respondStructured` with the same schema. Where a tier cannot do a
    feature at all, gate it or change the design. Keep a `CapabilityMap`
    if you want the table across tiers (`CapabilityMap.entry(from:evaluation:host:judge:)`).
+
+**Keep the task's instructions the app's.** A dataset measures the prompt
+the app sends only while the two are the same string, and they drift the
+first time the prompt is edited. Either build the `EvalTask` in Swift from
+the app's own constant, or regenerate the JSON from the constants with a
+script before every run; hand-copying was how a morning of measurements
+once ran against a prompt the app no longer sent. Bump `schemaVersion`
+with every change so old rows are not read as current.
 
 Session 298 also shows the Swift Testing trait form,
 `@Test(.evaluates(TaskEvaluation(...)))`; it works the same way, since
@@ -89,13 +119,66 @@ worked on the first client, and the one this library is built around:
    and name the task on each call (`task: TaskRequirement("myapp.meal-record")`);
    the chain skips a provider that measured below the floor for that task
    and mode, and `canServe` answers whether the feature can exist on this
-   device's chain at all. Unmeasured providers are always tried.
+   device's chain at all. Unmeasured providers are always tried. Gating
+   makes refusal an ordinary outcome, so give the refusal a cause: when a
+   call fails, `providerStatuses(task:)` says which providers could carry
+   the task and why each one is unavailable right now (switched off,
+   Apple Intelligence off, quota, network), which is what the person
+   should read instead of a generic error.
 5. **Keep the floors as tests.** One `@Test` per feature per shipped tier,
    asserting the measured pass rate, so a prompt edit or an OS update that
    regresses shows up with reasons attached.
 6. **Measure before wiring.** Every new prompt the app is about to ship gets
    a task and a number first, even a small one. Twenty samples and two
-   minutes on-device are cheaper than a release.
+   minutes on-device are cheaper than a release. Datasets written before
+   the feature can also choose its shape: on the first client, four small
+   tasks measured before any code decided which tier each call goes to,
+   which screen exists because a tier cannot do the job, and which
+   deterministic rule must run before the model is asked.
+7. **A rule before the model, wherever a rule can see the cue.** Routing
+   ("is this a list command, a question, a recipe request") went 0/20 as a
+   branch inside a big prompt and 25/28 as its own one-field call, and
+   then the dedicated call lost to a regex over the same phrasings. Let
+   the model write content in the shape a rule picked; a wrong rule is a
+   unit test, a wrong model reading is a dataset.
+8. **Every clause that adds context gets its own dataset.** A clause the
+   app appends (what is at home, the season, the person's notes) can
+   override the request it was meant to enrich (a named dish became a
+   salad because that was in the pantry). Measure that it does not, with
+   inputs where the clause and the request disagree.
+
+### What a small model does with a prompt (measured)
+
+Each of these cost a run on the on-device model; the larger tiers mostly
+read the prompt as written.
+
+- **Naming a thing primes it.** A sentence of banned words produced the
+  banned words; "do not mention X" produced X in the first line; a
+  language named in the prompt, or a name in the opening words, set the
+  reply's language. State the shape wanted, or move the rule into code.
+- **An example sentence is a spec literal.** It comes back verbatim
+  whatever the input, the same way an enum spec `"a|b|c"` comes back as
+  the value. Say what a field is and how it relates to the others; never
+  show one.
+- **A quotable phrase gets quoted back.** "His name the first word of your
+  answer" returned as "your name the first word of my annoyance". Leave
+  the prefixing to the app.
+- **Two rules pulling against each other break it.** A rule plus its
+  exception in one prompt scored 0/8 in three phrasings while the larger
+  tier held the exception; a persona that bans numbers next to a job that
+  needs them produced hedging. Split the job, or route it.
+- **A description of a voice becomes speech.** A simile written for the
+  model ("talks the way a friend at the gym talks") was said out loud in
+  every reply. Describe the character for the model and add that it never
+  says what it is like.
+- **An opinion clause drops items.** Any wording that let the model
+  disapprove made it leave the disapproved item out of a list it was
+  told to keep. Keep judgement in a prose field and the list unconditional.
+- **Position matters.** A clause crowded at the end of a long prompt was
+  ignored and respected when placed first.
+- **Asking it to pick or keep does worse than a rule.** Asked to pick the
+  in-season items it dropped the rest; asked to keep qualifiers it
+  invented them.
 
 ### Where things live
 
@@ -156,6 +239,7 @@ A task file is JSON:
 | `language` | `path`, `language`, `minWords` | the prose at the path is in the task's language (NLLanguageRecognizer) |
 | `forbidden-patterns` | `path`, `patterns` | no regex matches (case-insensitive) |
 | `elements-match` | `path`, `pattern`, `minFraction` | enough array elements match the regex |
+| `mentions` | `path`, `of`, `all` | the text at `path` names an element of the array at `of` (every element with `all`) |
 | `claimed-action` | `field`, `patterns` | the reply does not claim an action in prose while lacking the action field |
 | `retention` | `keepItems`, `keepStates`, `from`, `notTo` | later turns keep earlier items and states |
 
@@ -274,6 +358,13 @@ land in the host app's Documents; pull them with
 failure rationales, latency, and judge dimensions when a judge ran. Entries
 are upserted, so the map accumulates across machines. The framework's own
 run records (`runs/*.xcevalresult`, transcripts included) stay local.
+
+Read `availabilityRate` before the pass rate. A run that hit the PCC daily
+quota (every call answers `rateLimited` after a few hundred in a day) or a
+phone that locked mid-run reads 0/N with availability under 1: the model
+was never asked, and an upsert would overwrite a clean row with it.
+`scripts/evals-merge.py --min-availability 1` skips such entries; in code,
+check the entry before `CapabilityMap.upsert`.
 
 ## The judge (session 335)
 

@@ -4,11 +4,14 @@ on the Mac, or the iOS bundle on a device) into the capability map, and
 regenerate its Markdown twin.
 
     xcodebuild test ... 2>&1 | tee run.log
-    python3 scripts/evals-merge.py run.log [docs/evals/results/capability-map.json]
+    python3 scripts/evals-merge.py run.log [docs/evals/results/capability-map.json] [--min-availability 1]
 
 Entries replace existing rows with the same (task, tier, mode) key, exactly
-as the engine's own upsert does. The Markdown rendering mirrors
-CapabilityMap.markdown in Tests/VoltaSDKEvals/Engine/CapabilityMap.swift.
+as the engine's own upsert does. `--min-availability` (0 to 1, default 0)
+skips entries whose availability rate is below it: a run that hit the PCC
+daily quota or a locked phone reads 0/N with availability under 1, and
+without the guard it would overwrite a clean row. The Markdown rendering
+mirrors CapabilityMap.markdown in Tests/VoltaSDKEvals/Engine/CapabilityMap.swift.
 """
 import datetime
 import json
@@ -70,12 +73,23 @@ def markdown(doc):
 
 
 def main():
-    log = sys.argv[1]
-    target = sys.argv[2] if len(sys.argv) > 2 else "docs/evals/results/capability-map.json"
+    args = sys.argv[1:]
+    min_availability = 0.0
+    if "--min-availability" in args:
+        at = args.index("--min-availability")
+        min_availability = float(args[at + 1])
+        del args[at:at + 2]
+    log = args[0]
+    target = args[1] if len(args) > 1 else "docs/evals/results/capability-map.json"
     entries = []
     for line in open(log, encoding="utf-8", errors="ignore"):
         if "[evals-entry] " in line:
-            entries.append(json.loads(line.split("[evals-entry] ", 1)[1]))
+            entry = json.loads(line.split("[evals-entry] ", 1)[1])
+            if entry.get("availabilityRate", 1) < min_availability:
+                print("skipped (availability %s):" % percent(entry.get("availabilityRate", 1)),
+                      entry["task"], entry["tier"], entry["mode"])
+                continue
+            entries.append(entry)
     try:
         doc = json.load(open(target))
     except FileNotFoundError:

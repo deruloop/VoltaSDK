@@ -664,9 +664,15 @@ raw prompt with Volta's structured path, so the same task also measures
 what structured output buys on each tier. Graders are
 deterministic rules from a fixed registry; for the rest, a cloud model from
 another vendor can judge, and its agreement with human ratings is measured
-before it is trusted. The flow, the grader registry, the task format, and
-how to reach PCC and real devices are in
-[docs/evals/README.md](docs/evals/README.md).
+before it is trusted. Apple's framework needs iOS 27 / macOS 27 and Xcode 27.
+
+Three documents cover it: the guide,
+[docs/evals/README.md](docs/evals/README.md) (how it works, the adopter's
+flow from first run to a gated chain, what a small model does with a
+prompt, how to reach PCC and a real iPhone); the task reference,
+[docs/evals/TASK-FORMAT.md](docs/evals/TASK-FORMAT.md) (every field and
+grader); and `docs/evals/task.schema.json`, which validates a task file in
+an editor.
 
 ## For framework contributors
 

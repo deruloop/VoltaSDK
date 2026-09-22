@@ -27,6 +27,14 @@ iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
   listing every configured provider. The demo's single mode hands the pick to
   `enabledProviders` as a set of one rather than re-leading the chain through
   `preference`, which had no case for a PCC or user-account pick.
+- **Evaluation guide, Sep 22:** the adopter's flow now starts from the
+  shipped examples, loads tasks with `Bundle(for:)`, keeps real-model tests
+  behind an environment variable, and asks for one dataset per supported
+  language; new sections on keeping a task's instructions the app's, on
+  rules before the model, on context clauses, and "what a small model does
+  with a prompt (measured)"; the registry table lists `mentions`;
+  `scripts/evals-merge.py --min-availability` keeps a quota-spoiled row from
+  overwriting a clean one.
 - **Structured output (D21).** `respondStructured(to:instructions:history:
   schema:need:repair:)` and the typed `respond(to:…schema:as:)` on the
   orchestrator: a vendor-neutral `OutputSchema` (ordered object properties,
