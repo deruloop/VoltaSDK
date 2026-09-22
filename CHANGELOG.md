@@ -20,6 +20,13 @@ iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
   every available gate-free provider (on-device and PCC), each through
   `onSelection`; switching off never asks the handler. Demo: multiple by
   default, a "One model at a time" developer switch.
+  **Sep 22:** `providerStatuses` gains `honoringSelection: Bool = false`;
+  `true` returns the chain a call would actually walk (switched-off providers
+  left out, empty when nothing is on). The playground's "Chain:" preview uses
+  it, so the line under the need picker now matches what answers instead of
+  listing every configured provider. The demo's single mode hands the pick to
+  `enabledProviders` as a set of one rather than re-leading the chain through
+  `preference`, which had no case for a PCC or user-account pick.
 - **Structured output (D21).** `respondStructured(to:instructions:history:
   schema:need:repair:)` and the typed `respond(to:…schema:as:)` on the
   orchestrator: a vendor-neutral `OutputSchema` (ordered object properties,

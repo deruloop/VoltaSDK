@@ -297,7 +297,7 @@ public struct DemoRootView: View {
             Section("Model selector") {
                 Toggle("One model at a time", isOn: $singleChoice)
                 Text(singleChoice
-                     ? "Single mode: the user picks one model and the chain leads with it."
+                     ? "Single mode: the user picks one model and only that one answers (AIConfiguration.enabledProviders, a set of one)."
                      : "Multiple mode: the user switches models on and off; only the switched-on ones may answer (AIConfiguration.enabledProviders), in the chain's order.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -509,10 +509,11 @@ public struct DemoRootView: View {
            let factory = _vendorPackageFactory as? (@Sendable (String) -> [CustomLanguageModel]) {
             config.customModels = factory(applied.vendorPackageKey)
         }
-        config.preference = effectivePreference
-        // Multiple mode: the switched-on set is the chain; the others stay
-        // listed in the selector but never answer.
-        if !singleChoice { config.enabledProviders = userSelections }
+        // The user's commitment gates the chain in both shapes: the switched-on
+        // set in multiple mode, a set of one in single mode ("one model at a
+        // time" means exactly that). The others stay listed in the selector
+        // but never answer; nothing committed yet = nothing answers.
+        config.enabledProviders = singleChoice ? userSelection.map { [$0] } ?? [] : userSelections
         if applied.notifyDowngrades {
             config.privacyDisclosure = .notify { downgrade in
                 Task { @MainActor in
@@ -523,20 +524,5 @@ public struct DemoRootView: View {
             }
         }
         orchestrator = AIOrchestrator(configuration: config)
-    }
-
-    /// Single mode: the user's committed selection leads the chain; on-device
-    /// order is the default until they pick. Multiple mode: the chain keeps
-    /// its configured order and `enabledProviders` does the gating.
-    private var effectivePreference: ModelPreference {
-        guard singleChoice else { return .preferOnDevice }
-        switch userSelection {
-        case .onDevice:
-            return .preferOnDevice
-        case .openAI, .anthropic, .gemini:
-            return .preferDeveloperKey
-        default:
-            return .preferOnDevice
-        }
     }
 }

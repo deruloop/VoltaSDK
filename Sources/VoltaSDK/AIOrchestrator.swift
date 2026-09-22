@@ -722,13 +722,18 @@ public actor AIOrchestrator {
     /// ones, with the reason). Designed for picker/diagnostic UIs. Pass a
     /// `need` to see the chain in the order that need would walk it (D7) —
     /// the "what would happen" preview counterpart of `respond(need:)`.
+    /// By default the list ignores `enabledProviders`, so a picker can show
+    /// a switched-off provider and offer it back; pass
+    /// `honoringSelection: true` for the chain a call would actually walk
+    /// (the switched-off ones left out, empty when nothing is switched on).
     public func providerStatuses(
         for need: ModelNeed? = nil,
         task: TaskRequirement? = nil,
-        mode: MeasuredCapabilities.Mode = .raw
+        mode: MeasuredCapabilities.Mode = .raw,
+        honoringSelection: Bool = false
     ) async -> [ProviderStatus] {
         var result: [ProviderStatus] = []
-        for provider in orderedProviders(for: need, task: task, mode: mode, honoringSelection: false) {
+        for provider in orderedProviders(for: need, task: task, mode: mode, honoringSelection: honoringSelection) {
             result.append(ProviderStatus(
                 identifier: provider.identifier,
                 privacyLevel: provider.privacyLevel,

@@ -240,9 +240,15 @@ public struct AIPlaygroundView: View {
     }
 
     /// Recomputed when the need or the orchestrator changes, and after each
-    /// exchange (availability can shift between turns — quota, keys).
+    /// exchange (availability can shift between turns — quota, keys). This is
+    /// the chain the next call walks: switched-off providers
+    /// (`enabledProviders`) are left out, unlike the picker's full list.
     private func refreshChainPreview() async {
-        let statuses = await orchestrator.providerStatuses(for: need)
+        let statuses = await orchestrator.providerStatuses(for: need, honoringSelection: true)
+        guard !statuses.isEmpty else {
+            chainPreview = "nothing switched on"
+            return
+        }
         chainPreview = statuses
             .map { status in
                 if case .available = status.availability {

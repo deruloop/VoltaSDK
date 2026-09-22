@@ -173,8 +173,11 @@ struct ResolutionTests {
         let picked = AIOrchestrator(providers: providers, enabledProviders: [.privateCloudCompute, .openAI])
         #expect(try await picked.respond(to: "hello") == "pcc")
         #expect(try await picked.resolveProvider().identifier == .privateCloudCompute)
-        // The list still shows all three, so a picker can offer on-device back.
+        // The list still shows all three, so a picker can offer on-device back;
+        // a chain preview asks for the call's own walk instead.
         #expect(await picked.providerStatuses().map(\.identifier) == [.onDevice, .privateCloudCompute, .openAI])
+        #expect(await picked.providerStatuses(honoringSelection: true).map(\.identifier) == [.privateCloudCompute, .openAI])
+        #expect(await AIOrchestrator(providers: providers, enabledProviders: []).providerStatuses(honoringSelection: true).isEmpty)
         // canServe honours the picks: the on-device-only floor is out of reach.
         let map = MeasuredCapabilities(measurements: [
             .init(task: "t", provider: .onDevice, mode: .raw, passRate: 1, samples: 10),

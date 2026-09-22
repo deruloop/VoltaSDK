@@ -167,7 +167,9 @@ and then external with larger known context windows first, and keep on-device
 as the final fallback. The token pre-flight still guards every window, so a
 need can never send a call somewhere it doesn't fit, and every provider stays
 reachable. `providerStatuses(for: need)` previews the reordered chain without
-executing anything (the demo shows it live under its need picker).
+executing anything; with `honoringSelection: true` it is the chain the call
+would actually walk, switched-off providers left out (the demo shows that
+live under its need picker).
 
 ### 4. Multi-turn conversations
 
@@ -371,8 +373,8 @@ config.enabledProviders = enabled     // nil = every configured provider
 ```
 
 For one active model, pass `selection: $userChoice` (a
-`Binding<ProviderIdentifier?>`) instead and lead the chain with the pick
-(`preference`).
+`Binding<ProviderIdentifier?>`) instead and hand the pick to the chain as a
+set of one (`config.enabledProviders = userChoice.map { [$0] } ?? []`).
 
 - **`.activate`** commits the selection immediately.
 - **`.deny(message:)`** refuses it, with an optional message under the selector.
@@ -382,14 +384,15 @@ For one active model, pass `selection: $userChoice` (a
   identifier); the selector reflects it instantly. Nothing about the gate
   lives inside the component — it only reacts.
 
-An empty binding therefore means **no model committed yet**. In multiple
-mode the chain closes the loop by itself: an empty `enabledProviders` set
-answers nothing (`noProviderAvailable`), and a switched-off provider never
-serves a call however the fallback is ordered. In single mode the selector
-can't stop the orchestrator: if your fallback chain contains a gated
-provider, it will serve calls regardless of any UI. Close the loop on your
-side: gate the chat until something is committed (what the demo does), or
-keep the developer key out of the configuration for unentitled users.
+An empty binding therefore means **no model committed yet**, and
+`enabledProviders` closes the loop in both shapes: an empty set answers
+nothing (`noProviderAvailable`), and a provider outside the set never serves
+a call however the fallback is ordered. In single mode hand it a set of one
+(`[pick]`, what the demo does), so the pick is the only model that answers
+and a gated provider in the chain never serves a call the user did not
+commit to. If you would rather keep the fallback under a single pick, leave
+`enabledProviders` nil, gate the chat until something is committed, and keep
+the developer key out of the configuration for unentitled users.
 
 Design customization: per-provider `labels`, `hidesUnavailable`, standard
 SwiftUI modifiers — and `ModelSelectorRow` is public, so you can rebuild the
@@ -611,12 +614,14 @@ The demo mirrors a real integration's two roles: a **Developer** side
 **User** side (the chat with the `ModelSelector` underneath) — so you can see
 the result of any configuration × user-preference combination, including the
 activation gate rejecting the cloud model when the simulated subscription is
-off. The chat stays disabled until a model is committed — the
-`selection == nil` contract that keeps gated providers from answering before
-activation.
+off. The selector is in multiple mode by default, with a "One model at a
+time" developer switch for the single shape; in both, the committed choice
+goes to `enabledProviders`, and the chat stays disabled until something is
+committed.
 
 The chat itself demonstrates the whole iOS 27 story. A need picker with a
-live preview of the reordered chain, and a driver switch between "VoltaSDK
+live preview of the chain the switched-on models form for that need, and a
+driver switch between "VoltaSDK
 chain" (the SDK drives, with fallback and privacy gates) and "Dynamic
 Profile" (Apple drives a native profile fed by `preferred()`), with the same
 conversation surviving the switch mid-thread.

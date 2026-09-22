@@ -475,7 +475,7 @@ indirect enum OutputSchema { object(name:description:properties:), string(descri
 indirect enum JSONValue { null, bool, number, string, array, object; init(parsing:); serialized(); decode<T>(); extractObject(from:) }
 await kit.contextUsage(instructions:history:) -> ContextUsage?  // window pressure (D13)
 await kit.availableProviders() -> [ProviderIdentifier]
-await kit.providerStatuses(for: need) -> [ProviderStatus]       // for UI; need previews D7 order
+await kit.providerStatuses(for: need, honoringSelection:) -> [ProviderStatus] // for UI; need previews D7 order; honoringSelection = the call's own walk
 
 // extension points
 protocol ModelProvider { identifier; privacyLevel; availability(); respond(to:instructions:history:);
@@ -507,9 +507,14 @@ additive and optional by definition.
   say so): **multiple** (`selections: Binding<Set<ProviderIdentifier>>`,
   the user switches providers on and off; the set feeds
   `AIConfiguration.enabledProviders`, which resolution honours and
-  `providerStatuses` deliberately ignores, so a switched-off provider stays
-  listed and can be switched back) and **single**
-  (`selection: Binding<ProviderIdentifier?>`, the original shape). Internally
+  `providerStatuses` ignores by default, so a switched-off provider stays
+  listed and can be switched back; `honoringSelection: true` returns the
+  call's own walk, which is what the playground's chain preview shows, Sep
+  22) and **single** (`selection: Binding<ProviderIdentifier?>`, the
+  original shape; the demo hands it to `enabledProviders` as a set of one,
+  so both shapes gate the chain through one mechanism and a PCC or
+  user-account pick is honoured too, which the old `preference` re-lead
+  could not express). Internally
   one `Choice` enum carries the binding; rows, header, auto-select and the
   handler read the committed set through it, so the two shapes never
   diverge in behaviour.

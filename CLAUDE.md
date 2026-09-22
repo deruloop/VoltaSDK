@@ -373,7 +373,10 @@ available); D18's logging makes any further crossing visible.
 9. ~~Model picker component~~ ✅ (June 2026; **two shapes Sep 20, 2026**:
    a multiple mode, `selections: Binding<Set<ProviderIdentifier>>`, whose
    set feeds the new `AIConfiguration.enabledProviders` and gates
-   resolution but not `providerStatuses`; the single mode stays, the
+   resolution but not `providerStatuses` (unless asked with
+   `honoringSelection: true`, Sep 22, which is what the playground's chain
+   preview shows; the demo's single mode gates through the same set, as a
+   set of one); the single mode stays, the
    developer chooses): `ModelSelector` in VoltaSDKUI —
    collapsed user-side picker; selection answered by the app with
    `.activate`/`.deny`/`.deferred` (deferred = app-owned flow commits later
