@@ -7,6 +7,8 @@ iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
 
 ## [Unreleased] — quality evaluations (`evaluation` branch)
 
+- Graders: `expect-contains`, `expect-contains-any`, `expect-forbids` and the retention check match at word boundaries (a needle may end inside a word, never start inside one). Before, spaces were stripped and any substring counted, so a forbidden "pears" fired on "appears". Rows measured earlier under the looser rule may differ by a sample.
+
 - **`ModelSelector` in two shapes; `AIConfiguration.enabledProviders`**
   (Sep 20): the picker now has a **multiple** mode
   (`selections: Binding<Set<ProviderIdentifier>>`) where the user switches

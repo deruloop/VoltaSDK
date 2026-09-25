@@ -496,9 +496,21 @@ public enum TextNormalizer {
     /// Whether two normalized strings name the same thing: one contains the
     /// other, ignoring spaces ("lady fingers" ~ "ladyfingers", "peanut
     /// butter" ~ "burro d'arachidi" is NOT matched — no translation here).
-    static func matches(_ a: String, _ b: String) -> Bool {
+    /// Either normalized string occurs in the other, starting at a word boundary. A needle may
+    /// end inside a word, so a stem still matches ("stagion" in "stagione"), but it never
+    /// starts inside one: "pears" no longer matches "appears", which cost an honest remark a
+    /// forbids check.
+    public static func matches(_ a: String, _ b: String) -> Bool {
         guard !a.isEmpty, !b.isEmpty else { return false }
-        let x = a.replacingOccurrences(of: " ", with: ""), y = b.replacingOccurrences(of: " ", with: "")
-        return x.contains(y) || y.contains(x)
+        return startsAWord(b, in: a) || startsAWord(a, in: b)
+    }
+
+    private static func startsAWord(_ needle: String, in text: String) -> Bool {
+        var from = text.startIndex
+        while from < text.endIndex, let found = text.range(of: needle, range: from..<text.endIndex) {
+            if found.lowerBound == text.startIndex || text[text.index(before: found.lowerBound)] == " " { return true }
+            from = text.index(after: found.lowerBound)
+        }
+        return false
     }
 }

@@ -729,3 +729,14 @@ struct HandoffTests {
         #expect(lengths.first! < 2100 && lengths.last! > 16000)
     }
 }
+
+@Suite("Grader text matching")
+struct GraderMatchingTests {
+    @Test func aNeedleStartsAtAWordBoundaryAndMayEndInsideOne() {
+        #expect(TextNormalizer.matches("stagione", "stagion"))          // a stem
+        #expect(TextNormalizer.matches("figs are good", "figs"))
+        #expect(TextNormalizer.matches("fichi", "fichi e zucca"))          // either way round
+        #expect(!TextNormalizer.matches("dairy staple appears thrice", "pears"))
+        #expect(!TextNormalizer.matches("", "pears"))
+    }
+}
