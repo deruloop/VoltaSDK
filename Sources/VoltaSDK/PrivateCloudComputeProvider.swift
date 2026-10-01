@@ -31,9 +31,10 @@ import Security
 /// PCC entitlement (a wrong "yes" traps at the first call; a wrong "no"
 /// silently skips a free tier).
 public enum PrivateCloudComputeEntitlement: Sendable, Equatable {
-    /// Read it from the code signature (macOS) or the embedded provisioning
-    /// profile (iOS development/ad-hoc/enterprise builds). App Store builds
-    /// on iOS have no profile to read and resolve to "absent".
+    /// Read it from the code signature: `SecTask` on macOS, the signed
+    /// entitlements embedded in the executable on iOS (every signed build,
+    /// App Store included); the embedded provisioning profile only when the
+    /// executable carries no readable entitlements at all.
     case detect
     /// The app is signed with the entitlement (the App Store case on iOS).
     case granted
@@ -121,13 +122,15 @@ public struct PrivateCloudComputeProvider: ModelProvider {
     /// - macOS: the binary's own entitlements via `SecTask` (public API, no
     ///   special permission).
     /// - iOS: `SecTask` is not in the public SDK (found the hard way — the
-    ///   package did not compile for a physical iPhone until Sep 2026), so the
-    ///   embedded provisioning profile is read instead: development, ad-hoc,
-    ///   and enterprise builds carry `embedded.mobileprovision`, whose
-    ///   `Entitlements` dictionary lists the capability. App Store builds
-    ///   carry no profile, so `.detect` yields false there; an app that ships
-    ///   with the entitlement passes `.granted` via
-    ///   `AIConfiguration.privateCloudComputeEntitlement`.
+    ///   package did not compile for a physical iPhone until Sep 2026). The
+    ///   signed entitlements are read out of the executable instead: the code
+    ///   signature embeds them as an XML plist, in every signed build, App
+    ///   Store builds included. Only when the executable carries no readable
+    ///   entitlements at all is the embedded provisioning profile consulted
+    ///   (development, ad-hoc and enterprise builds carry one). The profile
+    ///   alone is not trusted: it says what the App ID MAY carry, and a build
+    ///   signed without the key while the profile grants it trapped at the
+    ///   first call (an adopter's regenerated project, Oct 1, 2026).
     public static func hasRequiredEntitlement() -> Bool {
         #if os(macOS)
         guard let task = SecTaskCreateFromSelf(nil) else { return false }
@@ -135,8 +138,40 @@ public struct PrivateCloudComputeProvider: ModelProvider {
         if let flag = value as? Bool { return flag }
         return value != nil
         #else
+        if let signed = signedEntitlementsGrantEntitlement() { return signed }
         return provisioningProfileGrantsEntitlement()
         #endif
+    }
+
+    /// Whether the executable's code signature carries the entitlement set to
+    /// true; nil when no signed entitlements can be read (no executable, or a
+    /// signature with no XML entitlements blob), so the caller can fall back.
+    static func signedEntitlementsGrantEntitlement() -> Bool? {
+        guard let url = Bundle.main.executableURL,
+              let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return nil }
+        return signedEntitlements(in: data, grant: requiredEntitlement)
+    }
+
+    /// Scans a signed Mach-O image for its XML entitlements and reads one key.
+    /// The signature's entitlements blob is the plist as text, so the key
+    /// appears as `<key>NAME</key>` followed by `<true/>`. Returns nil when
+    /// the image has no entitlements plist at all (`application-identifier`,
+    /// which every signed iOS app carries, is the sentinel), false when the
+    /// plist is there and the key is not true.
+    static func signedEntitlements(in data: Data, grant key: String) -> Bool? {
+        // Built at run time so the needles are not themselves string literals in the image.
+        let open = String(["<", "k", "e", "y", ">"]), close = String(["<", "/", "k", "e", "y", ">"])
+        let sentinel = Data((open + "application-identifier" + close).utf8)
+        guard data.range(of: sentinel) != nil else { return nil }
+        let needle = Data((open + key + close).utf8)
+        var search = data.startIndex
+        while let found = data.range(of: needle, in: search..<data.endIndex) {
+            let tail = data[found.upperBound..<min(found.upperBound + 32, data.endIndex)]
+            let text = String(decoding: tail, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+            if text.hasPrefix(String(["<", "t", "r", "u", "e", "/", ">"])) { return true }
+            search = found.upperBound
+        }
+        return false
     }
 
     /// Reads `embedded.mobileprovision` (a CMS envelope around a plist; the

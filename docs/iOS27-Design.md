@@ -412,11 +412,16 @@ exercised by a working harness.
 - **Two SDK bugs the real iPhone surfaced (Sep 15, 2026).** (1) The PCC
   provider's `SecTask` entitlement self-check is macOS-only, so the package
   had NOT compiled for a physical iOS device since the provider shipped
-  (simulator and macOS builds never noticed). iOS now reads the embedded
-  provisioning profile (`embedded.mobileprovision` → `Entitlements`), which
-  development/ad-hoc/enterprise builds carry; App Store builds carry none,
-  hence the explicit `AIConfiguration.privateCloudComputeEntitlement`
-  (`.detect`/`.granted`/`.absent`). (2) On iOS 27 the SYSTEM model throws
+  (simulator and macOS builds never noticed). iOS first read the embedded
+  provisioning profile (`embedded.mobileprovision` → `Entitlements`); since
+  Oct 1, 2026 it reads the signed entitlements out of the executable (the
+  code signature embeds them as an XML plist in every signed build, App
+  Store included) and keeps the profile only as a fallback when the
+  executable has no readable entitlements. The profile alone was wrong in
+  both directions: it grants what the App ID may carry, so a build signed
+  without the key (Raviolo's regenerated project) passed the check and
+  trapped at the first PCC call; and App Store builds carry no profile, so
+  `.detect` resolved to absent there. `.granted` stays as an override. (2) On iOS 27 the SYSTEM model throws
   the framework-wide `LanguageModelError` too, not only
   `GenerationError`: a hosted test run with the phone locked got
   `.rateLimited` ("background request") on every call after the first,

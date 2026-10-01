@@ -7,6 +7,8 @@ iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
 
 ## [Unreleased] — quality evaluations (`evaluation` branch)
 
+- **PCC entitlement detection on iOS reads the code signature** (Oct 1): the signed entitlements are read out of the executable, in every signed build, App Store included; the embedded provisioning profile is only a fallback when the executable has no readable entitlements. Before, the profile was the only source on iOS: a build signed without the key while the profile granted it (a regenerated Xcode project) passed the check and trapped at the first call, and an App Store build, which carries no profile, resolved to "absent" unless the app said `.granted`.
+
 - Graders: `expect-contains`, `expect-contains-any`, `expect-forbids` and the retention check match at word boundaries (a needle may end inside a word, never start inside one). Before, spaces were stripped and any substring counted, so a forbidden "pears" fired on "appears". Rows measured earlier under the looser rule may differ by a sample.
 
 - **`ModelSelector` in two shapes; `AIConfiguration.enabledProviders`**

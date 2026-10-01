@@ -414,15 +414,14 @@ configuration but **costs you nothing to leave on**:
   simply falls back to on-device (or your developer key). **Nothing crashes,
   and adopting VoltaSDK never forces you to request anything from Apple.** Set
   `enablePrivateCloudCompute = false` if you'd rather it not appear at all.
-- **How detection works, and the one case where you must say so.** On macOS
-  Volta reads the entitlement from the code signature. On iOS it reads the
-  embedded provisioning profile, which development, ad-hoc, and enterprise
-  builds carry; **an App Store build carries no profile**, so a shipping app
-  that has the capability must set
-  `config.privateCloudComputeEntitlement = .granted` (default `.detect`;
-  `.absent` switches PCC off for the process). Saying `.granted` without the
-  entitlement traps at the first call, so keep it tied to your release
-  configuration.
+- **How detection works.** On macOS Volta reads the entitlement from the
+  code signature. On iOS it reads the signed entitlements embedded in the
+  executable, which every signed build carries, App Store builds included,
+  and only falls back to the embedded provisioning profile when the
+  executable has no readable entitlements. The default `.detect` therefore
+  needs no help from you; `.granted` forces it and `.absent` switches PCC
+  off for the process. Saying `.granted` without the entitlement traps at
+  the first call, so leave detection on unless you know better.
 - **To actually use PCC, you must enable a capability — and that is on you,
   the developer, not your users.** PCC requires the
   `com.apple.developer.private-cloud-compute` entitlement, which Apple assigns

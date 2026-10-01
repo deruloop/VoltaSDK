@@ -591,6 +591,44 @@ struct CloudVendorTests {
 
 @Suite("Private Cloud Compute (iOS 27)")
 struct PrivateCloudComputeTests {
+    /// A signed image's entitlements plist, as the code signature embeds it (text inside the binary).
+    private func image(entitlements: String) -> Data {
+        var data = Data(repeating: 0xCF, count: 64)
+        data.append(Data("""
+        <?xml version="1.0" encoding="UTF-8"?>
+        <plist version="1.0"><dict>
+        \t<key>application-identifier</key>
+        \t<string>TEAM.dev.example.app</string>
+        \(entitlements)
+        </dict></plist>
+        """.utf8))
+        data.append(Data(repeating: 0x00, count: 64))
+        return data
+    }
+
+    @available(iOS 27.0, macOS 27.0, *)
+    @Test("Signed entitlements: granted when the key is true in the image")
+    func signedEntitlementTrue() {
+        let data = image(entitlements: "\t<key>com.apple.developer.private-cloud-compute</key>\n\t<true/>")
+        #expect(PrivateCloudComputeProvider.signedEntitlements(in: data, grant: PrivateCloudComputeProvider.requiredEntitlement) == true)
+    }
+
+    @available(iOS 27.0, macOS 27.0, *)
+    @Test("Signed entitlements: absent when the plist is there without the key, or with it false")
+    func signedEntitlementAbsent() {
+        let without = image(entitlements: "\t<key>com.apple.security.application-groups</key>\n\t<array><string>group.x</string></array>")
+        #expect(PrivateCloudComputeProvider.signedEntitlements(in: without, grant: PrivateCloudComputeProvider.requiredEntitlement) == false)
+        let falsed = image(entitlements: "\t<key>com.apple.developer.private-cloud-compute</key>\n\t<false/>")
+        #expect(PrivateCloudComputeProvider.signedEntitlements(in: falsed, grant: PrivateCloudComputeProvider.requiredEntitlement) == false)
+    }
+
+    @available(iOS 27.0, macOS 27.0, *)
+    @Test("Signed entitlements: unknown when the image carries no entitlements plist")
+    func signedEntitlementUnknown() {
+        let bare = Data("no plist here, only a mention of com.apple.developer.private-cloud-compute as a string".utf8)
+        #expect(PrivateCloudComputeProvider.signedEntitlements(in: bare, grant: PrivateCloudComputeProvider.requiredEntitlement) == nil)
+    }
+
 
     @Test("Disabling PCC keeps it out of the chain, regardless of OS")
     func disabledMeansNoProvider() {
