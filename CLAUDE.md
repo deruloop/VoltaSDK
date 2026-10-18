@@ -95,6 +95,9 @@ questions doc into the design doc; release → CHANGELOG + state here.
   ("Missing package product"); both demo `.xcodeproj` are hand-patched to use
   `XCLocalSwiftPackageReference` and are the source of truth — re-apply that fix
   if you regenerate.
+- **1.1.1 RELEASED (Oct 18, 2026): MIT license added** (docs-only patch on
+  `main`, prompted by an adopter asking to use the SDK in their app). Merged
+  forward into `evaluation`.
 - **1.1.0 RELEASED (Sep 14, 2026): the package floor drops to iOS 18 /
   macOS 15 (D19).** The cloud tier (developer key + user keys via the new
   `UserAccountRESTProvider`), streaming, needs, disclosure, and the UI kit
