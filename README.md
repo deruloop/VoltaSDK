@@ -60,7 +60,7 @@ UI.
 Add Local… → select the package folder. Note: a local dependency always uses
 the working copy; version tags don't apply.
 
-The latest released version is **1.1.0** (see [CHANGELOG.md](CHANGELOG.md)):
+The latest released version is **1.1.1** (see [CHANGELOG.md](CHANGELOG.md)):
 the complete feature set including the iOS 27 tier, installable from
 iOS 18 / macOS 15. Projects pinned to Xcode 26.4 should use **0.3.5**, the
 last release that builds there.
@@ -684,3 +684,9 @@ Internal documentation lives in `docs/`:
   Profiles bridge, and the evaluation engine are implemented.
 - [docs/iOS27-OpenQuestions.md](docs/iOS27-OpenQuestions.md) — the remaining
   open questions for the iOS 27 work.
+
+## License
+
+VoltaSDK is released under the [MIT License](LICENSE). Use it freely in
+commercial and open-source apps; the only requirement is keeping the
+copyright notice with the code.

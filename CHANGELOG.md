@@ -141,6 +141,11 @@ iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
 - **Evaluations harness (D20, first contact).** The mock-backed smoke
   evaluation that proved the framework links and runs in a plain SPM test
   target.
+## [1.1.1] — 2026-10-18 — docs-only: MIT license
+
+- **The package now carries a license: MIT** (`LICENSE` at the root, plus a
+  License section in the README). Requested by an adopter; nothing else
+  changes. Adopters resolving `from: "1.0.0"` pick this up automatically.
 
 ## [1.1.0] — 2026-09-14 — installs from iOS 18
 
