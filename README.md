@@ -47,7 +47,7 @@ independent. The on-device model needs a device with Apple Intelligence
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/deruloop/VoltaSDK.git", from: "1.0.0")
+    .package(url: "https://github.com/deruloop/VoltaSDK.git", from: "1.2.0")
 ]
 ```
 
@@ -60,7 +60,7 @@ UI.
 Add Local… → select the package folder. Note: a local dependency always uses
 the working copy; version tags don't apply.
 
-The latest released version is **1.1.1** (see [CHANGELOG.md](CHANGELOG.md)):
+The latest released version is **1.2.0** (see [CHANGELOG.md](CHANGELOG.md)):
 the complete feature set including the iOS 27 tier, installable from
 iOS 18 / macOS 15. Projects pinned to Xcode 26.4 should use **0.3.5**, the
 last release that builds there.

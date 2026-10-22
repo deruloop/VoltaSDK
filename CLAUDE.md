@@ -95,10 +95,15 @@ questions doc into the design doc; release → CHANGELOG + state here.
   ("Missing package product"); both demo `.xcodeproj` are hand-patched to use
   `XCLocalSwiftPackageReference` and are the source of truth — re-apply that fix
   if you regenerate.
-- **`evaluation` branch (Sep 14, 2026, unreleased): D21 structured output +
-  the D20 evaluation engine + the first capability map.** See roadmap item
-  11 for the numbers; `docs/evals/README.md` for the manual. 120 tests (92 +
-  28) green. Toolchain: beta 27A5237l at `~/Downloads/Xcode-beta.app`.
+- **1.2.0 RELEASED (Oct 22, 2026): the `evaluation` branch merged into
+  `main`.** D21 structured output, the D20 evaluation engine
+  (`VoltaSDKEvals`) and the first capability map, D22 runtime gating,
+  `enabledProviders` and the two-shape `ModelSelector`, and the iOS PCC
+  entitlement fix (1.0.0 through 1.1.1 did not compile for iOS because of
+  `SecTask`). 140 tests (100 + 40) green on Xcode 27.0 (27A266a); iOS
+  device and simulator builds verified. See roadmap item 11 for the numbers;
+  `docs/evals/README.md` for the manual. During development the branch ran
+  on beta 27A5237l at `~/Downloads/Xcode-beta.app`.
   Both demo projects now carry hosted eval bundles and are regenerated with
   `xcodegen generate` + `Examples/patch-local-package.py` (the hand-patch is
   scripted; the PCC entitlement stays a local `--entitlements` flag).
@@ -393,7 +398,7 @@ available); D18's logging makes any further crossing visible.
     Gemini `ListModels`): once a key is entered, populate a model picker for
     the developer instead of a free-text field. Complements D15.
 11. **Evaluations — ENGINE BUILT + FIRST CAPABILITY MAP (Sep 14, 2026,
-    `evaluation` branch, D20/D21).** **Sep 15: the engine became the
+    `evaluation` branch, D20/D21; released in 1.2.0, Oct 22, 2026).** **Sep 15: the engine became the
     `VoltaSDKEvals` LIBRARY product** (adopters import it from their test
     target: `EvalTask` JSON/Swift, `TaskEvaluation(task:provider:mode:)`,
     `result.passRate`/`failureReasons`; SDK tests in

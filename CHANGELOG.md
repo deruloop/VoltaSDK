@@ -5,7 +5,11 @@ All notable changes to this package. Versioning: [SemVer](https://semver.org).
 evolve the API. **1.0.0 will mark the complete feature set**, including the
 iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
 
-## [Unreleased] — quality evaluations (`evaluation` branch)
+## [1.2.0] — 2026-10-22 — structured output, the evaluation engine, iOS builds fixed
+
+Additive release: no existing API changes. 1.0.0 through 1.1.1 did not
+compile for iOS (the PCC entitlement check used the macOS-only `SecTask`);
+1.2.0 is the first 1.x release that builds for an iPhone or the simulator.
 
 - **PCC entitlement detection on iOS reads the code signature** (Oct 1): the signed entitlements are read out of the executable, in every signed build, App Store included; the embedded provisioning profile is only a fallback when the executable has no readable entitlements. Before, the profile was the only source on iOS: a build signed without the key while the profile granted it (a regenerated Xcode project) passed the check and trapped at the first call, and an App Store build, which carries no profile, resolved to "absent" unless the app said `.granted`.
 
@@ -124,10 +128,11 @@ iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
   `DecodingError`.
 - **Fixed: the package did not compile for a physical iPhone** since the
   PCC provider shipped — its entitlement self-check used `SecTask`, which is
-  macOS-only. On iOS the check now reads the embedded provisioning profile
-  (development / ad-hoc / enterprise builds); App Store builds carry no
-  profile, so the new `AIConfiguration.privateCloudComputeEntitlement`
-  (`.detect` default, `.granted`, `.absent`) lets a shipping app state it.
+  macOS-only. On iOS the check reads the entitlements signed into the
+  executable, with the embedded provisioning profile as a fallback (see the
+  PCC entry at the top of this release). The new
+  `AIConfiguration.privateCloudComputeEntitlement` (`.detect` default,
+  `.granted`, `.absent`) lets an app state it instead.
   `PrivateCloudComputeProvider.hasRequiredEntitlement()` is now public.
 - **Fixed: on-device rate limiting surfaced as a terminal generation
   error.** On iOS 27 the system model throws the framework-wide
