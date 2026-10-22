@@ -1,9 +1,11 @@
 # Changelog
 
 All notable changes to this package. Versioning: [SemVer](https://semver.org).
-**Pre-1.0 policy:** VoltaSDK is in active development — 0.x minor versions may
-evolve the API. **1.0.0 will mark the complete feature set**, including the
-iOS 27 extension (multi-provider, PCC, Dynamic Profiles bridge).
+The 1.x line is the complete feature set, including the iOS 27 extension
+(multi-provider, PCC, Dynamic Profiles bridge) and the evaluation engine;
+minor versions add, patch versions fix, and nothing shipped changes shape
+without a major version. The 0.x line (0.1.0 to 0.3.5) was the iOS 26 base,
+and 0.3.5 remains the release for projects pinned to Xcode 26.4.
 
 ## [1.2.0] — 2026-10-22 — structured output, the evaluation engine, iOS builds fixed
 
